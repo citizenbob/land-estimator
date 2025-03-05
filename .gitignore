@@ -25,7 +25,10 @@
 # misc
 .DS_Store
 *.pem
+<<<<<<< HEAD
 logs/
+=======
+>>>>>>> 1c5df74 (Initial commit from Create Next App)
 
 # debug
 npm-debug.log*
