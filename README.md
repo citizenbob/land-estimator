@@ -39,4 +39,8 @@ This project is publicly viewable for transparency and discussion but is **not o
 - **All contributions are owned by Good Citizens Corporation.**  
 
 This project is licensed under the **Business Source License 1.1 (BUSL-1.1)**.  
+<<<<<<< HEAD
 For details, see the [LICENSE](./LICENSE) file.
+=======
+For details, see the [LICENSE](./LICENSE) file.
+>>>>>>> ce96b00 ("docs: update README with project details and licensing")
