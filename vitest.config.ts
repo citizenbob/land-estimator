@@ -1,37 +1,33 @@
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-
 import { defineConfig } from 'vitest/config';
 
-import { storybookTest } from '@storybook/experimental-addon-test/vitest-plugin';
+const dirname = path.dirname(fileURLToPath(import.meta.url));
 
-const dirname =
-  typeof __dirname !== 'undefined'
-    ? __dirname
-    : path.dirname(fileURLToPath(import.meta.url));
-
-// More info at: https://storybook.js.org/docs/writing-tests/test-addon
 export default defineConfig({
-  test: {
-    workspace: [
-      {
-        extends: true,
-        plugins: [
-          // The plugin will run tests for the stories defined in your Storybook config
-          // See options at: https://storybook.js.org/docs/writing-tests/test-addon#storybooktest
-          storybookTest({ configDir: path.join(dirname, '.storybook') }),
-        ],
-        test: {
-          name: 'storybook',
-          browser: {
-            enabled: true,
-            headless: true,
-            name: 'chromium',
-            provider: 'playwright',
-          },
-          setupFiles: ['.storybook/vitest.setup.ts'],
-        },
-      },
-    ],
+  resolve: {
+    alias: {
+      '@': path.resolve(dirname, 'src'),
+      '@app': path.resolve(dirname, 'src/app'),
+      '@components': path.resolve(dirname, 'src/components'),
+      '@config': path.resolve(dirname, 'src/config'),
+      '@hooks': path.resolve(dirname, 'src/hooks'),
+      '@lib': path.resolve(dirname, 'src/lib'),
+      '@services': path.resolve(dirname, 'src/services'),
+      '@store': path.resolve(dirname, 'src/store'),
+      '@tokens': path.resolve(dirname, 'src/tokens'),
+      '@types': path.resolve(dirname, 'src/types')
+    }
   },
+
+  test: {
+    name: 'unit',
+    globals: true,
+    environment: 'jsdom',
+    setupFiles: ['./src/vitest.setup.ts'],
+    include: ['src/**/*.test.ts', 'src/**/*.test.tsx'],
+    exclude: ['src/**/*.stories.tsx']
+  },
+
+  plugins: []
 });

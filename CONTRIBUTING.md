@@ -13,6 +13,7 @@ Thank you for your interest in contributing to the Landscape Estimator project. 
 - [Code Style](#code-style)
 - [Design System](#design-system)
   - [Design Tokens](#design-tokens)
+  - [Theme Provider](#theme-provider)
   - [Styled Components](#styled-components)
   - [Accessibility](#accessibility)
   - [Storybook](#storybook)
@@ -106,7 +107,7 @@ Our project uses ESLint and Prettier to enforce consistent code style across the
 - **Quotes:** Use single quotes in JavaScript.
 - **Trailing Commas:** Enforced in multi-line structures.
 - **Bracket Placement:** Same-line (1TBS) for readability.
-- **Import Aliases:** Configured in our TypeScript setup to map `@app/*` to the root of `./src` and additional aliases such as `@components/*`, `@config/*`, `@hooks/*`, `@lib/*`, `@store/*`, and `@types/*` to their respective subdirectories.
+- **Import Aliases:** Configured in our TypeScript setup to map `@app/_` to the root of `./src` and additional aliases such as `@components/_`, `@config/_`, `@hooks/_`, `@lib/_`, `@store/_`, and `@types/\*` to their respective subdirectories.
 - **Comments:** Inline comments in code are disallowed; please use commit messages and GitHub discussions for context.
 
 ## Design System
@@ -115,137 +116,170 @@ Our design system defines the look and feel of the application. It provides a si
 
 ### Design Tokens
 
-To ensure that our design tokens (defined in `defaultTheme`) are available across all components, we use a `<Theme Provider />` from styled-components. Because React's context (which is used by `ThemeProvider`) only works in `Client Components`, we isolate the theme provisioning in a dedicated client component. This setup keeps our global design tokens centralized while maintaining optimal performance with Next.js server components.
+Our design tokens are now managed using [Style Dictionary](https://amzn.github.io/style-dictionary/), a tool that helps transform and format design tokens for different platforms. We use a `tokens.json` file as the single source of truth for our design tokens, which include colors, spacing, border radii, fonts, and more. Style Dictionary processes this file and generates a `tokens.css` file containing CSS custom properties. These properties are then imported globally, allowing all components in the project to access consistent design values without relying on a separate JSON theme file.
 
-#### Client Theme Provider
+#### Style Dictionary
 
-We create a client-only component named `ClientThemeProvider` that wraps its children with the ThemeProvider. This component is marked with `"use client"` to ensure it is treated as a client component:
+The configuration for Style Dictionary is defined in a `style-dictionary.config.js` file. This file specifies the input token file (`tokens.json`), the output formats (e.g., CSS, SCSS, JSON), and any custom transformations or formats we use. Here's an example configuration:
+
+```javascript
+const StyleDictionary = require('style-dictionary');
+
+module.exports = {
+  source: ['tokens.json'],
+  platforms: {
+    css: {
+      transformGroup: 'css',
+      buildPath: 'tokens/',
+      files: [
+        {
+          destination: 'tokens.css',
+          format: 'css/variables'
+        }
+      ]
+    }
+  }
+};
+
+StyleDictionary.extend(module.exports).buildAllPlatforms();
+```
+
+### Theme Provider
+
+Our design tokens are provided through CSS variables defined in `tokens.css`. Instead of using a JSON-based theme object, we now utilize a `getThemeClass` function to dynamically apply theme-specific CSS classes. The `ClientThemeProvider` ensures that the appropriate theme is applied on the client side. Here’s the updated implementation:
 
 ```tsx
 // src/app/ClientThemeProvider.tsx
 'use client';
 
 import React from 'react';
-import { ThemeProvider } from 'styled-components';
-import defaultTheme from './default_theme';
+import { getThemeClass, Theme } from '@tokens/theme';
+import '../tokens/tokens.css'; // Import the generated tokens
 
 interface ClientThemeProviderProps {
   children: React.ReactNode;
+  theme?: Theme;
 }
 
 export default function ClientThemeProvider({
   children,
+  theme = 'default'
 }: ClientThemeProviderProps) {
-  return <ThemeProvider theme={defaultTheme}>{children}</ThemeProvider>;
+  return <div className={getThemeClass(theme)}>{children}</div>;
 }
 ```
 
 #### Layout Integration
 
-In our root layout (`src/app/layout.tsx`), we import and use the `<ClientThemeProvider />` to provide the theme context to the entire application. This way, all styled-components can access our centralized design tokens. This approach makes it easier to update our design tokens or theme settings in one place, and those changes automatically propagate throughout the app.
+In our root layout, we use the `ClientThemeProvider` to ensure that the CSS custom properties from `tokens.css` are available throughout the app. Additionally, we dynamically apply the theme class using the `getThemeClass` function. Here’s the updated implementation:
 
 ```tsx
 // src/app/layout.tsx
+import React from 'react';
 import type { Metadata } from 'next';
 import { Geist, Geist_Mono } from 'next/font/google';
 import './globals.css';
-import ClientThemeProvider from './ClientThemeProvider';
+import { getThemeClass } from '@tokens/theme';
+import Analytics from '@components/PageAnalytics/PageAnalytics';
+
+const geistSans = Geist({
+  variable: '--font-geist-sans',
+  subsets: ['latin']
+});
+
+const geistMono = Geist_Mono({
+  variable: '--font-geist-mono',
+  subsets: ['latin']
+});
 
 export const metadata: Metadata = {
-  title: 'Create Next App',
-  description: 'Generated by create next app',
+  title: 'Land Estimator',
+  description: 'Generated by create next app'
 };
 
 export default function RootLayout({
-  children,
+  children
 }: {
   children: React.ReactNode;
 }) {
-  const geistSans = Geist({
-    variable: '--font-geist-sans',
-    subsets: ['latin'],
-  });
-  const geistMono = Geist_Mono({
-    variable: '--font-geist-mono',
-    subsets: ['latin'],
-  });
-
+  const clientTheme = 'default';
+  if (typeof window === 'undefined') {
+    return (
+      <html lang="en" className={getThemeClass(clientTheme)}>
+        <head></head>
+        <body
+          className={`${geistSans.variable} ${geistMono.variable} antialiased`}
+        >
+          <Analytics />
+          {children}
+        </body>
+      </html>
+    );
+  }
   return (
-    <html lang="en">
+    <html lang="en" className={getThemeClass(clientTheme)}>
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
-        <ClientThemeProvider>{children}</ClientThemeProvider>
+        <Analytics />
+        {children}
       </body>
     </html>
   );
 }
 ```
 
+#### Theme Utility
+
+The `getThemeClass` function maps theme names to their corresponding CSS class names. This utility ensures that the correct theme is applied consistently across the application.
+
+```tsx
+// tokens/theme.ts
+export type Theme = 'default' | 'clientA' | 'clientB';
+
+const themeMap: Record<Theme, string> = {
+  default: 'theme-default',
+  clientA: 'theme-client-a',
+  clientB: 'theme-client-b'
+};
+
+export function getThemeClass(theme: Theme): string {
+  return themeMap[theme] || themeMap.default;
+}
+```
+
+This approach provides flexibility for managing multiple themes while maintaining a clean and scalable structure.
+
 ### Styled Components
 
-This file defines the styled components for the `<AddressInput />` component. Each component (`Form`, `Input`, and `Button`) uses the `.attrs()` method to automatically apply a set of Tailwind utility `classNames`.
+Our styled components remain consistent with our design system. Each component utilizes the design tokens defined in `tokens.css` for colors, spacing, and typography.
 
 #### Example: AddressInput.styles.ts
 
-// src/components/AddressInput/AddressInput.styles.ts
-
 ```tsx
+// src/components/AddressInput/AddressInput.styles.ts
 import styled from 'styled-components';
 
 export const Form = styled.form.attrs(() => ({
-  className: 'flex flex-col gap-2 p-4 border rounded-md shadow-sm',
+  className: 'flex flex-col gap-2 p-4 border rounded-md shadow-sm'
 }))``;
 
 export const Input = styled.input.attrs(() => ({
   className:
-    'px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring focus:border-blue-300',
+    'px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring focus:border-blue-300'
 }))``;
 
 export const Button = styled.button.attrs(() => ({
   className:
-    'px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600 transition-colors',
+    'px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600 transition-colors'
 }))``;
 ```
 
-#### Example: AddressInput.tsx
+### Future Plans
 
-This file demonstrates how to import and use the styled components defined in `AddressInput.styles.ts`. The `<AddressInput />` component manages its own state and uses these styled components for layout and styling.
+We aim to move towards a shared, version-controlled repository for the `tokens.json` file. This will allow multiple projects to consume the same design tokens, ensuring consistency across applications. Additionally, we plan to integrate this repository with Storybook to automatically generate and update stories that showcase the design tokens in use.
 
-```tsx
-// src/components/AddressInput/AddressInput.tsx
-'use client';
-
-import React, { useState } from 'react';
-import { Form, Input, Button } from './AddressInput.styles';
-
-interface AddressInputProps {
-  onSubmit: (address: string) => void;
-}
-
-const AddressInput: React.FC<AddressInputProps> = ({ onSubmit }) => {
-  const [address, setAddress] = useState('');
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    onSubmit(address);
-  };
-
-  return (
-    <Form onSubmit={handleSubmit}>
-      <Input
-        type="text"
-        placeholder="Enter address"
-        value={address}
-        onChange={(e) => setAddress(e.target.value)}
-      />
-      <Button type="submit">Submit</Button>
-    </Form>
-  );
-};
-
-export default AddressInput;
-```
+For more details on Style Dictionary, refer to the [official documentation](https://amzn.github.io/style-dictionary/).
 
 ### Accessibility
 

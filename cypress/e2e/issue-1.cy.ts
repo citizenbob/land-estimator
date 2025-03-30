@@ -1,54 +1,143 @@
+/// <reference types="cypress" />
+export {};
+
+declare global {
+  interface Window {
+    logEvent: {
+      (event: { eventName: string; data: Record<string, unknown> }): void;
+      (eventName: string, data: Record<string, unknown>): void;
+    };
+  }
+}
+
 describe('Enter Address & Receive Instant Estimate', () => {
   beforeEach(() => {
-    // Visit the home page where the Address Input component is rendered
-    cy.visit('/');
+    cy.intercept(
+      'GET',
+      'https://nominatim.openstreetmap.org/search?*',
+      (req) => {
+        req.reply({
+          statusCode: 200,
+          body: [
+            {
+              lat: '33.123',
+              lon: '-111.123',
+              display_name:
+                '2323, East Highland Avenue, Biltmore, Phoenix, Maricopa County, Arizona, 85016, United States',
+              address: {
+                house_number: '2323',
+                road: 'East Highland Avenue',
+                neighborhood: 'Biltmore',
+                city: 'Phoenix',
+                county: 'Maricopa County',
+                state: 'Arizona',
+                postcode: '85016',
+                country: 'United States'
+              }
+            }
+          ]
+        });
+      }
+    ).as('getNominatimSuggestions');
+
+    cy.visit('/', {
+      onBeforeLoad(win) {
+        win.logEvent = () => {};
+      }
+    }).then((win) => {
+      cy.stub(win, 'logEvent').as('logEventSpy');
+    });
   });
 
-  it('displays the address input field and a submit button', () => {
-    // Verify that the input field and submit button exist
-    cy.get('input[placeholder="Enter address"]').should('exist');
-    cy.contains('button', 'Submit').should('exist');
+  it('fetches address suggestions as user types', () => {
+    cy.get('input[placeholder="Enter address"]')
+      .clear()
+      .type('2323 E Highland Ave');
+    cy.wait('@getNominatimSuggestions');
+    cy.get('ul', { timeout: 5000 }).should(
+      'contain.text',
+      '2323, East Highland Avenue, Biltmore, Phoenix, Maricopa County, Arizona, 85016, United States'
+    );
   });
 
-  // it('submits a valid address and receives an instant estimate', () => {
-  //   // Stub the API call that would return the estimate
-  //   // Adjust the URL and response as needed based on your implementation
-  //   cy.intercept('POST', '/api/estimate', {
-  //     statusCode: 200,
-  //     body: { estimate: '$250,000' },
-  //   }).as('getEstimate');
+  it('handles API failures gracefully', () => {
+    cy.intercept('GET', 'https://nominatim.openstreetmap.org/search?*', {
+      statusCode: 500
+    }).as('getNominatimSuggestionsFail');
 
-  //   // Simulate user entering an address
-  //   const testAddress = '123 Main St';
-  //   cy.get('input[placeholder="Enter address"]').type(testAddress);
+    cy.get('input[placeholder="Enter address"]')
+      .clear()
+      .type('2323 E Highland Ave');
+    cy.wait('@getNominatimSuggestionsFail');
+    cy.get('ul').should('not.exist');
+    cy.get('[role="alert"]').should(
+      'contain.text',
+      'Error fetching suggestions'
+    );
+  });
 
-  //   // Simulate clicking the submit button
-  //   cy.contains('button', 'Submit').click();
+  it('clears suggestions when input is empty', () => {
+    cy.get('input[placeholder="Enter address"]')
+      .clear()
+      .type('2323 E Highland Ave');
+    cy.wait('@getNominatimSuggestions');
+    cy.get('ul', { timeout: 5000 }).should(
+      'contain.text',
+      '2323, East Highland Avenue, Biltmore, Phoenix, Maricopa County, Arizona, 85016, United States'
+    );
+    cy.get('input[placeholder="Enter address"]').clear();
+    cy.wait(600);
+    cy.get('ul').should('not.exist');
+  });
 
-  //   // Wait for the API call and check for a successful response
-  //   cy.wait('@getEstimate').its('response.statusCode').should('eq', 200);
+  it('selects a suggestion and logs the suggestion event', () => {
+    cy.get('input[placeholder="Enter address"]')
+      .clear()
+      .type('2323 E Highland Ave');
+    cy.wait('@getNominatimSuggestions');
+    cy.contains(
+      'ul li',
+      '2323, East Highland Avenue, Biltmore, Phoenix, Maricopa County, Arizona, 85016, United States'
+    )
+      .should('be.visible')
+      .click();
+    cy.get('input[placeholder="Enter address"]').should(
+      'have.value',
+      '2323, East Highland Avenue, Biltmore, Phoenix, Maricopa County, Arizona, 85016, United States'
+    );
+    cy.get('@logEventSpy').should('have.been.calledWith', {
+      eventName: 'Address Matched',
+      data: {
+        address:
+          '2323, East Highland Avenue, Biltmore, Phoenix, Maricopa County, Arizona, 85016, United States',
+        confirmedIntent: false
+      }
+    });
+  });
 
-  //   // Verify that the instant estimate is displayed on the page
-  //   cy.contains('250,000').should('exist');
-  // });
-
-  // it('handles invalid addresses gracefully', () => {
-  //   // Optionally, stub an API error response for invalid addresses
-  //   cy.intercept('POST', '/api/estimate', {
-  //     statusCode: 400,
-  //     body: { error: 'Invalid address' },
-  //   }).as('invalidEstimate');
-
-  //   // Simulate entering an invalid address
-  //   cy.get('input[placeholder="Enter address"]').clear().type('!!!???');
-
-  //   // Simulate clicking submit
-  //   cy.contains('button', 'Submit').click();
-
-  //   // Wait for the API call and verify error handling
-  //   cy.wait('@invalidEstimate').its('response.statusCode').should('eq', 400);
-
-  //   // Verify that an error message is shown
-  //   cy.contains('Invalid address').should('exist');
-  // });
+  it('logs the intent to buy when "Get Instant Estimate" is clicked', () => {
+    cy.get('input[placeholder="Enter address"]')
+      .clear()
+      .type('2323 E Highland Ave');
+    cy.wait('@getNominatimSuggestions');
+    cy.contains(
+      'ul li',
+      '2323, East Highland Avenue, Biltmore, Phoenix, Maricopa County, Arizona, 85016, United States'
+    )
+      .should('be.visible')
+      .click();
+    cy.get('@logEventSpy').invoke('resetHistory');
+    cy.get('button')
+      .contains(/get instant estimate/i)
+      .should('be.visible')
+      .click();
+    cy.get('@logEventSpy').should('have.been.calledWith', {
+      eventName: 'Request Estimate',
+      data: {
+        address:
+          '2323, East Highland Avenue, Biltmore, Phoenix, Maricopa County, Arizona, 85016, United States',
+        confirmedIntent: true
+      }
+    });
+  });
 });

@@ -46,4 +46,21 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 
-*storybook.log
+# Storybook
+/.storybook-cache
+/storybook-static
+.storybook/*
+
+# Cypress
+/cypress/videos/
+/cypress/screenshots/
+
+# CI/CD
+/dist/
+/.turbo/
+
+# Editor and OS files
+.vscode/
+.idea/
+
+*storybook.log*
