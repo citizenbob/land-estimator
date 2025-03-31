@@ -10,7 +10,8 @@
     "lint": "next lint",
     "e2e": "cypress open",
     "test": "vitest --watch",
-    "test:ci": "vitest run --watch && cypress open",
+    "test:watch": "vitest run --watch && cypress open",
+    "test:ci": "vitest run && cypress run",
     "storybook": "storybook dev -p 6006",
     "build-storybook": "storybook build",
     "build-tokens": "npx style-dictionary build --config ./style-dictionary.config.mjs"
