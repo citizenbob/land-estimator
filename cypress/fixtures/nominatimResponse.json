@@ -1,0 +1,19 @@
+[
+  {
+    "place_id": 365107046,
+    "licence": "Data © OpenStreetMap contributors, ODbL 1.0.",
+    "osm_type": "way",
+    "osm_id": 436773192,
+    "lat": "33.50561036734694",
+    "lon": "-112.03175836734694",
+    "display_name": "1600 Amphitheatre Parkway, Mountain View, CA",
+    "address": {
+      "road": "Amphitheatre Parkway",
+      "city": "Mountain View",
+      "state": "California",
+      "postcode": "94043",
+      "country": "United States",
+      "country_code": "us"
+    }
+  }
+]

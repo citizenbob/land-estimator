@@ -1,0 +1,82 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches:
+      - main # Production deployment
+      - dev # Development branch deployments
+      - preview # Preview branch deployments
+  pull_request:
+    branches:
+      - main # Run tests for PRs targeting the main branch
+
+jobs:
+  build-and-test:
+    name: Build, Lint, and Run Tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v3
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+
+      - name: Install Dependencies
+        run: yarn install
+
+      - name: Build Design Tokens
+        run: yarn build-tokens
+
+<<<<<<< HEAD
+      - name: Start Environment
+        run: yarn start
+=======
+      - name: Build Application
+        run: yarn build
+>>>>>>> 41dcbb5 (chore(ci): add GitHub Actions workflow for CI/CD [#1])
+
+      - name: Lint Code
+        run: yarn lint
+
+      - name: Run Unit and E2E Tests
+        run: yarn test:ci
+
+      - name: Build Storybook
+        run: storybook build
+
+<<<<<<< HEAD
+      - name: Build Application
+        run: yarn build
+
+=======
+>>>>>>> 41dcbb5 (chore(ci): add GitHub Actions workflow for CI/CD [#1])
+  deploy:
+    name: Deploy to Vercel
+    runs-on: ubuntu-latest
+    needs: build-and-test
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v3
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+
+      - name: Install Vercel CLI
+        run: npm install -g vercel
+
+      - name: Deploy Application
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }} # Optional: set this if you store it in GitHub Secrets
+        run: |
+          if [ "${{ github.ref }}" = "refs/heads/main" ]; then
+            echo "Deploying production build..."
+            vercel --prod --confirm --project $VERCEL_PROJECT_ID
+          else
+            echo "Deploying preview build..."
+            vercel --confirm --project $VERCEL_PROJECT_ID
+          fi
