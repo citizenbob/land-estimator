@@ -18,7 +18,7 @@ export async function logEvent({
   }
 
   try {
-    await addDoc(collection(db, 'analyticsEvents'), {
+    await addDoc(collection(db, 'landscapeEstimates'), {
       eventName,
       data,
       timestamp: new Date().toISOString()

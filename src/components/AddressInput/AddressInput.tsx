@@ -2,6 +2,12 @@
 
 import React, { useRef } from 'react';
 import { useAddressLookup } from '@hooks/useAddressLookup';
+// Define the Suggestion type locally if it's not exported from the module
+type Suggestion = {
+  displayName: string;
+  label?: string;
+  [key: string]: unknown;
+};
 import {
   Form,
   Input,
@@ -78,7 +84,6 @@ interface AddressInputProps {
 
 const AddressInput = ({ mockLookup }: AddressInputProps) => {
   const defaultLookup = useAddressLookup();
-  // Merge the default hook with any overrides.
   const {
     query,
     suggestions,
@@ -90,19 +95,32 @@ const AddressInput = ({ mockLookup }: AddressInputProps) => {
   } = { ...defaultLookup, ...mockLookup };
 
   const inputRef = useRef<HTMLInputElement>(null);
+  const selectedSuggestion = useRef<Suggestion | null>(null);
 
   const onSelect = (address: string) => {
     handleSelect(address);
+    const matchedSuggestion = suggestions.find(
+      (s) => s.displayName === address
+    );
+    selectedSuggestion.current = matchedSuggestion || null;
     logEvent({
       eventName: 'Address Matched',
-      data: { address, confirmedIntent: false }
+      data: {
+        ...matchedSuggestion,
+        confirmedIntent: false
+      }
     });
   };
 
   const onEstimateClick = () => {
+    const matched = selectedSuggestion.current;
+    if (!matched) return;
     logEvent({
       eventName: 'Request Estimate',
-      data: { address: query, confirmedIntent: true }
+      data: {
+        ...matched,
+        confirmedIntent: true
+      }
     });
   };
 

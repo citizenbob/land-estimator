@@ -1,4 +1,3 @@
-// src/components/AddressInput/AddressInput.test.tsx
 import React from 'react';
 import userEvent from '@testing-library/user-event';
 import {
@@ -336,7 +335,11 @@ describe('AddressInput Component (Nominatim API)', () => {
     expect(logEvent).toHaveBeenCalledWith({
       eventName: 'Address Matched',
       data: {
-        address: '1600 Amphitheatre Parkway, Mountain View, CA',
+        displayName: '1600 Amphitheatre Parkway, Mountain View, CA',
+        label: '1600 Amphitheatre Parkway',
+        latitude: '37.422',
+        longitude: '-122.084',
+        value: '1',
         confirmedIntent: false
       }
     });
@@ -458,10 +461,14 @@ describe('AddressInput Component (Nominatim API)', () => {
     });
     expect(mockLogEvent).toHaveBeenCalledWith({
       eventName: 'Request Estimate',
-      data: {
-        address: '1600 Amphitheatre Parkway, Mountain View, CA',
-        confirmedIntent: true
-      }
+      data: expect.objectContaining({
+        confirmedIntent: true,
+        displayName: expect.any(String),
+        label: expect.any(String),
+        latitude: expect.any(String),
+        longitude: expect.any(String),
+        value: expect.any(String)
+      })
     });
   });
 });
