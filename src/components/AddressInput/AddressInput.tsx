@@ -93,16 +93,26 @@ const AddressInput = ({ mockLookup }: AddressInputProps) => {
 
   const onSelect = (address: string) => {
     handleSelect(address);
+    const matchedSuggestion = suggestions.find(
+      (s) => s.displayName === address
+    );
     logEvent({
       eventName: 'Address Matched',
-      data: { address, confirmedIntent: false }
+      data: {
+        ...matchedSuggestion,
+        confirmedIntent: false
+      }
     });
   };
 
   const onEstimateClick = () => {
+    const matchedSuggestion = suggestions.find((s) => s.displayName === query);
     logEvent({
       eventName: 'Request Estimate',
-      data: { address: query, confirmedIntent: true }
+      data: {
+        ...matchedSuggestion,
+        confirmedIntent: true
+      }
     });
   };
 

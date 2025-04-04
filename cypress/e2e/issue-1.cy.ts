@@ -108,8 +108,13 @@ describe('Enter Address & Receive Instant Estimate', () => {
     cy.get('@logEventSpy').should('have.been.calledWith', {
       eventName: 'Address Matched',
       data: {
-        address:
+        latitude: '33.123',
+        longitude: '-111.123',
+        displayName:
           '2323, East Highland Avenue, Biltmore, Phoenix, Maricopa County, Arizona, 85016, United States',
+        label:
+          '2323, East Highland Avenue, Biltmore, Phoenix, Maricopa County, Arizona, 85016, United States',
+        value: '33.123,-111.123',
         confirmedIntent: false
       }
     });
@@ -134,8 +139,13 @@ describe('Enter Address & Receive Instant Estimate', () => {
     cy.get('@logEventSpy').should('have.been.calledWith', {
       eventName: 'Request Estimate',
       data: {
-        address:
+        latitude: '33.123',
+        longitude: '-111.123',
+        displayName:
           '2323, East Highland Avenue, Biltmore, Phoenix, Maricopa County, Arizona, 85016, United States',
+        label:
+          '2323, East Highland Avenue, Biltmore, Phoenix, Maricopa County, Arizona, 85016, United States',
+        value: '33.123,-111.123',
         confirmedIntent: true
       }
     });
