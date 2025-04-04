@@ -7,9 +7,10 @@ Thank you for your interest in contributing to the Landscape Estimator project. 
 - [Workflow](#workflow)
 - [Branching Strategy](#branching-strategy)
 - [Commit Messages](#commit-messages)
-- [Testing & CI/CD](#testing--cicd)
+- [Testing & Deployment](#testing--deployment)
 - [Technical Spikes](#technical-spikes)
 - [Setup](#setup)
+- [Deploying to Vercel](#deploying-to-vercel)
 - [Code Style](#code-style)
 - [Design System](#design-system)
   - [Design Tokens](#design-tokens)
@@ -18,7 +19,7 @@ Thank you for your interest in contributing to the Landscape Estimator project. 
   - [Accessibility](#accessibility)
   - [Storybook](#storybook)
 - [Remote Collaboration Best Practices](#remote-collaboration-best-practices)
-- [Questions & Help](#questions--help)
+- [Need Help?](#need-help)
 
 ## Workflow
 
@@ -50,12 +51,13 @@ Thank you for your interest in contributing to the Landscape Estimator project. 
   - Integrate onSubmit callback.
   ```
 
-## Testing & CI/CD
+## Testing & Deployment
 
 - **Test-Driven Development (TDD):**  
   Every new feature or fix is developed using a TDD approach. Write tests first, then implement the minimal code to pass those tests. Remember: every commit merged into main must be deployable.
-- **CI/CD Pipeline:**  
-  Our GitHub CI pipeline runs tests on every pull request to ensure only fully tested, working code is merged into the main branch.
+
+- **CI/CD Pipeline (Coming Soon):**  
+  We currently deploy our application via [Vercel CLI](https://vercel.com/docs/cli) and preview environments are generated automatically from branches and pull requests. Only commits merged into the `main` branch are promoted to the production environment. A GitHub Actions CI pipeline will be introduced later to automate testing workflows.
 
 ## Technical Spikes
 
@@ -80,6 +82,25 @@ Thank you for your interest in contributing to the Landscape Estimator project. 
   ```bash
   yarn test
   ```
+
+## Deploying to Vercel
+
+Our application is hosted using [Vercel](https://vercel.com), which automatically creates preview deployments for each branch and pull request through GitHub integration.
+
+### Deployment Rules:
+
+- All branches pushed to GitHub will be deployed to a unique preview URL.
+- Only commits merged into the `main` branch are deployed to the production domain.
+
+### Local Deployment:
+
+You can also deploy manually using Vercel CLI:
+
+```bash
+vercel --prod
+```
+
+Please ensure your changes pass all tests (`yarn test`) and follow our commit conventions before promoting any code to `main`.
 
 ## Code Style
 
@@ -107,7 +128,7 @@ Our project uses ESLint and Prettier to enforce consistent code style across the
 - **Quotes:** Use single quotes in JavaScript.
 - **Trailing Commas:** Enforced in multi-line structures.
 - **Bracket Placement:** Same-line (1TBS) for readability.
-- **Import Aliases:** Configured in our TypeScript setup to map `@app/_` to the root of `./src` and additional aliases such as `@components/_`, `@config/_`, `@hooks/_`, `@lib/_`, `@store/_`, and `@types/\*` to their respective subdirectories.
+- **Import Aliases:** Configured in our TypeScript setup to map `@app/_` to the root of `./src` and additional aliases such as `@components/_`, `@config/_`, `@hooks/_`, `@lib/_`, `@store/_`, and `@types/*` to their respective subdirectories.
 - **Comments:** Inline comments in code are disallowed; please use commit messages and GitHub discussions for context.
 
 ## Design System
@@ -354,7 +375,7 @@ Our Storybook integration includes **@storybook/addon-a11y**, which automaticall
 - **Time Zones:**
   Be mindful of time zone differences—regular updates on shared channels (e.g., Slack, Teams) can help maintain smooth collaboration.
 
-## Questions & Help
+## Need Help?
 
 If you have any questions or need assistance:
 
