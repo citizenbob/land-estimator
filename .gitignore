@@ -25,7 +25,10 @@
 # misc
 .DS_Store
 *.pem
+<<<<<<< HEAD
 logs/
+=======
+>>>>>>> 1c5df74 (Initial commit from Create Next App)
 
 # debug
 npm-debug.log*
@@ -42,3 +45,22 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# Storybook
+/.storybook-cache
+/storybook-static
+.storybook/*
+
+# Cypress
+/cypress/videos/
+/cypress/screenshots/
+
+# CI/CD
+/dist/
+/.turbo/
+
+# Editor and OS files
+.vscode/
+.idea/
+
+*storybook.log*

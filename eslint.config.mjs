@@ -1,16 +1,40 @@
-import { dirname } from "path";
-import { fileURLToPath } from "url";
-import { FlatCompat } from "@eslint/eslintrc";
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
+import { FlatCompat } from '@eslint/eslintrc';
+import js from '@eslint/js';
+import storybookPlugin from 'eslint-plugin-storybook';
+import tsParser from '@typescript-eslint/parser';
 
 const compat = new FlatCompat({
-  baseDirectory: __dirname,
+  baseDirectory: import.meta.dirname
 });
 
-const eslintConfig = [
-  ...compat.extends("next/core-web-vitals", "next/typescript"),
+const config = [
+  { ignores: ['!.storybook'] },
+  js.configs.recommended,
+  ...compat.config({
+    extends: ['next/core-web-vitals', 'next/typescript']
+  }),
+  {
+    files: ['**/*.{js,jsx,ts,tsx,mjs,cjs}'],
+    languageOptions: {
+      parser: tsParser,
+      parserOptions: {
+        ecmaVersion: 'latest',
+        sourceType: 'module'
+      }
+    }
+  },
+  ...storybookPlugin.configs['flat/recommended'],
+  {
+    rules: {
+      indent: 'off',
+      semi: ['error', 'always'],
+      quotes: ['error', 'single'],
+      'comma-dangle': ['error', 'never'],
+      'brace-style': ['error', '1tbs', { allowSingleLine: true }],
+      'no-inline-comments': 'error',
+      'no-warning-comments': 'error'
+    }
+  }
 ];
 
-export default eslintConfig;
+export default config;
