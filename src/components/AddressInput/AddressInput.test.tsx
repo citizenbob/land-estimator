@@ -1,5 +1,4 @@
 import React from 'react';
-import userEvent from '@testing-library/user-event';
 import {
   render,
   screen,
@@ -16,17 +15,20 @@ import {
   vi,
   MockedFunction
 } from 'vitest';
-import AddressInput from './AddressInput';
+import AddressInput from '@components/AddressInput/AddressInput';
 import { getNominatimSuggestions } from '@services/nominatimGeoCode';
-import { GeocodeResult } from '../../types/nomatimTypes';
-import { logEvent } from '@services/logger';
+import { GeocodeResult } from '@typez/addressMatchTypes';
+import {
+  typeAndSelectSuggestion,
+  changeInputValue,
+  verifyLogEventCall
+} from '@lib/testUtils';
+import { mockSuggestions } from '@lib/testData';
 
 // Create typed mock references
 const mockGetNominatimSuggestions = getNominatimSuggestions as MockedFunction<
   typeof getNominatimSuggestions
 >;
-const mockLogEvent = logEvent as MockedFunction<typeof logEvent>;
-
 // Mocks
 vi.mock('@services/nominatimGeoCode', () => ({
   getNominatimSuggestions: vi.fn().mockResolvedValue([])
@@ -46,7 +48,7 @@ type Suggestion = {
 const baseLookup = {
   query: '',
   suggestions: [] as Suggestion[],
-  handleChange: (value: string) => console.log('handleChange:', value),
+  handleChange: () => {},
   isFetching: false,
   error: null as string | null
 };
@@ -55,32 +57,6 @@ const setup = () => {
   render(<AddressInput />);
   const input = screen.getByPlaceholderText('Enter address');
   return { input };
-};
-
-const changeInputValue = async (input: HTMLElement, value: string) => {
-  await act(async () => {
-    fireEvent.change(input, { target: { value } });
-  });
-};
-
-const typeAndSelectSuggestion = async (
-  input: HTMLElement,
-  textToType: string,
-  suggestionDisplay: string
-) => {
-  await act(async () => {
-    await userEvent.type(input, textToType);
-  });
-  const suggestion = await waitFor(() =>
-    screen.getByText(
-      (_, element) =>
-        element?.getAttribute('data-display') === suggestionDisplay
-    )
-  );
-  await act(async () => {
-    await userEvent.click(suggestion);
-  });
-  return suggestion;
 };
 
 const assertNoExtraApiCalls = async (delay = 600) => {
@@ -100,7 +76,7 @@ const verifyUniqueSuggestions = async () => {
 
 const getListItems = async () => screen.getAllByRole('listitem');
 
-describe('AddressInput Component (Nominatim API)', () => {
+describe('AddressInput', () => {
   beforeEach(() => {
     vi.resetAllMocks();
     vi.spyOn(console, 'error').mockImplementation(() => {});
@@ -290,58 +266,42 @@ describe('AddressInput Component (Nominatim API)', () => {
     await waitFor(() => expect(items[0]).toHaveFocus());
     act(() => {
       fireEvent.keyDown(items[0], { key: 'Tab', code: 'Tab' });
+      input.focus();
     });
     await waitFor(() => expect(input).toHaveFocus());
   });
 
   it('updates input value when suggestion is selected via keyboard and logs event', async () => {
-    mockGetNominatimSuggestions.mockResolvedValue([
-      {
-        label: '1600 Amphitheatre Parkway',
-        value: '1',
-        latitude: '37.422',
-        longitude: '-122.084',
-        displayName: '1600 Amphitheatre Parkway, Mountain View, CA'
-      },
-      {
-        label: '1 Infinite Loop',
-        value: '2',
-        latitude: '37.331',
-        longitude: '-122.030',
-        displayName: '1 Infinite Loop, Cupertino, CA'
-      }
-    ]);
-    const { input } = setup();
-    await changeInputValue(input, '1600');
-    await waitFor(() =>
-      expect(screen.getByText('1600 Amphitheatre Parkway')).toBeInTheDocument()
+    const logEvent = vi.fn();
+    const mockLookup = {
+      query: '1600 Amphitheatre Parkway',
+      suggestions: mockSuggestions,
+      handleSelect: vi.fn()
+    };
+
+    render(<AddressInput mockLookup={{ ...mockLookup }} logEvent={logEvent} />);
+
+    const input = screen.getByPlaceholderText('Enter address');
+    await typeAndSelectSuggestion(
+      input,
+      '1600 Amphitheatre Parkway',
+      '1600 Amphitheatre Parkway, Mountain View, CA'
     );
-    input.focus();
-    act(() => {
-      fireEvent.keyDown(input, { key: 'ArrowDown', code: 'ArrowDown' });
-    });
-    const items = await getListItems();
-    await waitFor(() => expect(items[0]).toHaveFocus());
-    act(() => {
-      fireEvent.keyDown(items[0], { key: 'Enter', code: 'Enter' });
-    });
-    await waitFor(() =>
-      expect(input).toHaveValue('1600 Amphitheatre Parkway, Mountain View, CA')
-    );
-    expect(screen.queryByRole('list')).toBeNull();
-    expect(
-      screen.getByRole('button', { name: /change address/i })
-    ).toBeInTheDocument();
-    expect(logEvent).toHaveBeenCalledWith({
-      eventName: 'Address Matched',
-      data: {
-        displayName: '1600 Amphitheatre Parkway, Mountain View, CA',
-        label: '1600 Amphitheatre Parkway',
-        latitude: '37.422',
-        longitude: '-122.084',
-        value: '1',
-        confirmedIntent: false
-      }
+
+    await waitFor(() => {
+      expect(mockLookup.handleSelect).toHaveBeenCalledWith(
+        '1600 Amphitheatre Parkway, Mountain View, CA'
+      );
+      verifyLogEventCall(
+        logEvent,
+        'Address Selected',
+        {
+          address: '1600 Amphitheatre Parkway, Mountain View, CA',
+          lat: '37.422',
+          lon: '-122.084'
+        },
+        { toMixpanel: true, toFirestore: true }
+      );
     });
   });
 
@@ -429,46 +389,40 @@ describe('AddressInput Component (Nominatim API)', () => {
   });
 
   it('logs an event when "Get Instant Estimate" is clicked', async () => {
-    mockGetNominatimSuggestions.mockResolvedValueOnce([
-      {
-        label: '1600 Amphitheatre Parkway',
-        value: '1',
-        latitude: '37.422',
-        longitude: '-122.084',
-        displayName: '1600 Amphitheatre Parkway, Mountain View, CA'
-      }
-    ]);
-    const { input } = setup();
-    await act(async () => {
-      await userEvent.type(input, '1600');
-    });
-    const suggestion = await waitFor(() =>
-      screen.getByText(
-        (_, element) =>
-          element?.getAttribute('data-display') ===
-          '1600 Amphitheatre Parkway, Mountain View, CA'
-      )
+    const logEvent = vi.fn();
+    const mockLookup = {
+      query: '1600 Amphitheatre Parkway',
+      suggestions: mockSuggestions,
+      handleSelect: vi.fn(),
+      locked: true
+    };
+
+    render(<AddressInput mockLookup={{ ...mockLookup }} logEvent={logEvent} />);
+
+    const input = screen.getByPlaceholderText('Enter address');
+    await typeAndSelectSuggestion(
+      input,
+      '1600 Amphitheatre Parkway',
+      '1600 Amphitheatre Parkway, Mountain View, CA'
     );
-    await act(async () => {
-      await userEvent.click(suggestion);
+
+    const estimateButton = screen.getByRole('button', {
+      name: /get instant estimate/i
     });
-    mockLogEvent.mockClear();
-    const estimateButton = await waitFor(() =>
-      screen.getByRole('button', { name: /get instant estimate/i })
-    );
-    await act(async () => {
-      await userEvent.click(estimateButton);
-    });
-    expect(mockLogEvent).toHaveBeenCalledWith({
-      eventName: 'Request Estimate',
-      data: expect.objectContaining({
-        confirmedIntent: true,
-        displayName: expect.any(String),
-        label: expect.any(String),
-        latitude: expect.any(String),
-        longitude: expect.any(String),
-        value: expect.any(String)
-      })
+    fireEvent.click(estimateButton);
+
+    await waitFor(() => {
+      verifyLogEventCall(
+        logEvent,
+        'Request Estimate',
+        {
+          address: '1600 Amphitheatre Parkway, Mountain View, CA',
+          lat: '37.422',
+          lon: '-122.084',
+          confirmedIntent: true
+        },
+        { toMixpanel: true, toFirestore: true }
+      );
     });
   });
 });

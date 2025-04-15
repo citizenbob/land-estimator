@@ -6,25 +6,33 @@ const db = getFirestore(app);
 
 export async function logEvent({
   eventName,
-  data
+  data,
+  toMixpanel = true,
+  toFirestore = true
 }: {
   eventName: string;
   data: Record<string, unknown>;
+  toMixpanel?: boolean;
+  toFirestore?: boolean;
 }): Promise<void> {
-  try {
-    mixpanel.track(eventName, data);
-  } catch (error) {
-    console.error('Error logging event to Mixpanel:', error);
+  if (toMixpanel) {
+    try {
+      mixpanel.track(eventName);
+    } catch (error: unknown) {
+      console.error('Error logging event to Mixpanel:', error);
+    }
   }
 
-  try {
-    await addDoc(collection(db, 'landscapeEstimates'), {
-      eventName,
-      data,
-      timestamp: new Date().toISOString()
-    });
-  } catch (error) {
-    console.error('Error logging event to Firestore:', error);
+  if (toFirestore) {
+    try {
+      await addDoc(collection(db, 'landscapeEstimates'), {
+        eventName,
+        data,
+        timestamp: new Date().toISOString()
+      });
+    } catch (error: unknown) {
+      console.error('Error logging event to Firestore:', error);
+    }
   }
 }
 

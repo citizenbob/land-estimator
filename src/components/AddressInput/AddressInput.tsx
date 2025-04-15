@@ -2,44 +2,14 @@
 
 import React, { useRef } from 'react';
 import { useAddressLookup } from '@hooks/useAddressLookup';
-// Define the Suggestion type locally if it's not exported from the module
-type Suggestion = {
-  displayName: string;
-  label?: string;
-  [key: string]: unknown;
-};
-import {
-  Form,
-  Input,
-  IconButton,
-  Button,
-  SuggestionsList,
-  SuggestionItem
-} from './AddressInput.styles';
-import { logEvent as importedLogEvent } from '@services/logger';
-
-if (typeof window !== 'undefined') {
-  window.logEvent = (
-    eventOrEventName:
-      | { eventName: string; data: Record<string, unknown> }
-      | string,
-    data?: Record<string, unknown>
-  ) => {
-    if (typeof eventOrEventName === 'string' && data) {
-      importedLogEvent({ eventName: eventOrEventName, data });
-    } else if (typeof eventOrEventName === 'object') {
-      importedLogEvent(eventOrEventName);
-    }
-  };
-}
-
-// Local logEvent helper that calls window.logEvent with a single object.
-const logEvent = (event: {
-  eventName: string;
-  data: Record<string, unknown>;
-}) => {
-  window.logEvent({ eventName: event.eventName, data: event.data });
-};
+import { useEventLogger } from '@hooks/useEventLogger';
+import InputField from '@components/InputField/InputField';
+import IconButton from '@components/IconButton/IconButton';
+import Button from '@components/Button/Button';
+import SuggestionsList from '@components/SuggestionsList/SuggestionsList';
+import Alert from '@components/Alert/Alert';
+import { Form } from '@components/AddressInput/AddressInput.styles';
+import { Suggestion } from '@typez/addressMatchTypes';
 
 const getSuggestionElements = (): HTMLElement[] =>
   Array.from(document.querySelectorAll('[data-display]')) as HTMLElement[];
@@ -47,42 +17,48 @@ const getSuggestionElements = (): HTMLElement[] =>
 const handleSuggestionKeyDown = (
   e: React.KeyboardEvent<HTMLLIElement>,
   index: number,
-  onSelect: (address: string) => void
+  onSelect: (address: string) => void,
+  inputRef: React.RefObject<HTMLInputElement | null>
 ) => {
   e.preventDefault();
   const items = getSuggestionElements();
   if (e.key === 'ArrowDown') {
-    const next = (index + 1) % items.length;
-    items[next].focus();
+    items[(index + 1) % items.length]?.focus();
   } else if (e.key === 'ArrowUp') {
-    const prev = (index - 1 + items.length) % items.length;
-    items[prev].focus();
+    items[(index - 1 + items.length) % items.length]?.focus();
   } else if (e.key === 'Enter') {
-    onSelect(items[index].getAttribute('data-display') || '');
+    onSelect(items[index]?.getAttribute('data-display') || '');
   } else if (e.key === 'Tab') {
-    const input = document.querySelector(
-      'input[placeholder="Enter address"]'
-    ) as HTMLElement;
-    input?.focus();
+    inputRef.current?.focus();
   }
 };
 
 const handleInputKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
   if (e.key === 'ArrowDown') {
     e.preventDefault();
-    const items = getSuggestionElements();
-    if (items.length > 0) {
-      items[0].focus();
-    }
-    e.stopPropagation();
+    getSuggestionElements()[0]?.focus();
   }
 };
 
 interface AddressInputProps {
-  mockLookup?: Partial<ReturnType<typeof useAddressLookup>>;
+  mockLookup?: Partial<ReturnType<typeof useAddressLookup>> & {
+    logEvent?: (
+      eventName: string,
+      data: Record<string, string | number | boolean>,
+      options?: Record<string, unknown>
+    ) => void;
+  };
+  logEvent?: (
+    eventName: string,
+    data: Record<string, string | number | boolean>,
+    options?: Record<string, unknown>
+  ) => void;
 }
 
-const AddressInput = ({ mockLookup }: AddressInputProps) => {
+const AddressInput = ({
+  mockLookup,
+  logEvent: logEventProp
+}: AddressInputProps) => {
   const defaultLookup = useAddressLookup();
   const {
     query,
@@ -94,49 +70,78 @@ const AddressInput = ({ mockLookup }: AddressInputProps) => {
     hasFetched
   } = { ...defaultLookup, ...mockLookup };
 
-  const inputRef = useRef<HTMLInputElement>(null);
+  const { logEvent: logEventHook } = useEventLogger();
+  const logEvent = logEventProp || logEventHook;
+
+  const inputRef = useRef<HTMLInputElement | null>(null);
+
   const selectedSuggestion = useRef<Suggestion | null>(null);
 
-  const onSelect = (address: string) => {
-    handleSelect(address);
-    const matchedSuggestion = suggestions.find(
-      (s) => s.displayName === address
-    );
-    selectedSuggestion.current = matchedSuggestion || null;
-    logEvent({
-      eventName: 'Address Matched',
-      data: {
-        ...matchedSuggestion,
-        confirmedIntent: false
-      }
-    });
+  const onSelect = (suggestion: Suggestion) => {
+    handleSelect(suggestion.displayName);
+    selectedSuggestion.current = suggestion;
+
+    // Log the address selection event
+    if (logEvent) {
+      logEvent(
+        'Address Selected',
+        {
+          address: suggestion.displayName,
+          lat: suggestion.latitude,
+          lon: suggestion.longitude
+        },
+        { toMixpanel: true, toFirestore: true }
+      );
+    }
+    {
+      return;
+    }
   };
 
   const onEstimateClick = () => {
     const matched = selectedSuggestion.current;
-    if (!matched) return;
-    logEvent({
-      eventName: 'Request Estimate',
-      data: {
-        ...matched,
-        confirmedIntent: true
-      }
-    });
+    if (
+      !matched ||
+      !matched.displayName ||
+      matched.latitude === undefined ||
+      matched.longitude === undefined
+    ) {
+      return;
+    }
+    if (logEvent) {
+      logEvent(
+        'Request Estimate',
+        {
+          address: matched.displayName,
+          lat: matched.latitude,
+          lon: matched.longitude,
+          confirmedIntent: true
+        },
+        { toMixpanel: true, toFirestore: true }
+      );
+    } else {
+      console.error('logEvent is not defined');
+    }
   };
 
   const uniqueSuggestions = [
-    ...new Map(suggestions.map((s) => [s.displayName, s])).values()
+    ...new Map(
+      suggestions.map((s) => [
+        s.displayName,
+        { ...s, latitude: s.latitude ?? 0, longitude: s.longitude ?? 0 }
+      ])
+    ).values()
   ];
 
   const showSuggestions =
-    query.trim() !== '' &&
+    (query?.trim() ?? '') !== '' &&
     uniqueSuggestions.length > 0 &&
     !uniqueSuggestions.some((s) => s.displayName === query);
 
   return (
     <Form>
       <div className="relative input-group">
-        <Input
+        <InputField
           ref={inputRef}
           type="text"
           placeholder="Enter address"
@@ -153,31 +158,38 @@ const AddressInput = ({ mockLookup }: AddressInputProps) => {
           </IconButton>
         )}
       </div>
-      {isFetching && <div role="status">Fetching suggestions</div>}
+      {isFetching && <Alert role="status">Fetching suggestions</Alert>}
       {!isFetching &&
         hasFetched &&
         !locked &&
         query.trim() !== '' &&
         suggestions.length === 0 && (
-          <div role="alert">Error fetching suggestions</div>
+          <Alert role="alert">Error fetching suggestions</Alert>
         )}
       {showSuggestions && (
-        <SuggestionsList>
-          {uniqueSuggestions.map((s, index) => (
-            <SuggestionItem
-              key={`${s.displayName}-${index}`}
-              data-display={s.displayName}
-              tabIndex={0}
-              onClick={() => onSelect(s.displayName)}
-              onKeyDown={(e) => handleSuggestionKeyDown(e, index, onSelect)}
-            >
-              {s.label || s.displayName || 'Unknown Location'}
-            </SuggestionItem>
-          ))}
-        </SuggestionsList>
+        <SuggestionsList
+          suggestions={uniqueSuggestions}
+          onSelect={onSelect}
+          onKeyDown={(e, index) =>
+            handleSuggestionKeyDown(
+              e,
+              index,
+              (address) =>
+                onSelect({
+                  displayName: address,
+                  latitude: '0',
+                  longitude: '0',
+                  value: address
+                }),
+              inputRef
+            )
+          }
+        />
       )}
       {locked && (
-        <Button onClick={onEstimateClick}>Get Instant Estimate</Button>
+        <Button onClick={onEstimateClick} aria-label="Get Instant Estimate">
+          Get Instant Estimate
+        </Button>
       )}
     </Form>
   );

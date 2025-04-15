@@ -23,13 +23,15 @@
       "@app/*": ["app/*"],
       "@components/*": ["components/*"],
       "@config/*": ["config/*"],
+      "@hocs/*": ["hocs/*"],
       "@hooks/*": ["hooks/*"],
       "@lib/*": ["lib/*"],
       "@services/*": ["services/*"],
       "@store/*": ["store/*"],
-      "@tokens/*": ["tokens/*"]
+      "@tokens/*": ["tokens/*"],
+      "@typez/*": ["types/*"]
     },
-    "types": ["cypress"]
+    "types": ["cypress", "vitest/globals", "@testing-library/jest-dom"]
   },
   "include": [
     "next-env.d.ts",

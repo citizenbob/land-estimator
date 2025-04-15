@@ -1,7 +1,7 @@
 // ./types/nominatimTypes.ts
 export interface NominatimResponse {
-  lat: string;
-  lon: string;
+  latitude: string;
+  longitude: string;
   display_name: string;
 }
 export interface GeocodeResult {
@@ -11,3 +11,11 @@ export interface GeocodeResult {
   latitude: string;
   longitude: string;
 }
+
+export type Suggestion = {
+  label?: string;
+  value: string;
+  displayName: string;
+  latitude: string;
+  longitude: string;
+};

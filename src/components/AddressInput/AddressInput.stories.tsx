@@ -2,7 +2,7 @@
 
 import React from 'react';
 import type { Meta, StoryObj } from '@storybook/react';
-import AddressInput from './AddressInput';
+import AddressInput from '@components/AddressInput/AddressInput';
 
 const meta: Meta<typeof AddressInput> = {
   title: 'Components/AddressInput',
@@ -24,8 +24,12 @@ type Story = StoryObj<typeof AddressInput>;
 const baseLookup = {
   query: '',
   suggestions: [],
-  handleChange: (value: string) => console.log('handleChange:', value),
-  handleSelect: (value: string) => console.log('handleSelect:', value),
+  handleChange: (value: string) => {
+    console.log('Input changed:', value);
+  },
+  handleSelect: (value: string) => {
+    console.log('Suggestion selected:', value);
+  },
   isFetching: false,
   locked: false,
   hasFetched: false
@@ -57,12 +61,16 @@ export const WithSuggestions: Story = {
           {
             displayName: '1600 Amphitheatre Parkway, Mountain View, CA',
             label: 'Google HQ',
-            value: '1600 Amphitheatre Parkway, Mountain View, CA'
+            value: '1600 Amphitheatre Parkway, Mountain View, CA',
+            latitude: '37.4221',
+            longitude: '-122.0841'
           },
           {
             displayName: '1600 Some Other Road, Some City, ST',
             label: 'Other Location',
-            value: '1600 Some Other Road, Some City, ST'
+            value: '1600 Some Other Road, Some City, ST',
+            latitude: '0',
+            longitude: '0'
           }
         ]
       }}

@@ -3,7 +3,11 @@ const NOMINATIM_BASE_URL =
   process.env.NOMINATIM_BASE_URL ||
   'https://nominatim.openstreetmap.org/search';
 
-import { NominatimResponse, GeocodeResult } from '../types/nomatimTypes';
+import {
+  NominatimResponse,
+  GeocodeResult,
+  Suggestion
+} from '@typez/addressMatchTypes';
 
 function buildNominatimUrl(query: string, limit: number): URL {
   const url = new URL(NOMINATIM_BASE_URL);
@@ -41,16 +45,16 @@ export async function getCoordinatesFromAddress(
       return null;
     }
     const result = data[0];
-    if (!result.lat || !result.lon || !result.display_name) {
+    if (!result.latitude || !result.longitude || !result.display_name) {
       console.warn(`Incomplete data for address: ${address}`);
       return null;
     }
     return {
-      latitude: result.lat,
-      longitude: result.lon,
+      latitude: result.latitude,
+      longitude: result.longitude,
       displayName: result.display_name,
       label: result.display_name,
-      value: `${result.lat},${result.lon}`
+      value: `${result.latitude},${result.longitude}`
     };
   } catch (error) {
     console.error(`Error fetching coordinates for "${address}":`, error);
@@ -60,32 +64,26 @@ export async function getCoordinatesFromAddress(
 
 export async function getNominatimSuggestions(
   query: string
-): Promise<GeocodeResult[]> {
+): Promise<Suggestion[]> {
   try {
-    const url = buildNominatimUrl(query, 5);
-    const data: NominatimResponse[] = await fetchNominatimResponse(url);
-    if (data.length === 0) {
-      console.warn(`No address suggestions found for: ${query}`);
-      return [];
-    }
-    return data
-      .map((result: NominatimResponse) => {
-        if (!result.lat || !result.lon || !result.display_name) {
-          console.warn(
-            `Incomplete suggestion data for query: ${query}`,
-            result
-          );
-          return null;
-        }
-        return {
-          latitude: result.lat,
-          longitude: result.lon,
-          displayName: result.display_name,
-          label: result.display_name,
-          value: `${result.lat},${result.lon}`
-        };
+    const response = await fetch(
+      `https://nominatim.openstreetmap.org/search?q=${query}&format=json`
+    );
+    const data = await response.json();
+
+    return data.map(
+      (item: {
+        display_name: string;
+        latitude: string;
+        longitude: string;
+      }) => ({
+        displayName: item.display_name,
+        label: item.display_name,
+        latitude: item.latitude,
+        longitude: item.longitude,
+        value: item.display_name
       })
-      .filter((result) => result !== null) as GeocodeResult[];
+    );
   } catch (error) {
     console.error(`Error fetching address suggestions for "${query}":`, error);
     return [];
