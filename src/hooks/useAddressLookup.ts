@@ -1,12 +1,11 @@
 // src/hooks/useAddressLookup.ts
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { getNominatimSuggestions } from '@services/nominatimGeoCode';
+import { Suggestion } from '@typez/addressMatchTypes';
 
 export const useAddressLookup = () => {
   const [query, setQuery] = useState<string>('');
-  const [suggestions, setSuggestions] = useState<
-    { label?: string; value: string; displayName: string }[]
-  >([]);
+  const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
   const [isFetching, setIsFetching] = useState<boolean>(false);
   const [locked, setLocked] = useState<boolean>(false);
   const [ignoreNextChange, setIgnoreNextChange] = useState<boolean>(false);
@@ -25,7 +24,14 @@ export const useAddressLookup = () => {
       setError(null);
       try {
         const results = await getNominatimSuggestions(value);
-        setSuggestions(results || []);
+        const transformedResults = results.map((result) => ({
+          displayName: result.displayName,
+          label: result.label,
+          latitude: result.latitude,
+          longitude: result.longitude,
+          value: result.displayName
+        }));
+        setSuggestions(transformedResults || []);
       } catch {
         setSuggestions([]);
         setError('Failed to fetch suggestions. Please try again.');
@@ -38,11 +44,11 @@ export const useAddressLookup = () => {
   );
 
   useEffect(() => {
-    if (locked || !query.trim()) {
+    if (locked || !(query?.trim() ?? '')) {
       if (debounceTimeout.current) clearTimeout(debounceTimeout.current);
       setSuggestions([]);
       setError(null);
-      if (!query.trim()) setHasFetched(false);
+      if (!(query?.trim() ?? '')) setHasFetched(false);
       return;
     }
     if (debounceTimeout.current) clearTimeout(debounceTimeout.current);
