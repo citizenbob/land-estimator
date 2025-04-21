@@ -3,15 +3,15 @@ import {
   SuggestionsListStyles,
   SuggestionItemStyles
 } from './SuggestionsList.styles';
-import { Suggestion } from '@typez/addressMatchTypes';
+import { GeocodeResult } from '@typez/addressMatchTypes';
 
 interface SuggestionsListProps {
-  suggestions: Suggestion[];
-  onSelect: (suggestion: Suggestion) => void;
+  suggestions: GeocodeResult[];
+  onSelect: (suggestion: GeocodeResult) => void;
   onKeyDown?: (e: React.KeyboardEvent<HTMLLIElement>, index: number) => void;
   logEvent?: (
     eventName: string,
-    data: { address: string; latitude: string; longitude: string },
+    data: { address: string; lat: string; lon: string },
     options?: Record<string, unknown>
   ) => void;
 }
@@ -24,7 +24,7 @@ const SuggestionsList: React.FC<SuggestionsListProps> = ({
 }) => {
   const itemsRef = React.useRef<HTMLElement[]>([]);
 
-  const handleSelect = (suggestion: Suggestion) => {
+  const handleSelect = (suggestion: GeocodeResult) => {
     onSelect(suggestion);
 
     // Log the suggestion selection event
@@ -33,8 +33,8 @@ const SuggestionsList: React.FC<SuggestionsListProps> = ({
         'Suggestion Selected',
         {
           address: suggestion.displayName,
-          latitude: suggestion.latitude,
-          longitude: suggestion.longitude
+          lat: suggestion.lat,
+          lon: suggestion.lon
         },
         { toMixpanel: true, toFirestore: true }
       );

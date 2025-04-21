@@ -38,3 +38,52 @@ export const verifyLogEventCall = (
 ) => {
   expect(logEvent).toHaveBeenCalledWith(eventName, data, options);
 };
+
+export const mockSuccessResponse = (
+  mockFetch: ReturnType<typeof vi.fn>,
+  data: unknown
+) => {
+  mockFetch.mockResolvedValueOnce({
+    ok: true,
+    json: async () => data
+  });
+};
+
+export const mockErrorResponse = (
+  mockFetch: ReturnType<typeof vi.fn>,
+  status = 500,
+  statusText = 'Internal Server Error'
+) => {
+  mockFetch.mockResolvedValueOnce({
+    ok: false,
+    status,
+    statusText
+  });
+};
+
+export const mockNetworkError = (
+  mockFetch: ReturnType<typeof vi.fn>,
+  errorMessage = 'Network error'
+) => {
+  const error = new Error(errorMessage);
+  mockFetch.mockRejectedValueOnce(error);
+};
+
+export const setupConsoleMocks = () => {
+  const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+  const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+  return { errorSpy, warnSpy };
+};
+
+export const verifyUniqueSuggestions = async () => {
+  const items = await waitFor(() => screen.getAllByRole('listitem'));
+  const displays = items
+    .map((item) => item.getAttribute('data-display'))
+    .filter(Boolean);
+  const uniqueDisplays = [...new Set(displays)];
+  expect(displays.length).toBe(uniqueDisplays.length);
+  expect(uniqueDisplays.length).toBeGreaterThan(0);
+};
+
+export const getListItems = async () => screen.getAllByRole('listitem');

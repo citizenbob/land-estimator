@@ -9,7 +9,8 @@ import Button from '@components/Button/Button';
 import SuggestionsList from '@components/SuggestionsList/SuggestionsList';
 import Alert from '@components/Alert/Alert';
 import { Form } from '@components/AddressInput/AddressInput.styles';
-import { Suggestion } from '@typez/addressMatchTypes';
+import { GeocodeResult } from '@typez/addressMatchTypes';
+import { motion } from 'framer-motion';
 
 const getSuggestionElements = (): HTMLElement[] =>
   Array.from(document.querySelectorAll('[data-display]')) as HTMLElement[];
@@ -47,6 +48,7 @@ interface AddressInputProps {
       data: Record<string, string | number | boolean>,
       options?: Record<string, unknown>
     ) => void;
+    selectedSuggestion?: GeocodeResult;
   };
   logEvent?: (
     eventName: string,
@@ -67,7 +69,8 @@ const AddressInput = ({
     handleSelect,
     isFetching,
     locked,
-    hasFetched
+    hasFetched,
+    selectedSuggestion: mockSelectedSuggestion
   } = { ...defaultLookup, ...mockLookup };
 
   const { logEvent: logEventHook } = useEventLogger();
@@ -75,26 +78,24 @@ const AddressInput = ({
 
   const inputRef = useRef<HTMLInputElement | null>(null);
 
-  const selectedSuggestion = useRef<Suggestion | null>(null);
+  const selectedSuggestion = useRef<GeocodeResult | null>(
+    mockSelectedSuggestion || null
+  );
 
-  const onSelect = (suggestion: Suggestion) => {
+  const onSelect = (suggestion: GeocodeResult) => {
     handleSelect(suggestion.displayName);
     selectedSuggestion.current = suggestion;
 
-    // Log the address selection event
     if (logEvent) {
       logEvent(
         'Address Selected',
         {
           address: suggestion.displayName,
-          lat: suggestion.latitude,
-          lon: suggestion.longitude
+          lat: suggestion.lat,
+          lon: suggestion.lon
         },
         { toMixpanel: true, toFirestore: true }
       );
-    }
-    {
-      return;
     }
   };
 
@@ -103,8 +104,8 @@ const AddressInput = ({
     if (
       !matched ||
       !matched.displayName ||
-      matched.latitude === undefined ||
-      matched.longitude === undefined
+      matched.lat === undefined ||
+      matched.lon === undefined
     ) {
       return;
     }
@@ -113,8 +114,8 @@ const AddressInput = ({
         'Request Estimate',
         {
           address: matched.displayName,
-          lat: matched.latitude,
-          lon: matched.longitude,
+          lat: matched.lat,
+          lon: matched.lon,
           confirmedIntent: true
         },
         { toMixpanel: true, toFirestore: true }
@@ -128,7 +129,7 @@ const AddressInput = ({
     ...new Map(
       suggestions.map((s) => [
         s.displayName,
-        { ...s, latitude: s.latitude ?? 0, longitude: s.longitude ?? 0 }
+        { ...s, lat: s.lat ?? 0, lon: s.lon ?? 0 }
       ])
     ).values()
   ];
@@ -149,6 +150,13 @@ const AddressInput = ({
           onChange={(e) => handleChange(e.target.value)}
           onKeyDown={handleInputKeyDown}
         />
+        {isFetching && (
+          <motion.div
+            className="absolute right-3 top-1/2 transform -translate-y-1/2 w-5 h-5 border-2 border-blue-500 border-t-transparent rounded-full"
+            animate={{ rotate: 360 }}
+            transition={{ repeat: Infinity, ease: 'linear', duration: 0.8 }}
+          />
+        )}
         {locked && (
           <IconButton
             aria-label="Change Address"
@@ -158,13 +166,14 @@ const AddressInput = ({
           </IconButton>
         )}
       </div>
-      {isFetching && <Alert role="status">Fetching suggestions</Alert>}
       {!isFetching &&
         hasFetched &&
         !locked &&
         query.trim() !== '' &&
         suggestions.length === 0 && (
-          <Alert role="alert">Error fetching suggestions</Alert>
+          <Alert role="alert" type="error">
+            Error fetching suggestions
+          </Alert>
         )}
       {showSuggestions && (
         <SuggestionsList
@@ -177,8 +186,8 @@ const AddressInput = ({
               (address) =>
                 onSelect({
                   displayName: address,
-                  latitude: '0',
-                  longitude: '0',
+                  lat: '0',
+                  lon: '0',
                   value: address
                 }),
               inputRef

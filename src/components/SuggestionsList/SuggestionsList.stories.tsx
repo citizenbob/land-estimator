@@ -26,15 +26,15 @@ export const Default: Story = {
         {
           displayName: '1600 Amphitheatre Parkway',
           label: 'Google HQ',
-          latitude: '37.422',
-          longitude: '-122.084',
+          lat: '37.422',
+          lon: '-122.084',
           value: 'google-hq'
         },
         {
           displayName: '1 Infinite Loop',
           label: 'Apple HQ',
-          latitude: '37.331',
-          longitude: '-122.031',
+          lat: '37.331',
+          lon: '-122.031',
           value: 'apple-hq'
         }
       ]}

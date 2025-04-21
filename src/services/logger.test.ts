@@ -3,21 +3,28 @@ import { logEvent } from '@services/logger';
 import mixpanel from '@services/mixpanelClient';
 import { addDoc } from 'firebase/firestore';
 
-vi.mock('mixpanel-browser', () => ({
-  default: {
-    track: vi.fn(() => true)
-  }
-}));
+// Common test setup
+const setupLoggerMocks = () => {
+  vi.mock('mixpanel-browser', () => ({
+    default: {
+      track: vi.fn(() => true)
+    }
+  }));
 
-vi.mock('firebase/firestore', () => ({
-  getFirestore: vi.fn(() => ({})),
-  collection: vi.fn(() => ({})),
-  addDoc: vi.fn(async () => ({ id: 'mockDocId' }))
-}));
+  vi.mock('firebase/firestore', () => ({
+    getFirestore: vi.fn(() => ({})),
+    collection: vi.fn(() => ({})),
+    addDoc: vi.fn(async () => ({ id: 'mockDocId' }))
+  }));
+
+  return {
+    mockMixpanelTrack: mixpanel.track as ReturnType<typeof vi.fn>,
+    mockAddDoc: addDoc as ReturnType<typeof vi.fn>
+  };
+};
 
 describe('logEvent', () => {
-  const mockMixpanelTrack = mixpanel.track as ReturnType<typeof vi.fn>;
-  const mockAddDoc = addDoc as ReturnType<typeof vi.fn>;
+  const { mockMixpanelTrack, mockAddDoc } = setupLoggerMocks();
 
   beforeEach(() => {
     vi.clearAllMocks();
