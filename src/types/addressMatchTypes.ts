@@ -1,21 +1,24 @@
-// ./types/nominatimTypes.ts
 export interface NominatimResponse {
-  latitude: string;
-  longitude: string;
+  place_id: number;
+  licence: string;
+  osm_type: string;
+  osm_id: number;
+  lat: string;
+  lon: string;
+  category?: string;
+  type?: string;
+  place_rank: number;
+  importance: number;
+  addresstype: string;
+  name: string;
   display_name: string;
+  boundingbox: string[];
 }
+
 export interface GeocodeResult {
   label?: string;
   value: string;
   displayName: string;
-  latitude: string;
-  longitude: string;
+  lat: string;
+  lon: string;
 }
-
-export type Suggestion = {
-  label?: string;
-  value: string;
-  displayName: string;
-  latitude: string;
-  longitude: string;
-};

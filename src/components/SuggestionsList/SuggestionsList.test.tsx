@@ -5,30 +5,15 @@ import userEvent from '@testing-library/user-event';
 import * as matchers from '@testing-library/jest-dom/matchers';
 
 import SuggestionsList from './SuggestionsList';
+import { mockSuggestions } from '@lib/testData';
+
 expect.extend(matchers);
 
 describe('SuggestionsList Component', () => {
-  const suggestions = [
-    {
-      displayName: '1600 Amphitheatre Parkway',
-      label: 'Google HQ',
-      latitude: '37.422',
-      longitude: '-122.084',
-      value: '1600 Amphitheatre Parkway'
-    },
-    {
-      displayName: '1 Infinite Loop',
-      label: 'Apple HQ',
-      latitude: '37.331',
-      longitude: '-122.031',
-      value: '1 Infinite Loop'
-    }
-  ];
-
   it('renders suggestions correctly', () => {
     render(
       <SuggestionsList
-        suggestions={suggestions}
+        suggestions={mockSuggestions}
         onSelect={vi.fn()}
         onKeyDown={vi.fn()}
       />
@@ -41,7 +26,7 @@ describe('SuggestionsList Component', () => {
     const handleSelect = vi.fn();
     render(
       <SuggestionsList
-        suggestions={suggestions}
+        suggestions={mockSuggestions}
         onSelect={handleSelect}
         onKeyDown={vi.fn()}
       />
@@ -49,12 +34,6 @@ describe('SuggestionsList Component', () => {
 
     const item = screen.getByText('Google HQ');
     await userEvent.click(item);
-    expect(handleSelect).toHaveBeenCalledWith({
-      displayName: '1600 Amphitheatre Parkway',
-      label: 'Google HQ',
-      latitude: '37.422',
-      longitude: '-122.084',
-      value: '1600 Amphitheatre Parkway'
-    });
+    expect(handleSelect).toHaveBeenCalledWith(mockSuggestions[0]);
   });
 });

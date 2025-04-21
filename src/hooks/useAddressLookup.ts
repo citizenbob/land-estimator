@@ -1,11 +1,9 @@
-// src/hooks/useAddressLookup.ts
 import { useState, useCallback, useEffect, useRef } from 'react';
-import { getNominatimSuggestions } from '@services/nominatimGeoCode';
-import { Suggestion } from '@typez/addressMatchTypes';
+import { GeocodeResult } from '@typez/addressMatchTypes';
 
 export const useAddressLookup = () => {
   const [query, setQuery] = useState<string>('');
-  const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
+  const [suggestions, setSuggestions] = useState<GeocodeResult[]>([]);
   const [isFetching, setIsFetching] = useState<boolean>(false);
   const [locked, setLocked] = useState<boolean>(false);
   const [ignoreNextChange, setIgnoreNextChange] = useState<boolean>(false);
@@ -23,18 +21,20 @@ export const useAddressLookup = () => {
       setIsFetching(true);
       setError(null);
       try {
-        const results = await getNominatimSuggestions(value);
-        const transformedResults = results.map((result) => ({
-          displayName: result.displayName,
-          label: result.label,
-          latitude: result.latitude,
-          longitude: result.longitude,
-          value: result.displayName
-        }));
-        setSuggestions(transformedResults || []);
-      } catch {
+        const response = await fetch(
+          `/api/nominatim?type=suggestions&query=${encodeURIComponent(value)}`
+        );
+
+        if (!response.ok) {
+          throw new Error(`Error: ${response.status}`);
+        }
+
+        const results = await response.json();
+        setSuggestions(results || []);
+      } catch (err) {
         setSuggestions([]);
-        setError('Failed to fetch suggestions. Please try again.');
+        setError('Error fetching suggestions. Please try again.');
+        console.error('Error fetching address suggestions:', err);
       } finally {
         setIsFetching(false);
         setHasFetched(true);
