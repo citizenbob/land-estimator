@@ -1,55 +1,52 @@
-// Alias for backward compatibility during transition
 export const mockSuggestions = [
   {
+    lat: '37.4224428',
+    lon: '-122.0842467',
     displayName: '1600 Amphitheatre Parkway, Mountain View, CA',
     label: 'Google HQ',
-    lat: '37.422',
-    lon: '-122.084',
     value: '1600 Amphitheatre Parkway, Mountain View, CA'
   },
   {
+    lat: '37.3318',
+    lon: '-122.0312',
     displayName: '1 Infinite Loop, Cupertino, CA',
     label: 'Apple HQ',
-    lat: '37.331',
-    lon: '-122.031',
     value: '1 Infinite Loop, Cupertino, CA'
   }
 ];
 
 export const mockGeocodeResults = [
   {
-    label: '1600 Amphitheatre Parkway',
-    value: '1',
-    lat: '37.422',
-    lon: '-122.084',
-    displayName: '1600 Amphitheatre Parkway, Mountain View, CA'
+    lat: '37.4224428',
+    lon: '-122.0842467',
+    displayName: '1600 Amphitheatre Parkway, Mountain View, CA',
+    label: 'Google HQ',
+    value: '1'
   },
   {
-    label: '1 Infinite Loop',
-    value: '2',
-    lat: '37.331',
-    lon: '-122.031',
-    displayName: '1 Infinite Loop, Cupertino, CA'
+    lat: '37.3318',
+    lon: '-122.0312',
+    displayName: '1 Infinite Loop, Cupertino, CA',
+    label: 'Apple HQ',
+    value: '2'
   },
   {
-    label: 'Empire State Building',
-    value: '3',
-    lat: '40.748817',
-    lon: '-73.985428',
-    displayName: 'Empire State Building, New York, NY'
+    lat: '47.6205',
+    lon: '-122.3493',
+    displayName: '410 Terry Ave N, Seattle, WA',
+    label: 'Amazon HQ',
+    value: '3'
   }
 ];
 
-// Common addresses used in tests
 export const mockAddresses = {
   google: '1600 Amphitheatre Parkway, Mountain View, CA',
   apple: '1 Infinite Loop, Cupertino, CA',
-  empire: 'Empire State Building, New York, NY',
+  amazon: '410 Terry Ave N, Seattle, WA',
   phoenix:
     '2323, East Highland Avenue, Biltmore, Phoenix, Maricopa County, Arizona, 85016, United States'
 };
 
-// Raw Nominatim API response format
 export const mockNominatimResponses = [
   {
     place_id: 365107046,
@@ -88,7 +85,26 @@ export const mockNominatimResponses = [
   }
 ];
 
-// Springfield example data used in nominatimGeoCode.test.ts
+export const mockNominatimResponse = {
+  place_id: 259127396,
+  licence:
+    'Data © OpenStreetMap contributors, ODbL 1.0. https://osm.org/copyright',
+  osm_type: 'relation',
+  osm_id: 186579,
+  boundingbox: ['42.0956247', '42.1173678', '-72.6463336', '-72.5708079'],
+  lat: '42.1070555',
+  lon: '-72.5906541',
+  display_name: 'Springfield, Hampden County, Massachusetts, United States',
+  class: 'boundary',
+  type: 'administrative',
+  importance: 0.7908560628085912
+};
+
+export const mockNominatimError = {
+  message: 'Service temporarily unavailable',
+  status: 503
+};
+
 export const mockSpringfieldApiResponse = [
   {
     display_name: 'Springfield, IL, USA',
@@ -118,3 +134,8 @@ export const mockSpringfieldSuggestions = [
     value: 'Springfield, MA, USA'
   }
 ];
+
+export const mockSpringfieldCoordinates = {
+  lat: '42.1070555',
+  lon: '-72.5906541'
+};

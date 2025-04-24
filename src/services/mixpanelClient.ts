@@ -1,4 +1,3 @@
-// src/services/mixpanelClient.ts
 import mixpanel from 'mixpanel-browser';
 
 try {

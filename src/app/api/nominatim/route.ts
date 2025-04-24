@@ -4,7 +4,6 @@ import {
   getNominatimSuggestions
 } from '@services/nominatimGeoCode';
 
-// Next.js App Router API route handler
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const type = searchParams.get('type');

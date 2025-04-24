@@ -1,8 +1,9 @@
 'use client';
 
-import React, { useRef } from 'react';
+import React, { useRef, createRef, useEffect, useMemo } from 'react';
 import { useAddressLookup } from '@hooks/useAddressLookup';
 import { useEventLogger } from '@hooks/useEventLogger';
+import { useSuggestionNavigation } from '@hooks/useSuggestionNavigation';
 import InputField from '@components/InputField/InputField';
 import IconButton from '@components/IconButton/IconButton';
 import Button from '@components/Button/Button';
@@ -11,35 +12,6 @@ import Alert from '@components/Alert/Alert';
 import { Form } from '@components/AddressInput/AddressInput.styles';
 import { GeocodeResult } from '@typez/addressMatchTypes';
 import { motion } from 'framer-motion';
-
-const getSuggestionElements = (): HTMLElement[] =>
-  Array.from(document.querySelectorAll('[data-display]')) as HTMLElement[];
-
-const handleSuggestionKeyDown = (
-  e: React.KeyboardEvent<HTMLLIElement>,
-  index: number,
-  onSelect: (address: string) => void,
-  inputRef: React.RefObject<HTMLInputElement | null>
-) => {
-  e.preventDefault();
-  const items = getSuggestionElements();
-  if (e.key === 'ArrowDown') {
-    items[(index + 1) % items.length]?.focus();
-  } else if (e.key === 'ArrowUp') {
-    items[(index - 1 + items.length) % items.length]?.focus();
-  } else if (e.key === 'Enter') {
-    onSelect(items[index]?.getAttribute('data-display') || '');
-  } else if (e.key === 'Tab') {
-    inputRef.current?.focus();
-  }
-};
-
-const handleInputKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-  if (e.key === 'ArrowDown') {
-    e.preventDefault();
-    getSuggestionElements()[0]?.focus();
-  }
-};
 
 interface AddressInputProps {
   mockLookup?: Partial<ReturnType<typeof useAddressLookup>> & {
@@ -77,6 +49,7 @@ const AddressInput = ({
   const logEvent = logEventProp || logEventHook;
 
   const inputRef = useRef<HTMLInputElement | null>(null);
+  const suggestionRefs = useRef<React.RefObject<HTMLLIElement>[]>([]);
 
   const selectedSuggestion = useRef<GeocodeResult | null>(
     mockSelectedSuggestion || null
@@ -125,14 +98,25 @@ const AddressInput = ({
     }
   };
 
-  const uniqueSuggestions = [
-    ...new Map(
-      suggestions.map((s) => [
-        s.displayName,
-        { ...s, lat: s.lat ?? 0, lon: s.lon ?? 0 }
-      ])
-    ).values()
-  ];
+  const uniqueSuggestions = useMemo(() => {
+    return [
+      ...new Map(
+        suggestions.map((s) => [
+          s.displayName,
+          { ...s, lat: s.lat ?? 0, lon: s.lon ?? 0 }
+        ])
+      ).values()
+    ];
+  }, [suggestions]);
+
+  useEffect(() => {
+    suggestionRefs.current = uniqueSuggestions.map(
+      (_, i) => suggestionRefs.current[i] ?? createRef<HTMLLIElement>()
+    );
+  }, [uniqueSuggestions]);
+
+  const { handleInputKeyDown, handleSuggestionKeyDown } =
+    useSuggestionNavigation(inputRef, onSelect, suggestionRefs.current);
 
   const showSuggestions =
     (query?.trim() ?? '') !== '' &&
@@ -179,20 +163,8 @@ const AddressInput = ({
         <SuggestionsList
           suggestions={uniqueSuggestions}
           onSelect={onSelect}
-          onKeyDown={(e, index) =>
-            handleSuggestionKeyDown(
-              e,
-              index,
-              (address) =>
-                onSelect({
-                  displayName: address,
-                  lat: '0',
-                  lon: '0',
-                  value: address
-                }),
-              inputRef
-            )
-          }
+          suggestionRefs={suggestionRefs.current}
+          onSuggestionKeyDown={handleSuggestionKeyDown}
         />
       )}
       {locked && (

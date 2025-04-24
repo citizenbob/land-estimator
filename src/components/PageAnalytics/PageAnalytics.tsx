@@ -1,4 +1,3 @@
-// src/components/PageAnalytics.tsx
 'use client';
 
 import { useEffect } from 'react';
