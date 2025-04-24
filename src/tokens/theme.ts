@@ -1,12 +1,11 @@
-// tokens/theme.ts
-export type Theme = 'default' | 'clientA' | 'clientB';
+export type ThemeType = 'default' | 'dark' | 'light';
 
-const themeMap: Record<Theme, string> = {
-  default: 'theme-default',
-  clientA: 'theme-client-a',
-  clientB: 'theme-client-b'
-};
+export function getThemeClass(theme: ThemeType): string {
+  const themeMap: Record<ThemeType, string> = {
+    default: 'theme-default',
+    dark: 'theme-dark',
+    light: 'theme-light'
+  };
 
-export function getThemeClass(theme: Theme): string {
   return themeMap[theme] || themeMap.default;
 }

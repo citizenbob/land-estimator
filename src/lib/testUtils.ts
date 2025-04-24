@@ -77,7 +77,7 @@ export const setupConsoleMocks = () => {
 };
 
 export const verifyUniqueSuggestions = async () => {
-  const items = await waitFor(() => screen.getAllByRole('listitem'));
+  const items = await waitFor(() => screen.getAllByRole('option'));
   const displays = items
     .map((item) => item.getAttribute('data-display'))
     .filter(Boolean);
@@ -86,4 +86,4 @@ export const verifyUniqueSuggestions = async () => {
   expect(uniqueDisplays.length).toBeGreaterThan(0);
 };
 
-export const getListItems = async () => screen.getAllByRole('listitem');
+export const getListItems = async () => screen.getAllByRole('option');

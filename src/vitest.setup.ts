@@ -7,19 +7,8 @@ import * as matchers from '@testing-library/jest-dom/matchers';
 import '@testing-library/jest-dom';
 import '@testing-library/jest-dom/vitest';
 
-// Extend Vitest's expect method with methods from react-testing-library
 expect.extend(matchers);
 
-// Mock ResizeObserver
-// ...existing code...
-
-// Mock IntersectionObserver
-// ...existing code...
-
-// Add a basic mock for mixpanel-browser
-// ...existing code...
-
-// Runs a cleanup after each test case (e.g. clearing jsdom)
 afterEach(() => {
   cleanup();
 });

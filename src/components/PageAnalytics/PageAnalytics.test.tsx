@@ -1,6 +1,3 @@
-// src/components/Analytics/Analytics.test.tsx
-'use client';
-
 import React from 'react';
 import { render } from '@testing-library/react';
 import { vi, expect } from 'vitest';
