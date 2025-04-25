@@ -4,22 +4,12 @@ declare global {
     toFirestore?: boolean;
   }
 
-  interface LogEventPayload {
-    eventName: string;
-    data: Record<string, unknown>;
-    toMixpanel?: boolean;
-    toFirestore?: boolean;
-  }
-
   interface Window {
-    logEvent: {
-      (payload: LogEventPayload): void;
-      (
-        eventName: string,
-        data: Record<string, unknown>,
-        options?: LogEventOptions
-      ): void;
-    };
+    logEvent: (
+      eventName: string,
+      data: Record<string, string | number | boolean | string[]>,
+      options?: LogEventOptions
+    ) => void;
   }
 }
 

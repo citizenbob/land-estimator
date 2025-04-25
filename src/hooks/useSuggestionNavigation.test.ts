@@ -2,9 +2,14 @@ import { renderHook, act } from '@testing-library/react';
 import { describe, it, expect, vi } from 'vitest';
 import React from 'react';
 import { useSuggestionNavigation } from './useSuggestionNavigation';
-import { mockSuggestions } from '@lib/testData';
+import { MOCK_SUGGESTIONS } from '@lib/testData';
+import { setupConsoleMocks } from '@lib/testUtils';
 
 describe('useSuggestionNavigation', () => {
+  beforeEach(() => {
+    setupConsoleMocks();
+  });
+
   it('should call onSelect when Enter is pressed on a suggestion', () => {
     const mockOnSelect = vi.fn();
     const mockInputRef = { current: document.createElement('input') };
@@ -20,11 +25,11 @@ describe('useSuggestionNavigation', () => {
     } as unknown as React.KeyboardEvent<HTMLLIElement>;
 
     act(() => {
-      result.current.handleSuggestionKeyDown(mockEvent, mockSuggestions[0], 0);
+      result.current.handleSuggestionKeyDown(mockEvent, MOCK_SUGGESTIONS[0], 0);
     });
 
     expect(mockOnSelect).toHaveBeenCalledTimes(1);
-    expect(mockOnSelect).toHaveBeenCalledWith(mockSuggestions[0]);
+    expect(mockOnSelect).toHaveBeenCalledWith(MOCK_SUGGESTIONS[0]);
   });
 
   it('should focus the first suggestion when ArrowDown is pressed in the input', () => {
@@ -79,7 +84,7 @@ describe('useSuggestionNavigation', () => {
     act(() => {
       result.current.handleSuggestionKeyDown(
         mockEventDown,
-        mockSuggestions[0],
+        MOCK_SUGGESTIONS[0],
         0
       );
     });
@@ -94,7 +99,7 @@ describe('useSuggestionNavigation', () => {
     act(() => {
       result.current.handleSuggestionKeyDown(
         mockEventUp,
-        mockSuggestions[1],
+        MOCK_SUGGESTIONS[1],
         1
       );
     });
@@ -120,7 +125,7 @@ describe('useSuggestionNavigation', () => {
     } as unknown as React.KeyboardEvent<HTMLLIElement>;
 
     act(() => {
-      result.current.handleSuggestionKeyDown(mockEvent, mockSuggestions[0], 0);
+      result.current.handleSuggestionKeyDown(mockEvent, MOCK_SUGGESTIONS[0], 0);
     });
 
     expect(mockEvent.preventDefault).toHaveBeenCalled();
@@ -165,7 +170,7 @@ describe('useSuggestionNavigation', () => {
     } as unknown as React.KeyboardEvent<HTMLLIElement>;
 
     act(() => {
-      result.current.handleSuggestionKeyDown(mockEvent, mockSuggestions[0], 0);
+      result.current.handleSuggestionKeyDown(mockEvent, MOCK_SUGGESTIONS[0], 0);
     });
 
     expect(mockEvent.preventDefault).not.toHaveBeenCalled();
@@ -195,7 +200,7 @@ describe('useSuggestionNavigation', () => {
     act(() => {
       result.current.handleSuggestionKeyDown(
         mockEventUp,
-        mockSuggestions[0],
+        MOCK_SUGGESTIONS[0],
         0
       );
     });
@@ -228,7 +233,7 @@ describe('useSuggestionNavigation', () => {
     act(() => {
       result.current.handleSuggestionKeyDown(
         mockEventDown,
-        mockSuggestions[2],
+        MOCK_SUGGESTIONS[2],
         2
       );
     });

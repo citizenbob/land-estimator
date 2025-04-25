@@ -1,12 +1,31 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
 import { useAddressLookup } from './useAddressLookup';
-import { NominatimResponse } from '@typez/addressMatchTypes';
+import { NominatimApiClient } from '@services/nominatimApi';
+import {
+  MOCK_NOMINATIM_RESPONSE,
+  MOCK_NOMINATIM_RESPONSES,
+  TEST_LOCATIONS,
+  MOCK_NOMINATIM_ERRORS
+} from '@lib/testData';
+import { setupConsoleMocks } from '@lib/testUtils';
+
+// Mock the API client instead of fetch directly
+vi.mock('@services/nominatimApi', () => ({
+  NominatimApiClient: {
+    fetchSuggestions: vi.fn()
+  }
+}));
+
+const mockFetchSuggestions = NominatimApiClient.fetchSuggestions as ReturnType<
+  typeof vi.fn
+>;
 
 describe('useAddressLookup', () => {
   beforeEach(() => {
     vi.useFakeTimers();
-    vi.spyOn(global, 'fetch');
+    mockFetchSuggestions.mockReset();
+    setupConsoleMocks();
   });
 
   afterEach(() => {
@@ -24,117 +43,131 @@ describe('useAddressLookup', () => {
     expect(result.current.error).toBeNull();
   });
 
-  it('fetches suggestions after debounce and updates state', async () => {
-    const mockData: NominatimResponse[] = [
-      {
-        place_id: 1,
-        licence: 'licence',
-        osm_type: 'type',
-        osm_id: 10,
-        lat: '10',
-        lon: '20',
-        place_rank: 0,
-        importance: 0,
-        addresstype: 'addr',
-        name: 'name',
-        display_name: 'Display A',
-        boundingbox: []
-      }
-    ];
-
-    (global.fetch as unknown as vi.Mock).mockResolvedValueOnce({
-      ok: true,
-      json: () => Promise.resolve(mockData)
-    });
+  it('fetches suggestions using API client after debounce and updates state', async () => {
+    mockFetchSuggestions.mockResolvedValueOnce([MOCK_NOMINATIM_RESPONSE]);
 
     const { result } = renderHook(() => useAddressLookup());
 
     act(() => {
-      result.current.handleChange('test');
+      result.current.handleChange(TEST_LOCATIONS.GOOGLE);
     });
+
+    expect(result.current.isFetching).toBe(true);
 
     await act(async () => {
       vi.advanceTimersByTime(600);
-      vi.useRealTimers();
     });
 
-    await vi.waitFor(
-      () => {
-        expect(result.current.suggestions).toHaveLength(1);
-      },
-      { timeout: 1000 }
-    );
+    await vi.waitFor(() => {
+      expect(result.current.suggestions).toHaveLength(1);
+      expect(result.current.isFetching).toBe(false);
+    });
 
-    expect(global.fetch).toHaveBeenCalledWith(
-      '/api/nominatim?type=suggestions&query=test'
-    );
+    expect(mockFetchSuggestions).toHaveBeenCalledTimes(1);
+    expect(mockFetchSuggestions).toHaveBeenCalledWith(TEST_LOCATIONS.GOOGLE);
+
     expect(result.current.suggestions[0]).toEqual({
-      place_id: 1,
-      display_name: 'Display A'
+      place_id: MOCK_NOMINATIM_RESPONSE.place_id,
+      display_name: MOCK_NOMINATIM_RESPONSE.display_name
     });
     expect(result.current.hasFetched).toBe(true);
     expect(result.current.error).toBeNull();
   });
 
   it('clears suggestions and locks state on handleSelect', () => {
+    const selectedAddress = TEST_LOCATIONS.APPLE;
     const { result } = renderHook(() => useAddressLookup());
+
     act(() => {
-      result.current.handleSelect('chosen');
+      result.current.handleSelect(selectedAddress);
     });
-    expect(result.current.query).toBe('chosen');
+
+    expect(result.current.query).toBe(selectedAddress);
     expect(result.current.suggestions).toEqual([]);
     expect(result.current.locked).toBe(true);
   });
 
   it('getSuggestionData returns stored raw data', async () => {
-    const mockData: NominatimResponse[] = [
-      {
-        place_id: 42,
-        licence: '',
-        osm_type: '',
-        osm_id: 0,
-        lat: '0',
-        lon: '0',
-        place_rank: 0,
-        importance: 0,
-        addresstype: '',
-        name: '',
-        display_name: 'Display B',
-        boundingbox: []
-      }
-    ];
-
-    (global.fetch as unknown as vi.Mock).mockResolvedValueOnce({
-      ok: true,
-      json: () => Promise.resolve(mockData)
-    });
+    mockFetchSuggestions.mockResolvedValueOnce([MOCK_NOMINATIM_RESPONSES[1]]);
 
     const { result } = renderHook(() => useAddressLookup());
 
-    // Change the query
     act(() => {
-      result.current.handleChange('foo');
+      result.current.handleChange(TEST_LOCATIONS.APPLE);
     });
 
-    // Advance timer to trigger fetch
     await act(async () => {
       vi.advanceTimersByTime(600);
-      // Switch to real timers
-      vi.useRealTimers();
     });
 
-    // Wait for the suggestions to be populated
-    await vi.waitFor(
-      () => {
-        expect(result.current.suggestions).toHaveLength(1);
-      },
-      { timeout: 1000 }
+    await vi.waitFor(() => {
+      expect(result.current.suggestions).toHaveLength(1);
+    });
+
+    expect(mockFetchSuggestions).toHaveBeenCalledTimes(1);
+    expect(mockFetchSuggestions).toHaveBeenCalledWith(TEST_LOCATIONS.APPLE);
+
+    const placeId = MOCK_NOMINATIM_RESPONSES[1].place_id;
+    expect(result.current.suggestions[0].place_id).toBe(placeId);
+    const data = result.current.getSuggestionData(placeId);
+    expect(data).toEqual(MOCK_NOMINATIM_RESPONSES[1]);
+  });
+
+  it('handles API errors', async () => {
+    mockFetchSuggestions.mockRejectedValueOnce(
+      new Error(MOCK_NOMINATIM_ERRORS.NOT_FOUND.message)
     );
 
-    expect(result.current.suggestions[0].place_id).toBe(42);
+    const { result } = renderHook(() => useAddressLookup());
 
-    // Now test getSuggestionData
-    const data = result.current.getSuggestionData(42);
-    expect(data).toEqual(mockData[0]);
+    act(() => {
+      result.current.handleChange(TEST_LOCATIONS.MICROSOFT);
+    });
+
+    await act(async () => {
+      vi.advanceTimersByTime(600);
+    });
+
+    await vi.waitFor(() => {
+      expect(result.current.error).not.toBeNull();
+      expect(result.current.isFetching).toBe(false);
+    });
+
+    expect(mockFetchSuggestions).toHaveBeenCalledTimes(1);
+    expect(mockFetchSuggestions).toHaveBeenCalledWith(TEST_LOCATIONS.MICROSOFT);
+
+    expect(result.current.suggestions).toEqual([]);
+    expect(result.current.hasFetched).toBe(true);
+    expect(result.current.error).toBe(MOCK_NOMINATIM_ERRORS.NOT_FOUND.message);
+  });
+
+  it('handles network errors during fetch', async () => {
+    mockFetchSuggestions.mockRejectedValueOnce(
+      MOCK_NOMINATIM_ERRORS.NETWORK_ERROR
+    );
+
+    const { result } = renderHook(() => useAddressLookup());
+
+    act(() => {
+      result.current.handleChange(TEST_LOCATIONS.FACEBOOK);
+    });
+
+    await act(async () => {
+      vi.advanceTimersByTime(600);
+    });
+
+    await vi.waitFor(() => {
+      expect(result.current.error).not.toBeNull();
+      expect(result.current.isFetching).toBe(false);
+    });
+
+    expect(mockFetchSuggestions).toHaveBeenCalledTimes(1);
+    expect(mockFetchSuggestions).toHaveBeenCalledWith(TEST_LOCATIONS.FACEBOOK);
+
+    expect(result.current.suggestions).toEqual([]);
+    expect(result.current.hasFetched).toBe(true);
+    expect(result.current.error).toBe(
+      MOCK_NOMINATIM_ERRORS.NETWORK_ERROR.message
+    );
   });
 });

@@ -1,6 +1,9 @@
 import { fireEvent, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { expect, vi } from 'vitest';
+import { MOCK_NOMINATIM_RESPONSES } from './testData';
+import { AddressSuggestion } from '@typez/addressMatchTypes';
+import { useAddressLookup } from '@hooks/useAddressLookup';
 
 export const typeAndSelectSuggestion = async (
   input: HTMLElement,
@@ -61,7 +64,8 @@ export const mockErrorResponse = (
   mockFetch.mockResolvedValueOnce({
     ok: false,
     status,
-    statusText
+    statusText,
+    json: async () => ({ error: statusText })
   });
 };
 
@@ -71,6 +75,18 @@ export const mockNetworkError = (
 ) => {
   const error = new Error(errorMessage);
   mockFetch.mockRejectedValueOnce(error);
+};
+
+export const mockJsonParsingError = (
+  mockFetch: ReturnType<typeof vi.fn>,
+  errorMessage = 'Invalid JSON'
+) => {
+  mockFetch.mockResolvedValueOnce({
+    ok: true,
+    json: async () => {
+      throw new SyntaxError(errorMessage);
+    }
+  });
 };
 
 export const setupConsoleMocks = () => {
@@ -91,3 +107,58 @@ export const verifyUniqueSuggestions = async () => {
 };
 
 export const getListItems = async () => screen.getAllByRole('option');
+
+/**
+ * Creates a standardized mock for useAddressLookup
+ *
+ * @param overrides Properties to override in the default mock
+ * @returns A mock object that can be used with AddressInput's mockLookup prop
+ */
+export function createAddressLookupMock(
+  overrides: Partial<ReturnType<typeof useAddressLookup>> = {}
+) {
+  const handleChange = vi.fn();
+  const handleSelect = vi.fn();
+
+  const getSuggestionData = vi.fn((id: number) => {
+    const suggestion = MOCK_NOMINATIM_RESPONSES.find((s) => s.place_id === id);
+    return suggestion || MOCK_NOMINATIM_RESPONSES[0];
+  });
+
+  const defaultMock = {
+    query: '',
+    suggestions: [] as AddressSuggestion[],
+    isFetching: false,
+    locked: false,
+    hasFetched: false,
+    error: null,
+    handleChange,
+    handleSelect,
+    getSuggestionData
+  };
+
+  return {
+    ...defaultMock,
+    ...overrides
+  };
+}
+
+/**
+ * Creates a standardized mock for NominatimApiClient
+ *
+ * @param overrides Custom behavior for the mock methods
+ * @returns A mocked NominatimApiClient with configured behavior
+ */
+export function createNominatimApiClientMock(
+  overrides: {
+    fetchSuggestions?: ReturnType<typeof vi.fn>;
+    fetchCoordinates?: ReturnType<typeof vi.fn>;
+  } = {}
+) {
+  return {
+    fetchSuggestions:
+      overrides.fetchSuggestions || vi.fn().mockResolvedValue([]),
+    fetchCoordinates:
+      overrides.fetchCoordinates || vi.fn().mockResolvedValue({})
+  };
+}

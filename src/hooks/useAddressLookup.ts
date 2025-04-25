@@ -1,118 +1,95 @@
-import { useState, useCallback, useEffect, useRef } from 'react';
-import { AddressSuggestion, NominatimResponse } from '@typez/addressMatchTypes';
+import { useState, useEffect, useRef } from 'react';
+import { NominatimApiClient } from '@services/nominatimApi';
 
-export const useAddressLookup = () => {
+/**
+ * Hook that manages address lookup functionality
+ *
+ * Provides stateful management of address search queries, suggestions retrieval,
+ * and selection. Handles API communication with throttling, error handling,
+ * and maintains the raw suggestion data for later reference.
+ *
+ * @returns Object containing the address lookup state and handler functions
+ */
+export function useAddressLookup() {
   const [query, setQuery] = useState<string>('');
-  const [suggestions, setSuggestions] = useState<AddressSuggestion[]>([]);
+  const [suggestions, setSuggestions] = useState<
+    { place_id: number; display_name: string }[]
+  >([]);
   const [isFetching, setIsFetching] = useState<boolean>(false);
   const [locked, setLocked] = useState<boolean>(false);
-  const [ignoreNextChange, setIgnoreNextChange] = useState<boolean>(false);
   const [hasFetched, setHasFetched] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
-  const debounceTimeout = useRef<NodeJS.Timeout | null>(null);
 
-  // Store raw suggestion data for later lookup
-  const rawDataMap = useRef<Record<number, NominatimResponse>>({});
+  const rawDataRef = useRef<
+    Record<number, { place_id: number; display_name: string }>
+  >({});
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const fetchSuggestions = useCallback(
-    async (value: string) => {
-      if (locked || !value.trim()) {
-        setSuggestions([]);
-        setIsFetching(false);
-        return;
-      }
-      setIsFetching(true);
-      setError(null);
-      try {
-        // fetch raw NominatimResponse array
-        const response = await fetch(
-          `/api/nominatim?type=suggestions&query=${encodeURIComponent(value)}`
-        );
-
-        if (!response.ok) {
-          throw new Error(`Error: ${response.status}`);
-        }
-
-        const results: NominatimResponse[] = await response.json();
-        // populate rawDataMap
-        rawDataMap.current = {};
-        results.forEach((item) => {
-          rawDataMap.current[item.place_id] = item;
-        });
-        // set minimal suggestions
-        setSuggestions(
-          results.map((item) => ({
-            place_id: item.place_id,
-            display_name: item.display_name
-          }))
-        );
-      } catch (err) {
-        setSuggestions([]);
-        setError('Error fetching suggestions. Please try again.');
-        console.error('Error fetching address suggestions:', err);
-      } finally {
-        setIsFetching(false);
-        setHasFetched(true);
-      }
-    },
-    [locked]
-  );
-
-  // Retrieve full payload for a suggestion
-  const getSuggestionData = useCallback(
-    (id: number): NominatimResponse | undefined => rawDataMap.current[id],
-    []
-  );
-
-  useEffect(() => {
-    if (locked || !(query?.trim() ?? '')) {
-      if (debounceTimeout.current) clearTimeout(debounceTimeout.current);
-      setSuggestions([]);
-      setError(null);
-      if (!(query?.trim() ?? '')) setHasFetched(false);
-      return;
-    }
-    if (debounceTimeout.current) clearTimeout(debounceTimeout.current);
-    debounceTimeout.current = setTimeout(() => {
-      fetchSuggestions(query);
-    }, 500);
-    return () => {
-      if (debounceTimeout.current) clearTimeout(debounceTimeout.current);
-    };
-  }, [query, fetchSuggestions, locked]);
-
-  const handleChange = useCallback(
-    (value: string) => {
-      if (ignoreNextChange) {
-        setIgnoreNextChange(false);
-        return;
-      }
-      setQuery(value);
-    },
-    [ignoreNextChange]
-  );
-
-  const handleSelect = useCallback((value: string) => {
-    if (debounceTimeout.current) {
-      clearTimeout(debounceTimeout.current);
-      debounceTimeout.current = null;
-    }
+  const handleChange = (value: string) => {
+    if (locked) return;
     setQuery(value);
     setSuggestions([]);
+    setError(null);
+    setHasFetched(false);
+    if (timerRef.current) clearTimeout(timerRef.current);
+    setIsFetching(true);
+
+    timerRef.current = setTimeout(async () => {
+      if (!value) {
+        setIsFetching(false);
+        return;
+      }
+      try {
+        const data = await NominatimApiClient.fetchSuggestions(value);
+        type Suggestion = { place_id: number; display_name: string };
+        const simplified = (data as Suggestion[]).map((item) => {
+          rawDataRef.current[item.place_id] = item;
+          return {
+            place_id: item.place_id,
+            display_name: item.display_name
+          };
+        });
+        setSuggestions(simplified);
+        setHasFetched(true);
+      } catch (err: unknown) {
+        if (err instanceof Error) {
+          setError(err.message);
+        } else {
+          setError('An unknown error occurred');
+        }
+        setSuggestions([]);
+        setHasFetched(true);
+      } finally {
+        setIsFetching(false);
+      }
+    }, 600);
+  };
+
+  const handleSelect = (selected: string) => {
+    setQuery(selected);
+    setSuggestions([]);
     setLocked(true);
-    setIgnoreNextChange(true);
+  };
+
+  const getSuggestionData = (id: number) => {
+    return rawDataRef.current[id];
+  };
+
+  useEffect(() => {
+    return () => {
+      if (timerRef.current) clearTimeout(timerRef.current);
+    };
   }, []);
 
   return {
     query,
-    setQuery,
     suggestions,
-    error,
-    handleChange,
-    handleSelect,
     isFetching,
     locked,
     hasFetched,
+    error,
+    handleChange,
+    handleSelect,
     getSuggestionData
   };
-};
+}
