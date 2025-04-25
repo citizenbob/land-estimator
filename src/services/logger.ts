@@ -11,13 +11,13 @@ export async function logEvent({
   toFirestore = true
 }: {
   eventName: string;
-  data: Record<string, unknown>;
+  data: Record<string, string | number | boolean | string[]>;
   toMixpanel?: boolean;
   toFirestore?: boolean;
 }): Promise<void> {
   if (toMixpanel) {
     try {
-      mixpanel.track(eventName);
+      mixpanel.track(eventName, data);
     } catch (error: unknown) {
       console.error('Error logging event to Mixpanel:', error);
     }
@@ -34,22 +34,6 @@ export async function logEvent({
       console.error('Error logging event to Firestore:', error);
     }
   }
-}
-
-if (typeof window !== 'undefined') {
-  function unifiedLogEvent(
-    eventOrEventName:
-      | string
-      | { eventName: string; data: Record<string, unknown> },
-    data?: Record<string, unknown>
-  ): void {
-    if (typeof eventOrEventName === 'string') {
-      logEvent({ eventName: eventOrEventName, data: data! });
-    } else {
-      logEvent(eventOrEventName);
-    }
-  }
-  window.logEvent = unifiedLogEvent;
 }
 
 export { app, db };

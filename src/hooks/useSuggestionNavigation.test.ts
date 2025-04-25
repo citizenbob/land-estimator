@@ -2,20 +2,12 @@ import { renderHook, act } from '@testing-library/react';
 import { describe, it, expect, vi } from 'vitest';
 import React from 'react';
 import { useSuggestionNavigation } from './useSuggestionNavigation';
-import { GeocodeResult } from '@typez/addressMatchTypes';
-
-type MockSuggestion = GeocodeResult;
+import { mockSuggestions } from '@lib/testData';
 
 describe('useSuggestionNavigation', () => {
   it('should call onSelect when Enter is pressed on a suggestion', () => {
     const mockOnSelect = vi.fn();
     const mockInputRef = { current: document.createElement('input') };
-    const mockSuggestion: MockSuggestion = {
-      value: 'Test Suggestion',
-      displayName: 'Test Suggestion',
-      lat: '0',
-      lon: '0'
-    };
     const mockSuggestionRefs: React.RefObject<HTMLLIElement>[] = [];
 
     const { result } = renderHook(() =>
@@ -28,11 +20,11 @@ describe('useSuggestionNavigation', () => {
     } as unknown as React.KeyboardEvent<HTMLLIElement>;
 
     act(() => {
-      result.current.handleSuggestionKeyDown(mockEvent, mockSuggestion, 0);
+      result.current.handleSuggestionKeyDown(mockEvent, mockSuggestions[0], 0);
     });
 
     expect(mockOnSelect).toHaveBeenCalledTimes(1);
-    expect(mockOnSelect).toHaveBeenCalledWith(mockSuggestion);
+    expect(mockOnSelect).toHaveBeenCalledWith(mockSuggestions[0]);
   });
 
   it('should focus the first suggestion when ArrowDown is pressed in the input', () => {
@@ -66,21 +58,6 @@ describe('useSuggestionNavigation', () => {
   it('should navigate between suggestions using ArrowDown and ArrowUp', () => {
     const mockOnSelect = vi.fn();
     const mockInputRef = { current: document.createElement('input') };
-    const mockSuggestions: MockSuggestion[] = [
-      {
-        value: 'Suggestion 1',
-        displayName: 'Suggestion 1',
-        lat: '0',
-        lon: '0'
-      },
-      {
-        value: 'Suggestion 2',
-        displayName: 'Suggestion 2',
-        lat: '0',
-        lon: '0'
-      },
-      { value: 'Suggestion 3', displayName: 'Suggestion 3', lat: '0', lon: '0' }
-    ];
     const mockSuggestionRefs: React.RefObject<HTMLLIElement>[] = [
       { current: document.createElement('li') },
       { current: document.createElement('li') },
@@ -129,9 +106,6 @@ describe('useSuggestionNavigation', () => {
     const mockOnSelect = vi.fn();
     const mockInputRef = { current: document.createElement('input') };
     vi.spyOn(mockInputRef.current, 'focus');
-    const mockSuggestions: MockSuggestion[] = [
-      { value: 'Suggestion 1', displayName: 'Suggestion 1', lat: '0', lon: '0' }
-    ];
     const mockSuggestionRefs: React.RefObject<HTMLLIElement>[] = [
       { current: document.createElement('li') }
     ];
@@ -177,9 +151,6 @@ describe('useSuggestionNavigation', () => {
   it('should not prevent default for Tab key in suggestions', () => {
     const mockOnSelect = vi.fn();
     const mockInputRef = { current: document.createElement('input') };
-    const mockSuggestions: MockSuggestion[] = [
-      { value: 'Suggestion 1', displayName: 'Suggestion 1', lat: '0', lon: '0' }
-    ];
     const mockSuggestionRefs: React.RefObject<HTMLLIElement>[] = [
       { current: document.createElement('li') }
     ];
@@ -203,21 +174,6 @@ describe('useSuggestionNavigation', () => {
   it('should wrap focus from the first item to the last item when ArrowUp is pressed', () => {
     const mockOnSelect = vi.fn();
     const mockInputRef = { current: document.createElement('input') };
-    const mockSuggestions: MockSuggestion[] = [
-      {
-        value: 'Suggestion 1',
-        displayName: 'Suggestion 1',
-        lat: '0',
-        lon: '0'
-      },
-      {
-        value: 'Suggestion 2',
-        displayName: 'Suggestion 2',
-        lat: '0',
-        lon: '0'
-      },
-      { value: 'Suggestion 3', displayName: 'Suggestion 3', lat: '0', lon: '0' }
-    ];
     const mockSuggestionRefs: React.RefObject<HTMLLIElement>[] = [
       { current: document.createElement('li') },
       { current: document.createElement('li') },
@@ -251,21 +207,6 @@ describe('useSuggestionNavigation', () => {
   it('should wrap focus from the last item to the first item when ArrowDown is pressed', () => {
     const mockOnSelect = vi.fn();
     const mockInputRef = { current: document.createElement('input') };
-    const mockSuggestions: MockSuggestion[] = [
-      {
-        value: 'Suggestion 1',
-        displayName: 'Suggestion 1',
-        lat: '0',
-        lon: '0'
-      },
-      {
-        value: 'Suggestion 2',
-        displayName: 'Suggestion 2',
-        lat: '0',
-        lon: '0'
-      },
-      { value: 'Suggestion 3', displayName: 'Suggestion 3', lat: '0', lon: '0' }
-    ];
     const mockSuggestionRefs: React.RefObject<HTMLLIElement>[] = [
       { current: document.createElement('li') },
       { current: document.createElement('li') },

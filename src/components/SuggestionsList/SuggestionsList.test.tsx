@@ -2,16 +2,11 @@ import React from 'react';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi } from 'vitest';
 import SuggestionsList from './SuggestionsList';
-import { GeocodeResult } from '@typez/addressMatchTypes';
+import { mockSuggestions } from '@lib/testData';
 
-const mockSuggestions: GeocodeResult[] = [
-  { displayName: 'Suggestion 1', value: 'suggestion-1', lat: '0', lon: '0' },
-  { displayName: 'Suggestion 2', value: 'suggestion-2', lat: '1', lon: '1' }
-];
-
-const mockRefs: React.RefObject<HTMLLIElement>[] = mockSuggestions.map(
-  () => React.createRef<HTMLLIElement>() as React.RefObject<HTMLLIElement>
-);
+const mockRefs: React.RefObject<HTMLLIElement>[] = mockSuggestions.map(() =>
+  React.createRef<HTMLLIElement>()
+) as React.RefObject<HTMLLIElement>[];
 
 describe('SuggestionsList Component', () => {
   it('renders suggestions correctly', () => {
@@ -27,8 +22,12 @@ describe('SuggestionsList Component', () => {
       />
     );
 
-    expect(screen.getByText('Suggestion 1')).toBeInTheDocument();
-    expect(screen.getByText('Suggestion 2')).toBeInTheDocument();
+    expect(
+      screen.getByText(mockSuggestions[0].display_name)
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(mockSuggestions[1].display_name)
+    ).toBeInTheDocument();
     const listItems = screen.getAllByRole('option');
     expect(listItems).toHaveLength(mockSuggestions.length);
   });
@@ -64,7 +63,7 @@ describe('SuggestionsList Component', () => {
       />
     );
 
-    fireEvent.click(screen.getByText('Suggestion 1'));
+    fireEvent.click(screen.getByText(mockSuggestions[0].display_name));
     expect(mockOnSelect).toHaveBeenCalledTimes(1);
     expect(mockOnSelect).toHaveBeenCalledWith(mockSuggestions[0]);
   });
@@ -82,7 +81,7 @@ describe('SuggestionsList Component', () => {
       />
     );
 
-    const firstItem = screen.getByText('Suggestion 1');
+    const firstItem = screen.getByText(mockSuggestions[0].display_name);
     fireEvent.keyDown(firstItem, { key: 'Enter', code: 'Enter' });
 
     expect(mockOnKeyDown).toHaveBeenCalledTimes(1);
