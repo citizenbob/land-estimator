@@ -1,9 +1,10 @@
 'use client';
 
-import React, { useRef, createRef, useEffect, useMemo } from 'react';
+import React, { useRef, createRef, useEffect } from 'react';
 import { useAddressLookup } from '@hooks/useAddressLookup';
 import { useEventLogger } from '@hooks/useEventLogger';
 import { useSuggestionNavigation } from '@hooks/useSuggestionNavigation';
+import { useInputState } from '@hooks/useInputState';
 import InputField from '@components/InputField/InputField';
 import IconButton from '@components/IconButton/IconButton';
 import Button from '@components/Button/Button';
@@ -21,14 +22,14 @@ interface AddressInputProps {
     logEvent?: (
       eventName: string,
       data: Record<string, string | number | boolean | string[]>,
-      options?: Record<string, unknown>
+      options?: { toMixpanel?: boolean; toFirestore?: boolean }
     ) => void;
     selectedSuggestion?: AddressSuggestion;
   };
   logEvent?: (
     eventName: string,
     data: Record<string, string | number | boolean | string[]>,
-    options?: Record<string, unknown>
+    options?: { toMixpanel?: boolean; toFirestore?: boolean }
   ) => void;
 }
 
@@ -59,20 +60,30 @@ const AddressInput = ({
     mockSelectedSuggestion || null
   );
 
+  // Use our new hook to manage UI state
+  const {
+    showLoading,
+    showErrorAlert,
+    showSuggestions,
+    showClearButton,
+    showEstimateButton,
+    uniqueSuggestions
+  } = useInputState(query, suggestions, isFetching, hasFetched, locked);
+
   const createAddressPayload = (
     suggestionId: number,
     confirmedIntent = false
   ) => {
-    const fullData = getSuggestionData(suggestionId);
+    const fullData = getSuggestionData(
+      suggestionId
+    ) as EnrichedAddressSuggestion;
 
     if (!fullData) {
-      console.error(`No data found for suggestion ID ${suggestionId}`);
       return null;
     }
 
-    // Convert lat/lon strings to numbers, fallback to 0
-    const lat = fullData.lat ? parseFloat(fullData.lat) : 0;
-    const lon = fullData.lon ? parseFloat(fullData.lon) : 0;
+    const lat = fullData.lat ? parseFloat(String(fullData.lat)) : 0;
+    const lon = fullData.lon ? parseFloat(String(fullData.lon)) : 0;
 
     return {
       id: fullData.place_id,
@@ -84,19 +95,29 @@ const AddressInput = ({
     };
   };
 
-  const onSelect = (suggestion: AddressSuggestion) => {
-    handleSelect(suggestion.display_name);
-    selectedSuggestion.current = suggestion;
-
+  const logAddressEvent = (
+    suggestion: AddressSuggestion,
+    eventName: string,
+    confirmedIntent = false
+  ) => {
     if (logEvent) {
-      const payload = createAddressPayload(suggestion.place_id, false);
+      const payload = createAddressPayload(
+        suggestion.place_id,
+        confirmedIntent
+      );
       if (payload) {
-        logEvent('Address Selected', payload, {
+        logEvent(eventName, payload, {
           toMixpanel: true,
           toFirestore: true
         });
       }
     }
+  };
+
+  const onSelect = (suggestion: AddressSuggestion) => {
+    handleSelect(suggestion.display_name);
+    selectedSuggestion.current = suggestion;
+    logAddressEvent(suggestion, 'Address Selected');
   };
 
   const onEstimateClick = () => {
@@ -111,31 +132,8 @@ const AddressInput = ({
       return;
     }
 
-    if (logEvent) {
-      const payload = createAddressPayload(matched.place_id, true);
-      if (payload) {
-        logEvent('Request Estimate', payload, {
-          toMixpanel: true,
-          toFirestore: true
-        });
-      }
-    }
+    logAddressEvent(matched, 'Request Estimate', true);
   };
-
-  const uniqueSuggestions = useMemo(() => {
-    return [
-      ...new Map(
-        suggestions.map((s) => [
-          s.display_name,
-          {
-            ...s,
-            lat: (s as EnrichedAddressSuggestion).lat ?? 0,
-            lon: (s as EnrichedAddressSuggestion).lon ?? 0
-          }
-        ])
-      ).values()
-    ];
-  }, [suggestions]);
 
   useEffect(() => {
     suggestionRefs.current = uniqueSuggestions.map(
@@ -145,11 +143,6 @@ const AddressInput = ({
 
   const { handleInputKeyDown, handleSuggestionKeyDown } =
     useSuggestionNavigation(inputRef, onSelect, suggestionRefs.current);
-
-  const showSuggestions =
-    (query?.trim() ?? '') !== '' &&
-    uniqueSuggestions.length > 0 &&
-    !uniqueSuggestions.some((s) => s.display_name === query);
 
   return (
     <Form>
@@ -162,14 +155,14 @@ const AddressInput = ({
           onChange={(e) => handleChange(e.target.value)}
           onKeyDown={handleInputKeyDown}
         />
-        {isFetching && (
+        {showLoading && (
           <motion.div
             className="absolute right-3 top-1/2 transform -translate-y-1/2 w-5 h-5 border-2 border-blue-500 border-t-transparent rounded-full"
             animate={{ rotate: 360 }}
             transition={{ repeat: Infinity, ease: 'linear', duration: 0.8 }}
           />
         )}
-        {locked && (
+        {showClearButton && (
           <IconButton
             aria-label="Change Address"
             onClick={() => handleChange('')}
@@ -178,15 +171,11 @@ const AddressInput = ({
           </IconButton>
         )}
       </div>
-      {!isFetching &&
-        hasFetched &&
-        !locked &&
-        query.trim() !== '' &&
-        suggestions.length === 0 && (
-          <Alert role="alert" type="error">
-            Error fetching suggestions
-          </Alert>
-        )}
+      {showErrorAlert && (
+        <Alert role="alert" type="error">
+          Error fetching suggestions
+        </Alert>
+      )}
       {showSuggestions && (
         <SuggestionsList
           suggestions={uniqueSuggestions}
@@ -195,7 +184,7 @@ const AddressInput = ({
           onSuggestionKeyDown={handleSuggestionKeyDown}
         />
       )}
-      {locked && (
+      {showEstimateButton && (
         <Button
           type="button"
           onClick={onEstimateClick}

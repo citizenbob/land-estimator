@@ -20,7 +20,6 @@ export interface AddressSuggestion {
   display_name: string;
 }
 
-// Extended suggestion that may contain partial geographic data
 export interface EnrichedAddressSuggestion extends AddressSuggestion {
   lat?: string | number;
   lon?: string | number;

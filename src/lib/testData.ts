@@ -1,4 +1,4 @@
-export const mockSuggestions = [
+export const MOCK_SUGGESTIONS = [
   {
     place_id: 365107046,
     display_name:
@@ -10,7 +10,22 @@ export const mockSuggestions = [
   }
 ];
 
-export const mockNominatimResponses = [
+// Common test locations
+export const TEST_LOCATIONS = {
+  GOOGLE: '1600 Amphitheatre Parkway, Mountain View, CA',
+  APPLE: '1 Infinite Loop, Cupertino, CA',
+  MICROSOFT: 'One Microsoft Way, Redmond, WA',
+  FACEBOOK: '1 Hacker Way, Menlo Park, CA'
+};
+
+export const TEST_COORDINATES = {
+  GOOGLE: { lat: '37.422', lon: '-122.084' },
+  APPLE: { lat: '37.331', lon: '-122.031' },
+  MICROSOFT: { lat: '47.639', lon: '-122.131' },
+  FACEBOOK: { lat: '37.484', lon: '-122.148' }
+};
+
+export const MOCK_NOMINATIM_RESPONSES = [
   {
     place_id: 365107046,
     license: 'Data © OpenStreetMap contributors, ODbL 1.0.',
@@ -52,7 +67,7 @@ export const mockNominatimResponses = [
   }
 ];
 
-export const mockNominatimResponse = {
+export const MOCK_NOMINATIM_RESPONSE = {
   place_id: 365107046,
   licence: 'Data © OpenStreetMap contributors, ODbL 1.0.',
   osm_type: 'way',
@@ -73,7 +88,26 @@ export const mockNominatimResponse = {
   }
 };
 
-export const mockNominatimError = {
-  message: 'Service temporarily unavailable',
-  status: 503
+// Standardized error responses for different scenarios
+export const MOCK_NOMINATIM_ERRORS = {
+  SERVICE_UNAVAILABLE: {
+    message: 'Service temporarily unavailable',
+    status: 503
+  },
+  NOT_FOUND: {
+    message: 'Address not found',
+    status: 404
+  },
+  RATE_LIMIT: {
+    message: 'Rate limit exceeded',
+    status: 429
+  },
+  SERVER_ERROR: {
+    message: 'Internal server error',
+    status: 500
+  },
+  NETWORK_ERROR: new Error('Network connection failed')
 };
+
+// Legacy export to maintain backward compatibility
+export const MOCK_NOMINATIM_ERROR = MOCK_NOMINATIM_ERRORS.SERVICE_UNAVAILABLE;

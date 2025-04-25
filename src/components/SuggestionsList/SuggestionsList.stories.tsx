@@ -24,22 +24,17 @@ export const Default: Story = {
     <SuggestionsList
       suggestions={[
         {
-          displayName: '1600 Amphitheatre Parkway',
-          label: 'Google HQ',
-          lat: '37.422',
-          lon: '-122.084',
-          value: 'google-hq'
+          display_name: '1600 Amphitheatre Parkway',
+          place_id: 1
         },
         {
-          displayName: '1 Infinite Loop',
-          label: 'Apple HQ',
-          lat: '37.331',
-          lon: '-122.031',
-          value: 'apple-hq'
+          display_name: '1 Infinite Loop',
+          place_id: 2
         }
       ]}
       onSelect={() => {}}
-      onKeyDown={() => {}}
+      suggestionRefs={[]}
+      onSuggestionKeyDown={() => {}}
     />
   )
 };

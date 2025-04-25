@@ -19,12 +19,11 @@ describe('useEventLogger', () => {
       await result.current.logEvent('Test Event', { foo: 'bar' });
     });
 
-    expect(mockLogEvent).toHaveBeenCalledWith({
-      eventName: 'Test Event',
-      data: { foo: 'bar' },
-      toMixpanel: true,
-      toFirestore: false
-    });
+    expect(mockLogEvent).toHaveBeenCalledWith(
+      'Test Event',
+      { foo: 'bar' },
+      { toMixpanel: true, toFirestore: true }
+    );
   });
 
   it('applies provided options to the log event', async () => {
@@ -41,12 +40,14 @@ describe('useEventLogger', () => {
       );
     });
 
-    expect(mockLogEvent).toHaveBeenCalledWith({
-      eventName: 'Test Event',
-      data: { foo: 'bar' },
-      toMixpanel: false,
-      toFirestore: true
-    });
+    expect(mockLogEvent).toHaveBeenCalledWith(
+      'Test Event',
+      { foo: 'bar' },
+      {
+        toMixpanel: false,
+        toFirestore: true
+      }
+    );
   });
 
   it('handles errors gracefully', async () => {

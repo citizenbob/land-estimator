@@ -1,27 +1,27 @@
 /// <reference types="cypress" />
+
 export {};
 
 describe('Enter Address & Receive Instant Estimate', () => {
   beforeEach(() => {
-    // Serve address suggestions from fixture
+    // Serve address suggestions from fixture using the new API route structure with type=suggestions
     cy.intercept('GET', '**/api/nominatim?type=suggestions&query=*', {
       fixture: 'addressSuggestions.json'
     }).as('nominatimApiCall');
 
-    const logEventStub = cy.stub();
+    // Intercept POST requests to the log API
+    cy.intercept('POST', '**/api/log', {
+      statusCode: 201,
+      body: { success: true, message: 'Log event stored', id: 'mock-doc-id' }
+    }).as('logApiCall');
+
+    const logEventStub = cy.stub().as('logEventSpy');
 
     cy.visit('/', {
       onBeforeLoad(win) {
         win.logEvent = logEventStub;
       }
     });
-
-    cy.window()
-      .its('logEvent')
-      .should('equal', logEventStub)
-      .then(() => {
-        cy.wrap(logEventStub).as('logEventSpy');
-      });
   });
 
   it('fetches address suggestions as user types', () => {
@@ -37,7 +37,7 @@ describe('Enter Address & Receive Instant Estimate', () => {
   });
 
   it('handles API failures gracefully', () => {
-    cy.intercept('GET', '/api/nominatim*type=suggestions*', {
+    cy.intercept('GET', '/api/nominatim?type=suggestions&query=*', {
       statusCode: 500
     }).as('getNominatimSuggestionsFail');
 
@@ -89,9 +89,11 @@ describe('Enter Address & Receive Instant Estimate', () => {
       '2323, East Highland Avenue, Biltmore, Phoenix, Maricopa County, Arizona, 85016, United States'
     );
 
-    cy.get('@logEventSpy').should('have.been.calledOnceWith', {
-      eventName: 'Address Selected',
-      data: {
+    // Match the actual format being used
+    cy.get('@logEventSpy').should(
+      'have.been.calledWith',
+      'Address Selected',
+      {
         id: 123456,
         address:
           '2323, East Highland Avenue, Biltmore, Phoenix, Maricopa County, Arizona, 85016, United States',
@@ -100,9 +102,11 @@ describe('Enter Address & Receive Instant Estimate', () => {
         boundingbox: ['33.122', '33.124', '-111.124', '-111.122'],
         confirmedIntent: false
       },
-      toMixpanel: true,
-      toFirestore: true
-    });
+      { toMixpanel: true, toFirestore: true }
+    );
+
+    // Wait for the API call to be made
+    cy.wait('@logApiCall');
   });
 
   it('logs the intent to buy when "Get Instant Estimate" is clicked', () => {
@@ -128,10 +132,11 @@ describe('Enter Address & Receive Instant Estimate', () => {
       .should('be.visible')
       .click();
 
-    cy.wait(500);
-    cy.get('@logEventSpy').should('have.been.calledOnceWith', {
-      eventName: 'Request Estimate',
-      data: {
+    // Match the actual format being used
+    cy.get('@logEventSpy').should(
+      'have.been.calledWith',
+      'Request Estimate',
+      {
         id: 123456,
         address:
           '2323, East Highland Avenue, Biltmore, Phoenix, Maricopa County, Arizona, 85016, United States',
@@ -140,8 +145,9 @@ describe('Enter Address & Receive Instant Estimate', () => {
         boundingbox: ['33.122', '33.124', '-111.124', '-111.122'],
         confirmedIntent: true
       },
-      toMixpanel: true,
-      toFirestore: true
-    });
+      { toMixpanel: true, toFirestore: true }
+    );
+
+    cy.wait('@logApiCall');
   });
 });

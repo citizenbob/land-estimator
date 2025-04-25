@@ -273,36 +273,52 @@ This approach provides flexibility for managing multiple themes while maintainin
 
 ### Styled Components
 
-Our styled components remain consistent with our design system. Each component utilizes the design tokens defined in `tokens.css` for colors, spacing, and typography.
+Our components use a hybrid approach combining styled-components with Tailwind CSS utility classes. This approach gives us the best of both worlds:
 
-#### Example: AddressInput.styles.ts
+1. **Tailwind CSS for static styling**: We use Tailwind's utility classes via the `attrs()` method for predictable, static styling needs like positioning, dimensions, flexbox, and basic responsive design.
+
+2. **Styled-components for dynamic styling**: We use styled-components' template literals for styles that need to respond to theme values, props, or other dynamic inputs.
+
+#### Example: IconButton.styles.ts
 
 ```tsx
-// src/components/AddressInput/AddressInput.styles.ts
+// src/components/IconButton/IconButton.styles.ts
 import styled from 'styled-components';
+import tokens from '@tokens/tokens.json';
 
-export const Form = styled.form.attrs(() => ({
-  className: 'flex flex-col gap-2 p-4 border rounded-md shadow-sm'
-}))``;
-
-export const Input = styled.input.attrs(() => ({
+export const IconButtonStyles = styled.button.attrs(() => ({
   className:
-    'px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring focus:border-blue-300'
-}))``;
-
-export const Button = styled.button.attrs(() => ({
-  className:
-    'px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600 transition-colors'
-}))``;
+    'absolute right-1 top-1/2 transform -translate-y-1/2 text-gray-600 hover:text-gray-800 w-11 h-11 min-w-[44px] min-h-[44px] flex items-center justify-center'
+}))`
+  background-color: ${({ theme }) =>
+    theme.colors?.light?.background?.value ||
+    tokens.colors.light.background.value};
+  color: ${({ theme }) =>
+    theme.colors?.light?.text?.value || tokens.colors.light.text.value};
+  @media (prefers-color-scheme: dark) {
+    background-color: ${({ theme }) =>
+      theme.colors?.dark?.background?.value ||
+      tokens.colors.dark.background.value};
+    color: ${({ theme }) =>
+      theme.colors?.dark?.text?.value || tokens.colors.dark.text.value};
+  }
+`;
 ```
 
-### Future Plans
+This hybrid pattern allows us to:
 
-We aim to move towards a shared, version-controlled repository for the `tokens.json` file. This will allow multiple projects to consume the same design tokens, ensuring consistency across applications. Additionally, we plan to integrate this repository with Storybook to automatically generate and update stories that showcase the design tokens in use.
+- Use the powerful utility-first approach of Tailwind for common styling needs
+- Leverage styled-components for dynamic theming and prop-based styling
+- Maintain a consistent design system through our tokens
+- Ensure proper type safety with TypeScript
 
-For more details on Style Dictionary, refer to the [official documentation](https://amzn.github.io/style-dictionary/).
+When creating styled components:
 
-### Accessibility
+1. Use Tailwind classes via `attrs()` for static styles that don't need to change based on props
+2. Use styled-components template literals for styles that need theme values or prop-based changes
+3. Always fallback to our token values when accessing theme properties to ensure resilience
+
+## Accessibility
 
 **WCAG 2.2 AA Compliance**
 

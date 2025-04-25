@@ -1,5 +1,3 @@
-// src/vitest.setup.ts
-
 import React from 'react';
 import { expect, afterEach, vi } from 'vitest';
 import { cleanup } from '@testing-library/react';

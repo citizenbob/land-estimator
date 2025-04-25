@@ -3,11 +3,11 @@ import path from 'path';
 
 const nextConfig: NextConfig = {
   compiler: {
-    styledComponents: true,
+    styledComponents: true
   },
   sassOptions: {
-    includePaths: [path.join(__dirname, 'styles')],
-  },
+    includePaths: [path.join(__dirname, 'styles')]
+  }
 };
 
 export default nextConfig;

@@ -10,22 +10,29 @@ import userEvent from '@testing-library/user-event';
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import AddressInput from '@components/AddressInput/AddressInput';
 import {
-  changeInputValue,
   verifyLogEventCall,
-  mockSuccessResponse,
-  mockErrorResponse,
   verifyUniqueSuggestions,
-  setupConsoleMocks
+  setupConsoleMocks,
+  createAddressLookupMock
 } from '@lib/testUtils';
-import { mockSuggestions, mockNominatimResponses } from '@lib/testData';
+import { MOCK_SUGGESTIONS, MOCK_NOMINATIM_RESPONSES } from '@lib/testData';
+import { NominatimApiClient } from '@services/nominatimApi';
 
+// Mock the logger
 vi.mock('@services/logger', () => ({
   logEvent: vi.fn()
 }));
 
-const originalFetch = global.fetch;
-const mockFetch = vi.fn();
-global.fetch = mockFetch;
+// Mock the Nominatim API client instead of fetch
+vi.mock('@services/nominatimApi', () => ({
+  NominatimApiClient: {
+    fetchSuggestions: vi.fn()
+  }
+}));
+
+const mockFetchSuggestions = NominatimApiClient.fetchSuggestions as ReturnType<
+  typeof vi.fn
+>;
 
 const setup = () => {
   render(<AddressInput />);
@@ -35,7 +42,7 @@ const setup = () => {
 
 describe('AddressInput', () => {
   beforeEach(() => {
-    vi.resetAllMocks();
+    mockFetchSuggestions.mockReset();
     setupConsoleMocks();
   });
 
@@ -43,106 +50,114 @@ describe('AddressInput', () => {
     vi.restoreAllMocks();
   });
 
-  afterAll(() => {
-    global.fetch = originalFetch;
-  });
-
   it('ensures suggestions have unique keys', async () => {
     const results = [
-      ...mockNominatimResponses,
-      { ...mockNominatimResponses[1] }
+      ...MOCK_NOMINATIM_RESPONSES,
+      { ...MOCK_NOMINATIM_RESPONSES[1] }
     ];
 
-    mockSuccessResponse(mockFetch, results);
+    mockFetchSuggestions.mockResolvedValueOnce(results);
 
     const { input } = setup();
-    await act(async () => {
-      fireEvent.change(input, { target: { value: '1' } });
-    });
+    fireEvent.change(input, { target: { value: '1' } });
 
-    await waitFor(() => {
-      expect(mockFetch).toHaveBeenCalledTimes(1);
-      expect(mockFetch).toHaveBeenCalledWith(
-        expect.stringContaining('/api/nominatim?type=suggestions&query=1')
-      );
-    });
+    await waitFor(
+      () => {
+        expect(mockFetchSuggestions).toHaveBeenCalledWith('1');
+      },
+      { timeout: 2000 }
+    );
 
+    await waitFor(
+      () => {
+        expect(screen.getAllByRole('option')).toHaveLength(
+          MOCK_NOMINATIM_RESPONSES.length
+        );
+      },
+      { timeout: 1000 }
+    );
     await verifyUniqueSuggestions();
   });
 
   it('fetches address suggestions as user types', async () => {
-    mockSuccessResponse(mockFetch, mockNominatimResponses);
+    mockFetchSuggestions.mockResolvedValueOnce(MOCK_NOMINATIM_RESPONSES);
 
     const { input } = setup();
-    await changeInputValue(input, '1600');
+    fireEvent.change(input, { target: { value: '1600' } });
 
-    await waitFor(() => {
-      expect(mockFetch).toHaveBeenCalledWith(
-        expect.stringContaining('/api/nominatim?type=suggestions&query=1600')
-      );
-      const options = screen.getAllByRole('option');
-      expect(options).toHaveLength(mockNominatimResponses.length);
-      expect(options[0]).toHaveAttribute(
-        'data-display',
-        mockNominatimResponses[0].display_name
-      );
-      expect(options[1]).toHaveAttribute(
-        'data-display',
-        mockNominatimResponses[1].display_name
-      );
-    });
+    await waitFor(
+      () => expect(mockFetchSuggestions).toHaveBeenCalledWith('1600'),
+      { timeout: 2000 }
+    );
+
+    const options = await screen.findAllByRole('option');
+    expect(options).toHaveLength(MOCK_NOMINATIM_RESPONSES.length);
+    expect(options[0]).toHaveAttribute(
+      'data-display',
+      MOCK_NOMINATIM_RESPONSES[0].display_name
+    );
+    expect(options[1]).toHaveAttribute(
+      'data-display',
+      MOCK_NOMINATIM_RESPONSES[1].display_name
+    );
   });
 
   it('handles API failures gracefully and displays an error message', async () => {
-    mockErrorResponse(mockFetch);
+    mockFetchSuggestions.mockRejectedValueOnce(
+      new Error('Failed to fetch suggestions')
+    );
 
     const { input } = setup();
-    await changeInputValue(input, '1600');
+    fireEvent.change(input, { target: { value: '1600' } });
 
-    await waitFor(() => {
-      expect(mockFetch).toHaveBeenCalledWith(
-        expect.stringContaining('/api/nominatim?type=suggestions&query=1600')
-      );
-    });
-
-    expect(screen.getByRole('alert')).toHaveTextContent(
-      /error fetching suggestions/i
+    await waitFor(
+      () => expect(mockFetchSuggestions).toHaveBeenCalledWith('1600'),
+      { timeout: 2000 }
     );
-    expect(screen.queryByRole('listitem')).toBeNull();
+    const alert = await screen.findByRole('alert');
+    expect(alert).toHaveTextContent(/error fetching suggestions/i);
+    expect(screen.queryByRole('option')).toBeNull();
   });
 
   it('clears suggestions when input is empty', async () => {
-    mockSuccessResponse(mockFetch, [mockSuggestions[0]]);
+    // Mock a successful response with the correct data format
+    mockFetchSuggestions.mockResolvedValueOnce([MOCK_NOMINATIM_RESPONSES[0]]);
 
     const { input } = setup();
-    await changeInputValue(input, '1600');
+    fireEvent.change(input, { target: { value: '1600' } });
 
+    // Wait for the suggestions to appear
     await waitFor(() => {
-      expect(mockFetch).toHaveBeenCalledWith(
-        expect.stringContaining('/api/nominatim?type=suggestions&query=1600')
-      );
+      expect(screen.getByRole('listbox')).toBeInTheDocument();
     });
 
-    await changeInputValue(input, '');
-    await waitFor(() =>
-      expect(screen.queryByText('1600 Amphitheatre Parkway')).toBeNull()
+    expect(screen.getAllByRole('option')).toHaveLength(1);
+
+    // Clear input to empty
+    mockFetchSuggestions.mockClear();
+    fireEvent.change(input, { target: { value: '' } });
+
+    // Verify suggestions are removed
+    await waitFor(
+      () => {
+        expect(screen.queryByRole('listbox')).toBeNull();
+      },
+      { timeout: 1000 }
     );
+
+    expect(mockFetchSuggestions).not.toHaveBeenCalled();
   });
 
   it('supports keyboard navigation for suggestions with cyclic focus and returns focus to input on tab', async () => {
     const handleSelect = vi.fn();
-    const mockLookup = {
+    const mockLookup = createAddressLookupMock({
       query: '1600',
-      suggestions: [mockSuggestions[0], mockSuggestions[1]],
+      suggestions: MOCK_SUGGESTIONS,
       handleSelect,
       hasFetched: true
-    };
+    });
 
-    render(
-      <AddressInput
-        mockLookup={{ ...mockLookup, suggestions: mockSuggestions }}
-      />
-    );
+    render(<AddressInput mockLookup={mockLookup} />);
 
     await waitFor(() => {
       expect(screen.getAllByRole('option')).toHaveLength(2);
@@ -157,27 +172,18 @@ describe('AddressInput', () => {
 
     await waitFor(() => {
       expect(handleSelect).toHaveBeenCalledWith(
-        mockSuggestions[0].display_name
+        MOCK_SUGGESTIONS[0].display_name
       );
     });
   });
 
   it('updates input value when suggestion is selected via keyboard and logs event', async () => {
     const logEvent = vi.fn();
-    const mockLookup = {
+    const mockLookup = createAddressLookupMock({
       query: '1600',
-      suggestions: mockSuggestions,
-      handleSelect: vi.fn(),
-      hasFetched: true,
-      getSuggestionData: () => ({
-        ...mockNominatimResponses[0],
-        licence: mockNominatimResponses[0].license,
-        place_rank: 0,
-        importance: 0,
-        addresstype: '',
-        name: ''
-      })
-    };
+      suggestions: MOCK_SUGGESTIONS,
+      hasFetched: true
+    });
 
     render(<AddressInput mockLookup={mockLookup} logEvent={logEvent} />);
 
@@ -190,17 +196,17 @@ describe('AddressInput', () => {
 
     await waitFor(() => {
       expect(mockLookup.handleSelect).toHaveBeenCalledWith(
-        mockSuggestions[0].display_name
+        MOCK_SUGGESTIONS[0].display_name
       );
       verifyLogEventCall(
         logEvent,
         'Address Selected',
         {
-          id: mockNominatimResponses[0].place_id,
-          address: mockNominatimResponses[0].display_name,
-          lat: parseFloat(mockNominatimResponses[0].lat),
-          lon: parseFloat(mockNominatimResponses[0].lon),
-          boundingbox: mockNominatimResponses[0].boundingbox,
+          id: MOCK_NOMINATIM_RESPONSES[0].place_id,
+          address: MOCK_NOMINATIM_RESPONSES[0].display_name,
+          lat: parseFloat(MOCK_NOMINATIM_RESPONSES[0].lat),
+          lon: parseFloat(MOCK_NOMINATIM_RESPONSES[0].lon),
+          boundingbox: MOCK_NOMINATIM_RESPONSES[0].boundingbox,
           confirmedIntent: false
         },
         { toMixpanel: true, toFirestore: true }
@@ -208,70 +214,114 @@ describe('AddressInput', () => {
     });
   });
 
-  it('clears previous suggestions while fetching new ones', async () => {
-    let resolvePromise: (value: Response) => void;
-    const delayedPromise = new Promise<Response>((resolve) => {
-      resolvePromise = resolve;
-    });
-
-    mockFetch.mockImplementationOnce(() => delayedPromise);
+  it('does not trigger an API call when a suggestion is selected', async () => {
+    // Use the correct data format for the mock
+    mockFetchSuggestions.mockResolvedValueOnce([MOCK_NOMINATIM_RESPONSES[1]]);
 
     const { input } = setup();
-    await changeInputValue(input, 'test');
 
-    expect(screen.queryByRole('listbox')).toBeNull();
-
-    act(() => {
-      resolvePromise!({
-        ok: true,
-        json: async () => [mockSuggestions[0]]
-      } as Response);
+    // Use act for state-updating events
+    await act(async () => {
+      fireEvent.change(input, { target: { value: '2323 E Highland' } });
     });
 
-    await waitFor(() =>
-      expect(
-        screen.getByText((content) =>
-          content.includes('1600 Amphitheatre Parkway')
-        )
-      ).toBeInTheDocument()
+    // Wait for debounce and API call
+    await waitFor(
+      () =>
+        expect(mockFetchSuggestions).toHaveBeenCalledWith('2323 E Highland'),
+      { timeout: 2000 }
     );
+
+    // Wait for the suggestions to appear by looking for the option role
+    await waitFor(() => {
+      expect(screen.getByRole('option')).toBeInTheDocument();
+    });
+
+    // Get suggestion by role and data attribute instead of text
+    const suggestionElement = screen.getByRole('option');
+
+    // Clear fetch mock before clicking
+    mockFetchSuggestions.mockClear();
+
+    // Click the suggestion (this updates input value internally)
+    await act(async () => {
+      fireEvent.click(suggestionElement);
+    });
+
+    // Wait for input value to update
+    await waitFor(() => {
+      expect(input).toHaveValue(MOCK_NOMINATIM_RESPONSES[1].display_name);
+    });
+
+    // Advance timers again to ensure no debounced call happens
+    await waitFor(() => expect(mockFetchSuggestions).not.toHaveBeenCalled(), {
+      timeout: 1000
+    });
   });
 
-  it('does not trigger an API call when a suggestion is selected', async () => {
-    mockSuccessResponse(mockFetch, [mockNominatimResponses[1]]);
+  it('clears previous suggestions while fetching new ones', async () => {
+    // First, provide initial suggestions
+    mockFetchSuggestions.mockResolvedValueOnce([MOCK_NOMINATIM_RESPONSES[0]]);
 
     const { input } = setup();
 
-    await changeInputValue(input, '2323 E Highland');
-
-    await waitFor(() => {
-      expect(
-        screen.getByText(mockSuggestions[1].display_name)
-      ).toBeInTheDocument();
+    // Type the first query
+    await act(async () => {
+      fireEvent.change(input, { target: { value: 'first query' } });
     });
 
-    const suggestion = screen.getByText(mockSuggestions[1].display_name);
-    fireEvent.click(suggestion);
+    // Wait for the first suggestions to appear
+    await waitFor(() => {
+      expect(screen.getByRole('listbox')).toBeInTheDocument();
+    });
 
-    expect(input).toHaveValue(mockSuggestions[1].display_name);
+    // Set up a delayed promise for the second query
+    let resolvePromise: (value: unknown) => void;
+    const delayedPromise = new Promise((resolve) => {
+      resolvePromise = resolve;
+    });
+    mockFetchSuggestions.mockImplementationOnce(() => delayedPromise);
 
-    mockFetch.mockClear();
+    // Type a second query which should clear the suggestions while fetching
+    await act(async () => {
+      fireEvent.change(input, { target: { value: 'test' } });
+    });
 
-    await changeInputValue(input, mockSuggestions[1].display_name);
+    // Wait for the API call after debounce
+    await waitFor(
+      () => expect(mockFetchSuggestions).toHaveBeenCalledWith('test'),
+      { timeout: 2000 }
+    );
 
-    await new Promise<void>((resolve) => setTimeout(resolve, 600));
-    expect(mockFetch).not.toHaveBeenCalled();
+    // Check that the listbox is removed while fetching
+    await waitFor(() => {
+      expect(screen.queryByRole('listbox')).toBeNull();
+    });
+
+    // Now resolve the promise with new suggestions
+    await act(async () => {
+      resolvePromise!([MOCK_NOMINATIM_RESPONSES[0]]);
+    });
+
+    // Check that the listbox appears again with the new suggestion
+    await waitFor(() => {
+      expect(screen.getByRole('listbox')).toBeInTheDocument();
+      expect(screen.getByRole('option')).toHaveAttribute(
+        'data-display',
+        MOCK_NOMINATIM_RESPONSES[0].display_name
+      );
+    });
   });
 
   it('displays the API error message when the API call fails', () => {
-    const errorLookup = {
+    const errorLookup = createAddressLookupMock({
       query: 'Invalid',
       isFetching: false,
       hasFetched: true,
       locked: false,
       error: 'Error fetching suggestions',
       suggestions: []
-    };
+    });
     render(<AddressInput mockLookup={errorLookup} />);
     expect(screen.getByRole('alert')).toHaveTextContent(
       'Error fetching suggestions'
@@ -279,13 +329,13 @@ describe('AddressInput', () => {
   });
 
   it('does not display the error when locked', () => {
-    const lockedLookup = {
+    const lockedLookup = createAddressLookupMock({
       query: '123 Main St',
       locked: true,
       hasFetched: true,
       error: 'Error fetching suggestions',
       suggestions: []
-    };
+    });
     render(<AddressInput mockLookup={lockedLookup} />);
     expect(screen.queryByRole('alert')).toBeNull();
   });
@@ -294,44 +344,43 @@ describe('AddressInput', () => {
     const logEvent = vi.fn();
 
     const suggestion = {
-      place_id: mockSuggestions[0].place_id,
-      display_name: mockSuggestions[0].display_name
+      place_id: MOCK_SUGGESTIONS[0].place_id,
+      display_name: MOCK_SUGGESTIONS[0].display_name
     };
 
     render(
       <AddressInput
-        mockLookup={{
-          query: mockSuggestions[0].display_name,
+        mockLookup={createAddressLookupMock({
+          query: MOCK_SUGGESTIONS[0].display_name,
           suggestions: [suggestion],
-          locked: true,
-          getSuggestionData: () => ({
-            ...mockNominatimResponses[0],
-            licence: mockNominatimResponses[0].license,
-            place_rank: 0,
-            importance: 0,
-            addresstype: '',
-            name: ''
-          })
-        }}
+          locked: true
+        })}
         logEvent={logEvent}
       />
     );
 
-    await userEvent.click(
-      screen.getByRole('button', { name: /get instant estimate/i })
-    );
+    // Trigger the estimate button
+    const button = screen.getByRole('button', {
+      name: /get instant estimate/i
+    });
+    await act(async () => {
+      await userEvent.click(button);
+    });
 
-    expect(logEvent).toHaveBeenCalledWith(
-      'Request Estimate',
-      {
-        id: mockNominatimResponses[0].place_id,
-        address: mockNominatimResponses[0].display_name,
-        lat: parseFloat(mockNominatimResponses[0].lat),
-        lon: parseFloat(mockNominatimResponses[0].lon),
-        boundingbox: mockNominatimResponses[0].boundingbox,
-        confirmedIntent: true
-      },
-      { toMixpanel: true, toFirestore: true }
-    );
+    // Wait for the log event to be called
+    await waitFor(() => {
+      expect(logEvent).toHaveBeenCalledWith(
+        'Request Estimate',
+        {
+          id: MOCK_NOMINATIM_RESPONSES[0].place_id,
+          address: MOCK_NOMINATIM_RESPONSES[0].display_name,
+          lat: parseFloat(MOCK_NOMINATIM_RESPONSES[0].lat),
+          lon: parseFloat(MOCK_NOMINATIM_RESPONSES[0].lon),
+          boundingbox: MOCK_NOMINATIM_RESPONSES[0].boundingbox,
+          confirmedIntent: true
+        },
+        { toMixpanel: true, toFirestore: true }
+      );
+    });
   });
 });

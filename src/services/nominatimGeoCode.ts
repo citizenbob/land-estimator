@@ -4,6 +4,13 @@ const NOMINATIM_BASE_URL =
 
 import { NominatimResponse, AddressSuggestion } from '@typez/addressMatchTypes';
 
+/**
+ * Constructs a URL for the Nominatim API with appropriate query parameters
+ *
+ * @param query - The search query or address string to look up
+ * @param limit - Maximum number of results to request
+ * @returns URL object configured for the Nominatim API request
+ */
 function buildNominatimUrl(query: string, limit: number): URL {
   const url = new URL(NOMINATIM_BASE_URL);
   url.searchParams.append('q', query);
@@ -13,6 +20,13 @@ function buildNominatimUrl(query: string, limit: number): URL {
   return url;
 }
 
+/**
+ * Fetches and validates response data from the Nominatim API
+ * 
+ * @param url - URL object configured for the Nominatim API request
+ * @returns Promise resolving to array of NominatimResponse objects
+ * @throws Error when API request fails or response format is invalid
+ */
 async function fetchNominatimResponse(url: URL): Promise<NominatimResponse[]> {
   const response = await fetch(url.toString(), {
     headers: { 'User-Agent': 'land-estimator-app' }
@@ -29,6 +43,12 @@ async function fetchNominatimResponse(url: URL): Promise<NominatimResponse[]> {
   return data;
 }
 
+/**
+ * Gets geocoding information for a specific address
+ * 
+ * @param address - The full address to look up
+ * @returns Promise resolving to an AddressSuggestion object or null if not found
+ */
 export async function getCoordinatesFromAddress(
   address: string
 ): Promise<AddressSuggestion | null> {
@@ -58,17 +78,19 @@ export async function getCoordinatesFromAddress(
   }
 }
 
-// Return only the essential suggestion info
+/**
+ * Retrieves address suggestions based on a partial query string
+ *
+ * @param query - The partial address or location search term
+ * @returns Promise resolving to array of NominatimResponse objects
+ */
 export async function getNominatimSuggestions(
   query: string
-): Promise<AddressSuggestion[]> {
+): Promise<NominatimResponse[]> {
   try {
     const url = buildNominatimUrl(query, 5);
     const data = await fetchNominatimResponse(url);
-    return data.map((item: NominatimResponse) => ({
-      place_id: item.place_id,
-      display_name: item.display_name
-    }));
+    return data;
   } catch (error) {
     console.error(`Error fetching address suggestions for "${query}":`, error);
     return [];
