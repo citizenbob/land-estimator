@@ -1,0 +1,18 @@
+[
+  {
+    "place_id": 123456,
+    "display_name": "2323, East Highland Avenue, Biltmore, Phoenix, Maricopa County, Arizona, 85016, United States",
+    "lat": "33.123",
+    "lon": "-111.123",
+    "boundingbox": ["33.122", "33.124", "-111.124", "-111.122"],
+    "osm_type": "node",
+    "osm_id": 123456,
+    "licence": "Data © OpenStreetMap contributors",
+    "category": "place",
+    "type": "house",
+    "importance": 0.73,
+    "place_rank": 30,
+    "addresstype": "house",
+    "name": "2323"
+  }
+]

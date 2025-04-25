@@ -10,21 +10,24 @@ import Button from '@components/Button/Button';
 import SuggestionsList from '@components/SuggestionsList/SuggestionsList';
 import Alert from '@components/Alert/Alert';
 import { Form } from '@components/AddressInput/AddressInput.styles';
-import { GeocodeResult } from '@typez/addressMatchTypes';
+import {
+  AddressSuggestion,
+  EnrichedAddressSuggestion
+} from '@typez/addressMatchTypes';
 import { motion } from 'framer-motion';
 
 interface AddressInputProps {
   mockLookup?: Partial<ReturnType<typeof useAddressLookup>> & {
     logEvent?: (
       eventName: string,
-      data: Record<string, string | number | boolean>,
+      data: Record<string, string | number | boolean | string[]>,
       options?: Record<string, unknown>
     ) => void;
-    selectedSuggestion?: GeocodeResult;
+    selectedSuggestion?: AddressSuggestion;
   };
   logEvent?: (
     eventName: string,
-    data: Record<string, string | number | boolean>,
+    data: Record<string, string | number | boolean | string[]>,
     options?: Record<string, unknown>
   ) => void;
 }
@@ -42,6 +45,7 @@ const AddressInput = ({
     isFetching,
     locked,
     hasFetched,
+    getSuggestionData,
     selectedSuggestion: mockSelectedSuggestion
   } = { ...defaultLookup, ...mockLookup };
 
@@ -51,50 +55,70 @@ const AddressInput = ({
   const inputRef = useRef<HTMLInputElement | null>(null);
   const suggestionRefs = useRef<React.RefObject<HTMLLIElement>[]>([]);
 
-  const selectedSuggestion = useRef<GeocodeResult | null>(
+  const selectedSuggestion = useRef<AddressSuggestion | null>(
     mockSelectedSuggestion || null
   );
 
-  const onSelect = (suggestion: GeocodeResult) => {
-    handleSelect(suggestion.displayName);
+  const createAddressPayload = (
+    suggestionId: number,
+    confirmedIntent = false
+  ) => {
+    const fullData = getSuggestionData(suggestionId);
+
+    if (!fullData) {
+      console.error(`No data found for suggestion ID ${suggestionId}`);
+      return null;
+    }
+
+    // Convert lat/lon strings to numbers, fallback to 0
+    const lat = fullData.lat ? parseFloat(fullData.lat) : 0;
+    const lon = fullData.lon ? parseFloat(fullData.lon) : 0;
+
+    return {
+      id: fullData.place_id,
+      address: fullData.display_name,
+      lat,
+      lon,
+      boundingbox: fullData.boundingbox || [],
+      confirmedIntent
+    };
+  };
+
+  const onSelect = (suggestion: AddressSuggestion) => {
+    handleSelect(suggestion.display_name);
     selectedSuggestion.current = suggestion;
 
     if (logEvent) {
-      logEvent(
-        'Address Selected',
-        {
-          address: suggestion.displayName,
-          lat: suggestion.lat,
-          lon: suggestion.lon
-        },
-        { toMixpanel: true, toFirestore: true }
-      );
+      const payload = createAddressPayload(suggestion.place_id, false);
+      if (payload) {
+        logEvent('Address Selected', payload, {
+          toMixpanel: true,
+          toFirestore: true
+        });
+      }
     }
   };
 
   const onEstimateClick = () => {
-    const matched = selectedSuggestion.current;
-    if (
-      !matched ||
-      !matched.displayName ||
-      matched.lat === undefined ||
-      matched.lon === undefined
-    ) {
+    let matched = selectedSuggestion.current;
+    if (!matched && suggestions.length > 0) {
+      matched =
+        suggestions.find((s) => s.display_name === query) || suggestions[0];
+      selectedSuggestion.current = matched;
+    }
+
+    if (!matched) {
       return;
     }
+
     if (logEvent) {
-      logEvent(
-        'Request Estimate',
-        {
-          address: matched.displayName,
-          lat: matched.lat,
-          lon: matched.lon,
-          confirmedIntent: true
-        },
-        { toMixpanel: true, toFirestore: true }
-      );
-    } else {
-      console.error('logEvent is not defined');
+      const payload = createAddressPayload(matched.place_id, true);
+      if (payload) {
+        logEvent('Request Estimate', payload, {
+          toMixpanel: true,
+          toFirestore: true
+        });
+      }
     }
   };
 
@@ -102,8 +126,12 @@ const AddressInput = ({
     return [
       ...new Map(
         suggestions.map((s) => [
-          s.displayName,
-          { ...s, lat: s.lat ?? 0, lon: s.lon ?? 0 }
+          s.display_name,
+          {
+            ...s,
+            lat: (s as EnrichedAddressSuggestion).lat ?? 0,
+            lon: (s as EnrichedAddressSuggestion).lon ?? 0
+          }
         ])
       ).values()
     ];
@@ -121,7 +149,7 @@ const AddressInput = ({
   const showSuggestions =
     (query?.trim() ?? '') !== '' &&
     uniqueSuggestions.length > 0 &&
-    !uniqueSuggestions.some((s) => s.displayName === query);
+    !uniqueSuggestions.some((s) => s.display_name === query);
 
   return (
     <Form>
@@ -168,7 +196,11 @@ const AddressInput = ({
         />
       )}
       {locked && (
-        <Button onClick={onEstimateClick} aria-label="Get Instant Estimate">
+        <Button
+          type="button"
+          onClick={onEstimateClick}
+          aria-label="Get Instant Estimate"
+        >
           Get Instant Estimate
         </Button>
       )}

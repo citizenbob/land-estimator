@@ -2,7 +2,7 @@ const NOMINATIM_BASE_URL =
   process.env.NOMINATIM_BASE_URL ||
   'https://nominatim.openstreetmap.org/search';
 
-import { NominatimResponse, GeocodeResult } from '@typez/addressMatchTypes';
+import { NominatimResponse, AddressSuggestion } from '@typez/addressMatchTypes';
 
 function buildNominatimUrl(query: string, limit: number): URL {
   const url = new URL(NOMINATIM_BASE_URL);
@@ -31,7 +31,7 @@ async function fetchNominatimResponse(url: URL): Promise<NominatimResponse[]> {
 
 export async function getCoordinatesFromAddress(
   address: string
-): Promise<GeocodeResult | null> {
+): Promise<AddressSuggestion | null> {
   try {
     const url = buildNominatimUrl(address, 1);
     const data = await fetchNominatimResponse(url);
@@ -41,20 +41,16 @@ export async function getCoordinatesFromAddress(
     }
     const result = data[0];
 
-    const lat = result.lat;
-    const lon = result.lon;
-    const displayName = result.display_name;
+    const place_id = result.place_id;
+    const display_name = result.display_name;
 
-    if (!lat || !lon || !displayName) {
+    if (!place_id || !display_name) {
       console.warn(`Incomplete data for address: ${address}`);
       return null;
     }
     return {
-      lat,
-      lon,
-      displayName,
-      label: displayName,
-      value: `${lat},${lon}`
+      place_id,
+      display_name
     };
   } catch (error) {
     console.error(`Error fetching coordinates for "${address}":`, error);
@@ -62,19 +58,16 @@ export async function getCoordinatesFromAddress(
   }
 }
 
+// Return only the essential suggestion info
 export async function getNominatimSuggestions(
   query: string
-): Promise<GeocodeResult[]> {
+): Promise<AddressSuggestion[]> {
   try {
     const url = buildNominatimUrl(query, 5);
     const data = await fetchNominatimResponse(url);
-
     return data.map((item: NominatimResponse) => ({
-      displayName: item.display_name,
-      label: item.display_name,
-      lat: item.lat,
-      lon: item.lon,
-      value: item.display_name
+      place_id: item.place_id,
+      display_name: item.display_name
     }));
   } catch (error) {
     console.error(`Error fetching address suggestions for "${query}":`, error);

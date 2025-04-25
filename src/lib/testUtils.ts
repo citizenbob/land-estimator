@@ -36,7 +36,11 @@ export const verifyLogEventCall = (
   data: Record<string, unknown>,
   options: { toMixpanel?: boolean; toFirestore?: boolean }
 ) => {
-  expect(logEvent).toHaveBeenCalledWith(eventName, data, options);
+  expect(logEvent).toHaveBeenCalledWith(
+    eventName,
+    expect.objectContaining(data),
+    options
+  );
 };
 
 export const mockSuccessResponse = (

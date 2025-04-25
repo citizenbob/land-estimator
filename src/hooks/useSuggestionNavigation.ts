@@ -1,8 +1,8 @@
 import React, { KeyboardEvent, RefObject } from 'react';
-import { GeocodeResult } from '@typez/addressMatchTypes';
+import { AddressSuggestion } from '@typez/addressMatchTypes';
 
 interface OnSelect {
-  (suggestion: GeocodeResult): void;
+  (suggestion: AddressSuggestion): void;
 }
 
 export function useSuggestionNavigation(
@@ -21,7 +21,7 @@ export function useSuggestionNavigation(
 
   const handleSuggestionKeyDown = (
     e: KeyboardEvent<HTMLLIElement>,
-    suggestion: GeocodeResult,
+    suggestion: AddressSuggestion,
     index: number
   ) => {
     if (e.key === 'Enter') {

@@ -29,18 +29,16 @@ describe('logEvent', () => {
     vi.clearAllMocks();
   });
 
-  it('logs only the event name to Mixpanel', async () => {
+  it('logs the event name and data to Mixpanel', async () => {
+    const testData = { key: 'value' };
     await logEvent({
       eventName: 'Test Event',
-      data: { key: 'value' },
+      data: testData,
       toMixpanel: true,
       toFirestore: true
     });
 
-    expect(mockMixpanelTrack).toHaveBeenCalledWith('Test Event');
-    expect(mockMixpanelTrack).not.toHaveBeenCalledWith(
-      expect.objectContaining({ key: 'value' })
-    );
+    expect(mockMixpanelTrack).toHaveBeenCalledWith('Test Event', testData);
   });
 
   it('logs the full payload to Firestore', async () => {

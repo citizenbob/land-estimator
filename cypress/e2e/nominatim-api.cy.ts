@@ -11,10 +11,8 @@ describe('Nominatim API Route', () => {
         '/api/nominatim?type=coordinates&address=1600+Amphitheatre+Parkway'
       ).then((response) => {
         expect(response.status).to.eq(200);
-        expect(response.body).to.have.property('lat');
-        expect(response.body).to.have.property('lon');
-        expect(response.body).to.have.property('displayName');
-        expect(response.body).to.have.property('value');
+        expect(response.body).to.have.property('place_id');
+        expect(response.body).to.have.property('display_name');
       });
     });
 
@@ -43,10 +41,8 @@ describe('Nominatim API Route', () => {
           expect(response.body).to.be.an('array');
           if (response.body.length > 0) {
             const firstSuggestion = response.body[0];
-            expect(firstSuggestion).to.have.property('displayName');
-            expect(firstSuggestion).to.have.property('lat');
-            expect(firstSuggestion).to.have.property('lon');
-            expect(firstSuggestion).to.have.property('value');
+            expect(firstSuggestion).to.have.property('place_id');
+            expect(firstSuggestion).to.have.property('display_name');
           }
         }
       );

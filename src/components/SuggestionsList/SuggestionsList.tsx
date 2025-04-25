@@ -1,17 +1,17 @@
 import React from 'react';
-import { GeocodeResult } from '@typez/addressMatchTypes';
+import { AddressSuggestion } from '@typez/addressMatchTypes';
 import {
   SuggestionsListStyles as List,
   SuggestionItemStyles as ListItem
 } from './SuggestionsList.styles';
 
 interface SuggestionsListProps {
-  suggestions: GeocodeResult[];
-  onSelect: (suggestion: GeocodeResult) => void;
+  suggestions: AddressSuggestion[];
+  onSelect: (suggestion: AddressSuggestion) => void;
   suggestionRefs: React.RefObject<HTMLLIElement>[];
   onSuggestionKeyDown: (
     e: React.KeyboardEvent<HTMLLIElement>,
-    suggestion: GeocodeResult,
+    suggestion: AddressSuggestion,
     index: number
   ) => void;
 }
@@ -26,7 +26,7 @@ const SuggestionsList: React.FC<SuggestionsListProps> = ({
     <List role="listbox">
       {suggestions.map((suggestion, index) => (
         <ListItem
-          key={suggestion.displayName}
+          key={suggestion.place_id}
           ref={suggestionRefs[index]}
           role="option"
           aria-selected="false"
@@ -35,9 +35,9 @@ const SuggestionsList: React.FC<SuggestionsListProps> = ({
           onKeyDown={(e: React.KeyboardEvent<HTMLLIElement>) =>
             onSuggestionKeyDown(e, suggestion, index)
           }
-          data-display={suggestion.displayName}
+          data-display={suggestion.display_name}
         >
-          {suggestion.displayName}
+          {suggestion.display_name}
         </ListItem>
       ))}
     </List>

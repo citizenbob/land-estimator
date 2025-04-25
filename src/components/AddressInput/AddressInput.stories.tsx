@@ -3,11 +3,11 @@
 import type { Meta, StoryObj } from '@storybook/react';
 import { fn } from '@storybook/test';
 import AddressInput from '@components/AddressInput/AddressInput';
-import { GeocodeResult } from '@typez/addressMatchTypes';
+import { EnrichedAddressSuggestion } from '@typez/addressMatchTypes';
 
 const baseLookupArgs = {
   query: '',
-  suggestions: [] as GeocodeResult[],
+  suggestions: [] as EnrichedAddressSuggestion[],
   handleChange: fn(),
   handleSelect: fn(),
   isFetching: false,
@@ -68,19 +68,17 @@ export const WithSuggestions: Story = {
       hasFetched: true,
       suggestions: [
         {
-          displayName: '1600 Amphitheatre Parkway, Mountain View, CA',
-          label: 'Google HQ',
-          value: '1600 Amphitheatre Parkway, Mountain View, CA',
+          display_name: '1600 Amphitheatre Parkway, Mountain View, CA',
+          place_id: 1234,
           lat: '37.4221',
           lon: '-122.0841'
-        },
+        } as EnrichedAddressSuggestion,
         {
-          displayName: '1600 Pennsylvania Avenue NW, Washington, DC',
-          label: 'White House',
-          value: '1600 Pennsylvania Avenue NW, Washington, DC',
+          display_name: '1600 Pennsylvania Avenue NW, Washington, DC',
+          place_id: 5678,
           lat: '38.8977',
           lon: '-77.0365'
-        }
+        } as EnrichedAddressSuggestion
       ]
     }
   }
@@ -104,12 +102,11 @@ export const LockedWithCTA: Story = {
       query: '1600 Amphitheatre Parkway, Mountain View, CA',
       locked: true,
       selectedSuggestion: {
-        displayName: '1600 Amphitheatre Parkway, Mountain View, CA',
-        label: 'Google HQ',
-        value: '1600 Amphitheatre Parkway, Mountain View, CA',
+        display_name: '1600 Amphitheatre Parkway, Mountain View, CA',
+        place_id: 1234,
         lat: '37.4221',
         lon: '-122.0841'
-      }
+      } as EnrichedAddressSuggestion
     }
   }
 };

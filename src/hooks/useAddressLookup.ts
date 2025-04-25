@@ -1,15 +1,18 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
-import { GeocodeResult } from '@typez/addressMatchTypes';
+import { AddressSuggestion, NominatimResponse } from '@typez/addressMatchTypes';
 
 export const useAddressLookup = () => {
   const [query, setQuery] = useState<string>('');
-  const [suggestions, setSuggestions] = useState<GeocodeResult[]>([]);
+  const [suggestions, setSuggestions] = useState<AddressSuggestion[]>([]);
   const [isFetching, setIsFetching] = useState<boolean>(false);
   const [locked, setLocked] = useState<boolean>(false);
   const [ignoreNextChange, setIgnoreNextChange] = useState<boolean>(false);
   const [hasFetched, setHasFetched] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   const debounceTimeout = useRef<NodeJS.Timeout | null>(null);
+
+  // Store raw suggestion data for later lookup
+  const rawDataMap = useRef<Record<number, NominatimResponse>>({});
 
   const fetchSuggestions = useCallback(
     async (value: string) => {
@@ -21,6 +24,7 @@ export const useAddressLookup = () => {
       setIsFetching(true);
       setError(null);
       try {
+        // fetch raw NominatimResponse array
         const response = await fetch(
           `/api/nominatim?type=suggestions&query=${encodeURIComponent(value)}`
         );
@@ -29,8 +33,19 @@ export const useAddressLookup = () => {
           throw new Error(`Error: ${response.status}`);
         }
 
-        const results = await response.json();
-        setSuggestions(results || []);
+        const results: NominatimResponse[] = await response.json();
+        // populate rawDataMap
+        rawDataMap.current = {};
+        results.forEach((item) => {
+          rawDataMap.current[item.place_id] = item;
+        });
+        // set minimal suggestions
+        setSuggestions(
+          results.map((item) => ({
+            place_id: item.place_id,
+            display_name: item.display_name
+          }))
+        );
       } catch (err) {
         setSuggestions([]);
         setError('Error fetching suggestions. Please try again.');
@@ -41,6 +56,12 @@ export const useAddressLookup = () => {
       }
     },
     [locked]
+  );
+
+  // Retrieve full payload for a suggestion
+  const getSuggestionData = useCallback(
+    (id: number): NominatimResponse | undefined => rawDataMap.current[id],
+    []
   );
 
   useEffect(() => {
@@ -91,6 +112,7 @@ export const useAddressLookup = () => {
     handleSelect,
     isFetching,
     locked,
-    hasFetched
+    hasFetched,
+    getSuggestionData
   };
 };
