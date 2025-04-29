@@ -22,7 +22,7 @@ import { AddressSuggestion } from '@typez/addressMatchTypes';
  * @returns Object containing event handlers for keyboard navigation
  */
 export function useSuggestionNavigation(
-  inputRef: React.RefObject<HTMLInputElement>,
+  inputRef: React.RefObject<HTMLInputElement | null>,
   onSelect: (suggestion: AddressSuggestion) => void,
   suggestionRefs: React.RefObject<HTMLLIElement>[]
 ) {

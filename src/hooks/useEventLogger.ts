@@ -22,31 +22,17 @@ export const useEventLogger = () => {
     };
     const mergedOptions = { ...defaultOptions, ...options };
 
-    const loggerFn =
-      typeof window !== 'undefined' && typeof window.logEvent === 'function'
-        ? window.logEvent
-        : actualLogEvent;
-
     try {
-      await loggerFn(eventName, data, mergedOptions);
+      // First call the actual logger to ensure API calls are always made
+      await actualLogEvent(eventName, data, mergedOptions);
 
+      // Then call the test stub if it exists (for test assertions)
       if (
         typeof window !== 'undefined' &&
         typeof window.logEvent === 'function' &&
-        window.logEvent !== actualLogEvent &&
-        mergedOptions.toFirestore !== false
+        window.logEvent !== actualLogEvent
       ) {
-        try {
-          await fetch('/api/log', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({ eventName, data })
-          });
-        } catch (error) {
-          console.debug('Error in test environment API call:', error);
-        }
+        await window.logEvent(eventName, data, mergedOptions);
       }
     } catch (error) {
       console.error(`Error logging event: ${eventName}`, error);

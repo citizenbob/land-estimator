@@ -31,7 +31,12 @@
       "@tokens/*": ["tokens/*"],
       "@typez/*": ["types/*"]
     },
-    "types": ["cypress", "vitest/globals", "vitest"]
+    "types": [
+      "cypress",
+      "vitest/globals",
+      "vitest",
+      "@testing-library/jest-dom"
+    ]
   },
   "include": [
     "next-env.d.ts",

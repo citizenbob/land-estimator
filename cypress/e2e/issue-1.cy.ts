@@ -15,6 +15,22 @@ describe('Enter Address & Receive Instant Estimate', () => {
       body: { success: true, message: 'Log event stored', id: 'mock-doc-id' }
     }).as('logApiCall');
 
+    // Since the estimation is done client-side, we don't need to intercept API calls
+    // But we'll keep this for future reference if the implementation changes
+    cy.intercept('GET', '**/api/estimate*', {
+      statusCode: 200,
+      body: {
+        lotSizeSqFt: 7500,
+        baseRatePerSqFt: { min: 4.5, max: 12 },
+        designFee: 900,
+        installationCost: 45000,
+        maintenanceMonthly: 200,
+        subtotal: { min: 33750, max: 90000 },
+        minimumServiceFee: 400,
+        finalEstimate: { min: 33750, max: 90000 }
+      }
+    }).as('estimateApiCall');
+
     const logEventStub = cy.stub().as('logEventSpy');
 
     cy.visit('/', {
@@ -149,5 +165,80 @@ describe('Enter Address & Receive Instant Estimate', () => {
     );
 
     cy.wait('@logApiCall');
+  });
+
+  it('displays calculation results after selecting an address and requesting an estimate', () => {
+    cy.get('input[placeholder="Enter address"]')
+      .clear()
+      .type('2323 E Highland Ave');
+
+    cy.wait('@nominatimApiCall');
+
+    cy.contains(
+      'ul li',
+      '2323, East Highland Avenue, Biltmore, Phoenix, Maricopa County, Arizona, 85016, United States'
+    )
+      .should('be.visible')
+      .click();
+
+    // Click the Get Instant Estimate button
+    cy.get('button')
+      .contains(/get instant estimate/i)
+      .should('be.visible')
+      .click();
+
+    // Wait for the API call to be logged
+    cy.wait('@logApiCall');
+
+    // Use a longer timeout and wait for the calculator container to be visible
+    cy.get('[class*="EstimateCalculator-styles__CalculatorContainer"]', {
+      timeout: 10000
+    }).should('be.visible');
+
+    // Check the title is displayed
+    cy.contains('Customize Your Landscaping Services', {
+      timeout: 10000
+    }).should('be.visible');
+
+    // Check for the lot size display with more flexible matching
+    // Sometimes the specific formatting might vary, so we'll just check for "sq ft"
+    cy.contains('Lot Size:').should('be.visible');
+    cy.contains('sq ft').should('be.visible');
+
+    // Check the service options are available (3 checkboxes: design, installation, maintenance)
+    cy.get('input[type="checkbox"]').should('have.length.at.least', 3);
+
+    // Verify that Design and Installation are selected by default
+    cy.contains('Design')
+      .parent()
+      .find('input[type="checkbox"]')
+      .should('be.checked');
+    cy.contains('Installation')
+      .parent()
+      .find('input[type="checkbox"]')
+      .should('be.checked');
+
+    // Check that design and installation costs are displayed by default
+    cy.contains('Design:').should('be.visible');
+    cy.contains('Installation:').should('be.visible');
+
+    // Total estimate should be displayed
+    cy.contains('Total Estimate:').should('be.visible');
+
+    // Check that maintenance is not displayed initially (since not selected by default)
+    cy.contains('Maintenance:').should('not.exist');
+
+    // Select maintenance option by clicking its label
+    cy.contains('Maintenance').click();
+
+    // Wait for animations to complete and maintenance cost to appear
+    // Use should('exist') first to ensure the element appears before checking content
+    cy.contains('Maintenance:').should('exist');
+    cy.contains('/ month').should('be.visible');
+
+    // Verify disclaimer is shown
+    cy.contains(/Estimate range is based on typical landscaping costs/i).should(
+      'be.visible'
+    );
   });
 });
