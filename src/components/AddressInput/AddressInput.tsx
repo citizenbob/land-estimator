@@ -18,6 +18,7 @@ import {
 import { motion } from 'framer-motion';
 
 interface AddressInputProps {
+  onAddressSelect?: (payload: EnrichedAddressSuggestion) => void;
   mockLookup?: Partial<ReturnType<typeof useAddressLookup>> & {
     logEvent?: (
       eventName: string,
@@ -35,7 +36,8 @@ interface AddressInputProps {
 
 const AddressInput = ({
   mockLookup,
-  logEvent: logEventProp
+  logEvent: logEventProp,
+  onAddressSelect
 }: AddressInputProps) => {
   const defaultLookup = useAddressLookup();
   const {
@@ -133,6 +135,13 @@ const AddressInput = ({
     }
 
     logAddressEvent(matched, 'Request Estimate', true);
+    // Invoke wrapper callback with the enriched address suggestion
+    const fullData = getSuggestionData(
+      matched.place_id
+    ) as EnrichedAddressSuggestion;
+    if (fullData && onAddressSelect) {
+      onAddressSelect(fullData);
+    }
   };
 
   useEffect(() => {

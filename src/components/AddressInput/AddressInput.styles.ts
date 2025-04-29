@@ -1,22 +1,6 @@
-import styled, { DefaultTheme } from 'styled-components';
+import styled from 'styled-components';
 import tokens from '@tokens/tokens.json';
-
-const getToken = (
-  theme: DefaultTheme,
-  path: string,
-  fallback: string
-): string => {
-  const keys = path.split('.');
-  let result: unknown = theme;
-  for (const key of keys) {
-    if (result && typeof result === 'object' && key in result) {
-      result = (result as Record<string, unknown>)[key];
-    } else {
-      return fallback;
-    }
-  }
-  return typeof result === 'string' ? result : fallback;
-};
+import { getToken } from '@tokens/tokenUtils';
 
 export const Form = styled.form.attrs(() => ({
   className: 'relative flex flex-col rounded-md shadow-sm'
