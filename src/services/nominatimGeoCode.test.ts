@@ -20,7 +20,6 @@ import {
 const mockFetch = vi.fn();
 global.fetch = mockFetch;
 
-// Helper function to modify what the test expects
 const expectUrlContainsParams = (url: string, params: string[]): void => {
   params.forEach((param: string) => {
     expect(url).toContain(param);

@@ -83,6 +83,10 @@ const showEstimateButton = locked;
 ### useEventLogger
 
 - Logs user interactions with the address input
+- Integrates with the central `logger.ts` service
+- Sends analytics data to Mixpanel and Firestore
+- Records events like address selection, search queries, and UI interactions
+- Supports configurable options for controlling where data is sent
 - Sends analytics data to Mixpanel and Firestore
 - Wraps the logging service to provide a consistent interface
 

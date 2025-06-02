@@ -4,6 +4,7 @@ import { expect, vi } from 'vitest';
 import { MOCK_NOMINATIM_RESPONSES } from './testData';
 import { AddressSuggestion } from '@typez/addressMatchTypes';
 import { useAddressLookup } from '@hooks/useAddressLookup';
+import { EventMap, LogOptions } from '@typez/analytics';
 
 export const typeAndSelectSuggestion = async (
   input: HTMLElement,
@@ -33,17 +34,24 @@ export const assertNoExtraApiCalls = async (
   expect(mockFunction.mock.calls.length).toBe(0);
 };
 
-export const verifyLogEventCall = (
+export const verifyLogEventCall = <T extends keyof EventMap>(
   logEvent: ReturnType<typeof vi.fn>,
-  eventName: string,
-  data: Record<string, unknown>,
-  options: { toMixpanel?: boolean; toFirestore?: boolean }
+  eventName: T,
+  data: Partial<EventMap[T]>,
+  options?: LogOptions
 ) => {
-  expect(logEvent).toHaveBeenCalledWith(
-    eventName,
-    expect.objectContaining(data),
-    options
-  );
+  if (options) {
+    expect(logEvent).toHaveBeenCalledWith(
+      eventName,
+      expect.objectContaining(data),
+      options
+    );
+  } else {
+    expect(logEvent).toHaveBeenCalledWith(
+      eventName,
+      expect.objectContaining(data)
+    );
+  }
 };
 
 export const mockSuccessResponse = (

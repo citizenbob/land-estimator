@@ -105,20 +105,15 @@ describe('Enter Address & Receive Instant Estimate', () => {
       '2323, East Highland Avenue, Biltmore, Phoenix, Maricopa County, Arizona, 85016, United States'
     );
 
-    // Match the actual format being used
+    // Match the new typed analytics format
     cy.get('@logEventSpy').should(
       'have.been.calledWith',
-      'Address Selected',
+      'address_selected',
       {
-        id: 123456,
-        address:
-          '2323, East Highland Avenue, Biltmore, Phoenix, Maricopa County, Arizona, 85016, United States',
-        lat: 33.123,
-        lon: -111.123,
-        boundingbox: ['33.122', '33.124', '-111.124', '-111.122'],
-        confirmedIntent: false
-      },
-      { toMixpanel: true, toFirestore: true }
+        query: '2323 E Highland Ave',
+        address_id: '123456',
+        position_in_results: 0
+      }
     );
 
     // Wait for the API call to be made
@@ -148,20 +143,13 @@ describe('Enter Address & Receive Instant Estimate', () => {
       .should('be.visible')
       .click();
 
-    // Match the actual format being used
+    // Match the new typed analytics format
     cy.get('@logEventSpy').should(
       'have.been.calledWith',
-      'Request Estimate',
+      'estimate_button_clicked',
       {
-        id: 123456,
-        address:
-          '2323, East Highland Avenue, Biltmore, Phoenix, Maricopa County, Arizona, 85016, United States',
-        lat: 33.123,
-        lon: -111.123,
-        boundingbox: ['33.122', '33.124', '-111.124', '-111.122'],
-        confirmedIntent: true
-      },
-      { toMixpanel: true, toFirestore: true }
+        address_id: '123456'
+      }
     );
 
     cy.wait('@logApiCall');

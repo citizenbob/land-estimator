@@ -18,12 +18,10 @@ import {
 import { MOCK_SUGGESTIONS, MOCK_NOMINATIM_RESPONSES } from '@lib/testData';
 import { NominatimApiClient } from '@services/nominatimApi';
 
-// Mock the logger
 vi.mock('@services/logger', () => ({
   logEvent: vi.fn()
 }));
 
-// Mock the Nominatim API client instead of fetch
 vi.mock('@services/nominatimApi', () => ({
   NominatimApiClient: {
     fetchSuggestions: vi.fn()
@@ -198,19 +196,11 @@ describe('AddressInput', () => {
       expect(mockLookup.handleSelect).toHaveBeenCalledWith(
         MOCK_SUGGESTIONS[0].display_name
       );
-      verifyLogEventCall(
-        logEvent,
-        'Address Selected',
-        {
-          id: MOCK_NOMINATIM_RESPONSES[0].place_id,
-          address: MOCK_NOMINATIM_RESPONSES[0].display_name,
-          lat: parseFloat(MOCK_NOMINATIM_RESPONSES[0].lat),
-          lon: parseFloat(MOCK_NOMINATIM_RESPONSES[0].lon),
-          boundingbox: MOCK_NOMINATIM_RESPONSES[0].boundingbox,
-          confirmedIntent: false
-        },
-        { toMixpanel: true, toFirestore: true }
-      );
+      verifyLogEventCall(logEvent, 'address_selected', {
+        query: '1600',
+        address_id: MOCK_NOMINATIM_RESPONSES[0].place_id.toString(),
+        position_in_results: 0
+      });
     });
   });
 
@@ -369,18 +359,9 @@ describe('AddressInput', () => {
 
     // Wait for the log event to be called
     await waitFor(() => {
-      expect(logEvent).toHaveBeenCalledWith(
-        'Request Estimate',
-        {
-          id: MOCK_NOMINATIM_RESPONSES[0].place_id,
-          address: MOCK_NOMINATIM_RESPONSES[0].display_name,
-          lat: parseFloat(MOCK_NOMINATIM_RESPONSES[0].lat),
-          lon: parseFloat(MOCK_NOMINATIM_RESPONSES[0].lon),
-          boundingbox: MOCK_NOMINATIM_RESPONSES[0].boundingbox,
-          confirmedIntent: true
-        },
-        { toMixpanel: true, toFirestore: true }
-      );
+      verifyLogEventCall(logEvent, 'estimate_button_clicked', {
+        address_id: MOCK_SUGGESTIONS[0].place_id.toString()
+      });
     });
   });
 });

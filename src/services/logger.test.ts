@@ -7,6 +7,7 @@ import {
   mockNetworkError,
   setupConsoleMocks
 } from '@lib/testUtils';
+import { ButtonClickEvent } from '../types/analytics';
 
 const mockFetch = vi.fn();
 global.fetch = mockFetch;
@@ -34,14 +35,17 @@ describe('logEvent', () => {
     vi.clearAllMocks();
     mockFetch.mockReset();
     consoleSpies = setupConsoleMocks();
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(2025, 5, 1, 12, 0, 0));
   });
 
   afterEach(() => {
     vi.restoreAllMocks();
+    vi.useRealTimers();
   });
 
-  const testEvent = 'Test Event';
-  const testData = { key: 'value' };
+  const testEvent = 'button_clicked';
+  const testData: ButtonClickEvent = { button_id: 'test_button' };
 
   it('logs the event name and data to Mixpanel', async () => {
     await logEvent(testEvent, testData, {
@@ -49,7 +53,13 @@ describe('logEvent', () => {
       toFirestore: false
     });
 
-    expect(mockMixpanelTrack).toHaveBeenCalledWith(testEvent, testData);
+    expect(mockMixpanelTrack).toHaveBeenCalledWith(
+      testEvent,
+      expect.objectContaining({
+        button_id: testData.button_id,
+        timestamp: expect.any(Number)
+      })
+    );
     expect(mockFetch).not.toHaveBeenCalled();
   });
 
@@ -67,7 +77,9 @@ describe('logEvent', () => {
       headers: {
         'Content-Type': 'application/json'
       },
-      body: JSON.stringify({ eventName: testEvent, data: testData })
+      body: expect.stringMatching(
+        /{"eventName":"button_clicked","data":{"button_id":"test_button","timestamp":\d+}}/
+      )
     });
     expect(mockMixpanelTrack).not.toHaveBeenCalled();
   });
@@ -142,5 +154,63 @@ describe('logEvent', () => {
 
     expect(mockFetch).not.toHaveBeenCalled();
     expect(mockMixpanelTrack).toHaveBeenCalledTimes(1);
+  });
+
+  it('adds a timestamp if one is not provided', async () => {
+    mockSuccessResponse(mockFetch, { success: true });
+
+    await logEvent(testEvent, testData, {
+      toMixpanel: true,
+      toFirestore: true
+    });
+
+    expect(mockMixpanelTrack).toHaveBeenCalledWith(testEvent, {
+      ...testData,
+      timestamp: Date.now()
+    });
+
+    expect(mockFetch).toHaveBeenCalledWith('/api/log', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        eventName: testEvent,
+        data: {
+          ...testData,
+          timestamp: Date.now()
+        }
+      })
+    });
+  });
+
+  it('preserves existing timestamp if one is provided', async () => {
+    const existingTimestamp = 1622540400000;
+    const dataWithTimestamp: ButtonClickEvent = {
+      button_id: 'test_button',
+      timestamp: existingTimestamp
+    };
+
+    mockSuccessResponse(mockFetch, { success: true });
+
+    await logEvent(testEvent, dataWithTimestamp, {
+      toMixpanel: true,
+      toFirestore: true
+    });
+
+    expect(mockMixpanelTrack).toHaveBeenCalledWith(
+      testEvent,
+      dataWithTimestamp
+    );
+    expect(mockFetch).toHaveBeenCalledWith('/api/log', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        eventName: testEvent,
+        data: dataWithTimestamp
+      })
+    });
   });
 });

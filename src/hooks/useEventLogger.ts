@@ -1,4 +1,5 @@
 import { logEvent as actualLogEvent } from '@services/logger';
+import { EventMap, LogOptions } from '../types/analytics';
 
 /**
  * Hook for consistent event logging across components
@@ -11,10 +12,10 @@ import { logEvent as actualLogEvent } from '@services/logger';
  * @returns Object containing the logEvent method
  */
 export const useEventLogger = () => {
-  const logEventToServices = async (
-    eventName: string,
-    data: Record<string, string | number | boolean | string[]>,
-    options?: { toMixpanel?: boolean; toFirestore?: boolean }
+  const logEventToServices = async <T extends keyof EventMap>(
+    eventName: T,
+    data: EventMap[T],
+    options?: LogOptions
   ) => {
     const defaultOptions = {
       toMixpanel: true,
@@ -23,16 +24,14 @@ export const useEventLogger = () => {
     const mergedOptions = { ...defaultOptions, ...options };
 
     try {
-      // First call the actual logger to ensure API calls are always made
       await actualLogEvent(eventName, data, mergedOptions);
 
-      // Then call the test stub if it exists (for test assertions)
       if (
         typeof window !== 'undefined' &&
-        typeof window.logEvent === 'function' &&
-        window.logEvent !== actualLogEvent
+        typeof window.logEvent === 'function'
       ) {
-        await window.logEvent(eventName, data, mergedOptions);
+        const testLogger = window.logEvent as unknown as typeof actualLogEvent;
+        await testLogger(eventName, data, mergedOptions);
       }
     } catch (error) {
       console.error(`Error logging event: ${eventName}`, error);

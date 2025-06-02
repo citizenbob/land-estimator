@@ -2,7 +2,6 @@ import { describe, it, expect } from 'vitest';
 import { estimateLandscapingPrice } from './landscapeEstimator';
 
 describe('landscapeEstimator', () => {
-  // Mock bounding box representing approximately 1 acre (43,560 sq ft)
   const oneAcreBoundingBox = [
     '37.4215',
     '37.4225',
@@ -10,7 +9,6 @@ describe('landscapeEstimator', () => {
     '-122.0835'
   ] as [string, string, string, string];
 
-  // Mock bounding box for a smaller area
   const smallerBoundingBox = [
     '37.4215',
     '37.4220',
@@ -18,7 +16,6 @@ describe('landscapeEstimator', () => {
     '-122.0840'
   ] as [string, string, string, string];
 
-  // Mock bounding box for a tiny area that should trigger minimum service fee
   const tinyBoundingBox = [
     '37.4215',
     '37.42151',

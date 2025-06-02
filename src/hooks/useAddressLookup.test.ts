@@ -10,7 +10,6 @@ import {
 } from '@lib/testData';
 import { setupConsoleMocks } from '@lib/testUtils';
 
-// Mock the API client instead of fetch directly
 vi.mock('@services/nominatimApi', () => ({
   NominatimApiClient: {
     fetchSuggestions: vi.fn()

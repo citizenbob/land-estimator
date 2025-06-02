@@ -1,5 +1,3 @@
-// src/services/LandscapingPriceEstimator.ts
-
 /**
  * Type definition for bounding box coordinates in the format [latMin, latMax, lonMin, lonMax]
  */

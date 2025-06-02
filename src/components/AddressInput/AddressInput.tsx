@@ -15,22 +15,28 @@ import {
   AddressSuggestion,
   EnrichedAddressSuggestion
 } from '@typez/addressMatchTypes';
+import {
+  AddressSelectedEvent,
+  EstimateButtonClickedEvent,
+  EventMap,
+  LogOptions
+} from '@typez/analytics';
 import { motion } from 'framer-motion';
 
 interface AddressInputProps {
   onAddressSelect?: (payload: EnrichedAddressSuggestion) => void;
   mockLookup?: Partial<ReturnType<typeof useAddressLookup>> & {
-    logEvent?: (
-      eventName: string,
-      data: Record<string, string | number | boolean | string[]>,
-      options?: { toMixpanel?: boolean; toFirestore?: boolean }
+    logEvent?: <T extends keyof EventMap>(
+      eventName: T,
+      data: EventMap[T],
+      options?: LogOptions
     ) => void;
     selectedSuggestion?: AddressSuggestion;
   };
-  logEvent?: (
-    eventName: string,
-    data: Record<string, string | number | boolean | string[]>,
-    options?: { toMixpanel?: boolean; toFirestore?: boolean }
+  logEvent?: <T extends keyof EventMap>(
+    eventName: T,
+    data: EventMap[T],
+    options?: LogOptions
   ) => void;
 }
 
@@ -62,7 +68,6 @@ const AddressInput = ({
     mockSelectedSuggestion || null
   );
 
-  // Use our new hook to manage UI state
   const {
     showLoading,
     showErrorAlert,
@@ -72,46 +77,25 @@ const AddressInput = ({
     uniqueSuggestions
   } = useInputState(query, suggestions, isFetching, hasFetched, locked);
 
-  const createAddressPayload = (
-    suggestionId: number,
-    confirmedIntent = false
-  ) => {
-    const fullData = getSuggestionData(
-      suggestionId
-    ) as EnrichedAddressSuggestion;
-
-    if (!fullData) {
-      return null;
-    }
-
-    const lat = fullData.lat ? parseFloat(String(fullData.lat)) : 0;
-    const lon = fullData.lon ? parseFloat(String(fullData.lon)) : 0;
-
-    return {
-      id: fullData.place_id,
-      address: fullData.display_name,
-      lat,
-      lon,
-      boundingbox: fullData.boundingbox || [],
-      confirmedIntent
-    };
-  };
-
   const logAddressEvent = (
     suggestion: AddressSuggestion,
-    eventName: string,
-    confirmedIntent = false
+    eventType: 'address_selected' | 'estimate_button_clicked'
   ) => {
-    if (logEvent) {
-      const payload = createAddressPayload(
-        suggestion.place_id,
-        confirmedIntent
-      );
-      if (payload) {
-        logEvent(eventName, payload, {
-          toMixpanel: true,
-          toFirestore: true
-        });
+    if (logEvent && suggestion) {
+      if (eventType === 'address_selected') {
+        const addressSelectedEvent: AddressSelectedEvent = {
+          query: query,
+          address_id: suggestion.place_id.toString(),
+          position_in_results: suggestions.findIndex(
+            (s) => s.place_id === suggestion.place_id
+          )
+        };
+        logEvent('address_selected', addressSelectedEvent);
+      } else if (eventType === 'estimate_button_clicked') {
+        const estimateEvent: EstimateButtonClickedEvent = {
+          address_id: suggestion.place_id.toString()
+        };
+        logEvent('estimate_button_clicked', estimateEvent);
       }
     }
   };
@@ -119,7 +103,7 @@ const AddressInput = ({
   const onSelect = (suggestion: AddressSuggestion) => {
     handleSelect(suggestion.display_name);
     selectedSuggestion.current = suggestion;
-    logAddressEvent(suggestion, 'Address Selected');
+    logAddressEvent(suggestion, 'address_selected');
   };
 
   const onEstimateClick = () => {
@@ -134,8 +118,7 @@ const AddressInput = ({
       return;
     }
 
-    logAddressEvent(matched, 'Request Estimate', true);
-    // Invoke wrapper callback with the enriched address suggestion
+    logAddressEvent(matched, 'estimate_button_clicked');
     const fullData = getSuggestionData(
       matched.place_id
     ) as EnrichedAddressSuggestion;

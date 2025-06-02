@@ -14,7 +14,6 @@ import {
   setupConsoleMocks
 } from '@lib/testUtils';
 
-// Mock fetch globally
 const mockFetch = vi.fn();
 global.fetch = mockFetch;
 
