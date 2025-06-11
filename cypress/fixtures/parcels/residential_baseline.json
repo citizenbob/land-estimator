@@ -1,0 +1,19 @@
+{
+  "id": "RES_BASELINE",
+  "full_address": "907 Volz Dr, Crestwood, MO 63126",
+  "region": "St. Louis County",
+  "latitude": 38.5587,
+  "longitude": -90.3774,
+  "calc": {
+    "landarea": 12500,
+    "building_sqft": 2500,
+    "estimated_landscapable_area": 8500,
+    "property_type": "residential"
+  },
+  "owner": {
+    "name": "Sample Owner"
+  },
+  "affluence_score": 50,
+  "source_file": "unified_addresses_lookup.json",
+  "processed_date": "2025-06-01T00:00:00.000Z"
+}

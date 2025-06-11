@@ -4,12 +4,7 @@ import { EventMap, LogOptions } from '../types/analytics';
 /**
  * Hook for consistent event logging across components
  *
- * Provides a wrapper around the logger service that:
- * - Ensures consistent default options for logging events
- * - Properly handles Cypress test environment integration
- * - Gracefully handles any errors during the logging process
- *
- * @returns Object containing the logEvent method
+ * @returns {object} Object containing the logEvent method
  */
 export const useEventLogger = () => {
   const logEventToServices = async <T extends keyof EventMap>(

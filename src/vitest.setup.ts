@@ -24,6 +24,32 @@ vi.mock('next/router', () => ({
 
 HTMLCanvasElement.prototype.getContext = vi.fn().mockReturnValue({});
 
+/**
+ * Enhance navigator object for tests that need clipboard or other APIs
+ */
+if (typeof globalThis.navigator === 'undefined') {
+  Object.defineProperty(globalThis, 'navigator', {
+    value: {
+      userAgent: 'Vitest',
+      clipboard: {
+        writeText: vi.fn(),
+        readText: vi.fn()
+      }
+    },
+    writable: true,
+    configurable: true
+  });
+} else if (!globalThis.navigator.clipboard) {
+  Object.defineProperty(globalThis.navigator, 'clipboard', {
+    value: {
+      writeText: vi.fn(),
+      readText: vi.fn()
+    },
+    writable: true,
+    configurable: true
+  });
+}
+
 vi.mock('next/image', () => ({
   __esModule: true,
   default: (props: React.ComponentProps<'img'>) =>

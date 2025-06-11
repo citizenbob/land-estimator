@@ -7,6 +7,11 @@ const nextConfig: NextConfig = {
   },
   sassOptions: {
     includePaths: [path.join(__dirname, 'styles')]
+  },
+  async headers() {
+    return [
+      // FlexSearch index headers removed - clients now use /api/lookup endpoint
+    ];
   }
 };
 

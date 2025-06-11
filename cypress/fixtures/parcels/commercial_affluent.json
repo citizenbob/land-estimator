@@ -1,0 +1,19 @@
+{
+  "id": "COM_AFFLUENT",
+  "full_address": "621 Market St, St. Louis, MO 63103",
+  "region": "St. Louis City",
+  "latitude": 38.6272,
+  "longitude": -90.1978,
+  "calc": {
+    "landarea": 22000,
+    "building_sqft": 9000,
+    "estimated_landscapable_area": 13000,
+    "property_type": "commercial"
+  },
+  "owner": {
+    "name": "City of St. Louis"
+  },
+  "affluence_score": 85,
+  "source_file": "unified_addresses_lookup.json",
+  "processed_date": "2025-06-01T00:00:00.000Z"
+}

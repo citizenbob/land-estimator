@@ -1,4 +1,3 @@
-import React from 'react';
 import type { Meta, StoryObj } from '@storybook/react';
 import Alert from './Alert';
 
@@ -20,19 +19,19 @@ export default meta;
 type Story = StoryObj<typeof Alert>;
 
 export const Status: Story = {
-  render: () => (
-    <Alert role="status" type="info">
-      Fetching suggestions...
-    </Alert>
-  )
+  args: {
+    role: 'status',
+    type: 'info',
+    children: 'Fetching suggestions...'
+  }
 };
 
 export const AlertMessage: Story = {
-  render: () => (
-    <Alert role="alert" type="error">
-      Error fetching suggestions
-    </Alert>
-  )
+  args: {
+    role: 'alert',
+    type: 'error',
+    children: 'Error fetching suggestions'
+  }
 };
 
 export const Success: Story = {

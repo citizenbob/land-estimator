@@ -14,5 +14,4 @@ declare global {
   }
 }
 
-// This empty export is needed to make this a module
 export {};

@@ -1,133 +1,272 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { loadShard, searchShard } from './addressSearch';
-import { logEvent } from './logger';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import {
+  searchAddresses,
+  AddressLookupRecord,
+  resetAddressSearchCache
+} from './addressSearch';
+import { MOCK_ADDRESS_LOOKUP_DATA } from '@lib/testData';
 
-const shardCache: { [key: string]: unknown } = {};
+const mockAddressData: AddressLookupRecord[] = MOCK_ADDRESS_LOOKUP_DATA;
 
-vi.mock('./logger', () => ({
-  logEvent: vi.fn()
+vi.mock('./loadAddressIndex', () => ({
+  loadAddressIndex: vi.fn()
 }));
 
-beforeEach(() => {
-  vi.clearAllMocks();
-  Object.keys(shardCache).forEach((key) => delete shardCache[key]);
-});
-
-vi.mock('path', () => ({
-  resolve: (...args: string[]) => {
-    // Simple mock that just joins the path segments
-    return args.join('/').replace(/\/+/g, '/');
-  }
-}));
-
-vi.mock('fs/promises', () => {
-  const readFile = vi.fn(async (path) => {
-    if (path.includes('city-C.json')) {
-      return JSON.stringify([
-        {
-          id: 'city-123',
-          full_address: '123 MAIN ST, SAINT LOUIS, MO',
-          latitude: 38.123456,
-          longitude: -90.123456,
-          region: 'St. Louis City',
-          estimated_landscapable_area: 5000,
-          record_reference: 'city/city-123'
-        }
-      ]);
-    }
-    if (path.includes('city-Z.json')) {
-      throw new Error('File not found');
-    }
-    throw new Error('Unexpected file path');
-  });
-
-  return {
-    readFile,
-    default: { readFile }
-  };
-});
-
-describe('addressSearch with logging', () => {
-  it('loads and indexes the correct shard based on query', async () => {
-    const shard = await loadShard('city', 'C');
-    expect(shard).toEqual([
-      {
-        id: 'city-123',
-        full_address: '123 MAIN ST, SAINT LOUIS, MO',
-        latitude: 38.123456,
-        longitude: -90.123456,
-        region: 'St. Louis City',
-        estimated_landscapable_area: 5000,
-        record_reference: 'city/city-123'
-      }
-    ]);
-  });
-
-  it('returns FlexSearch matches for known addresses', async () => {
-    const results = await searchShard('city', 'C', '123 MAIN');
-    expect(results).toHaveLength(1);
-    expect(results[0].full_address).toBe('123 MAIN ST, SAINT LOUIS, MO');
-  });
-
-  it('handles missing or invalid shards gracefully', async () => {
-    await expect(loadShard('city', 'Z')).rejects.toThrow(
-      'Failed to load or process shard city-Z.'
-    );
-  });
-
-  it('logs cache hits when shard is already loaded', async () => {
-    await loadShard('city', 'C');
+describe('addressSearch', () => {
+  beforeEach(() => {
     vi.clearAllMocks();
-
-    await loadShard('city', 'C');
-    expect(logEvent).toHaveBeenCalledWith('cache_hit', { shard: 'city-C' });
+    resetAddressSearchCache();
+    delete (globalThis as Record<string, unknown>).window;
+    delete (globalThis as Record<string, unknown>).fetch;
   });
 
-  it('logs shard loading events', async () => {
-    vi.resetModules();
-    vi.mock('./logger', () => ({
-      logEvent: vi.fn()
-    }));
-
-    const { loadShard } = await import('./addressSearch');
-    const { logEvent } = await import('./logger');
-
-    await loadShard('city', 'C');
-    expect(logEvent).toHaveBeenCalledWith(
-      'shard_loaded',
-      expect.objectContaining({
-        shard: 'city-C',
-        recordCount: 1
-      })
-    );
+  afterEach(() => {
+    vi.restoreAllMocks();
   });
 
-  it('logs errors during shard loading', async () => {
-    await expect(loadShard('city', 'Z')).rejects.toThrow(
-      'Failed to load or process shard city-Z.'
-    );
-    expect(logEvent).toHaveBeenCalledWith('shard_load_error', {
-      shard: 'city-Z',
-      error: 'File not found'
+  describe('Browser Environment (Client-side)', () => {
+    beforeEach(() => {
+      (globalThis as Record<string, unknown>).window = {};
+      (globalThis as Record<string, unknown>).fetch = vi.fn();
+    });
+
+    it('should call /api/lookup endpoint in browser', async () => {
+      const mockResponse = {
+        ok: true,
+        json: vi.fn().mockResolvedValue({
+          results: [mockAddressData[0]]
+        })
+      };
+      const mockFetch = (globalThis as Record<string, unknown>)
+        .fetch as ReturnType<typeof vi.fn>;
+      mockFetch.mockResolvedValue(mockResponse);
+
+      const results = await searchAddresses('riverview');
+
+      expect(globalThis.fetch).toHaveBeenCalledWith(
+        '/api/lookup?query=riverview'
+      );
+      expect(results).toEqual([mockAddressData[0]]);
+    });
+
+    it('should handle API errors gracefully', async () => {
+      const mockResponse = {
+        ok: false,
+        status: 500,
+        statusText: 'Internal Server Error'
+      };
+      const mockFetch = (globalThis as Record<string, unknown>)
+        .fetch as ReturnType<typeof vi.fn>;
+      mockFetch.mockResolvedValue(mockResponse);
+
+      const results = await searchAddresses('test');
+
+      expect(results).toEqual([]);
+    });
+
+    it('should handle network errors gracefully', async () => {
+      const mockFetch = (globalThis as Record<string, unknown>)
+        .fetch as ReturnType<typeof vi.fn>;
+      mockFetch.mockRejectedValue(new Error('Network error'));
+
+      const results = await searchAddresses('test');
+
+      expect(results).toEqual([]);
+    });
+
+    it('should encode query parameters properly', async () => {
+      const mockResponse = {
+        ok: true,
+        json: vi.fn().mockResolvedValue({ results: [] })
+      };
+      const mockFetch = (globalThis as Record<string, unknown>)
+        .fetch as ReturnType<typeof vi.fn>;
+      mockFetch.mockResolvedValue(mockResponse);
+
+      await searchAddresses('123 Main St, St. Louis');
+
+      expect(globalThis.fetch).toHaveBeenCalledWith(
+        `/api/lookup?query=${encodeURIComponent('123 Main St, St. Louis')}`
+      );
+    });
+
+    it('should return empty array for queries shorter than 2 characters', async () => {
+      const results = await searchAddresses('a');
+
+      expect(results).toEqual([]);
+      expect(globalThis.fetch).not.toHaveBeenCalled();
+    });
+
+    it('should return empty array for empty queries', async () => {
+      const results = await searchAddresses('');
+
+      expect(results).toEqual([]);
+      expect(globalThis.fetch).not.toHaveBeenCalled();
     });
   });
 
-  it('logs search performance', async () => {
-    await searchShard('city', 'C', '123 MAIN');
-    expect(logEvent).toHaveBeenCalledWith('search_performed', {
-      shard: 'city-C',
-      query: '123 MAIN',
-      resultCount: 1
+  describe('Server Environment (Server-side)', () => {
+    let mockLoadAddressIndex: ReturnType<typeof vi.fn>;
+
+    beforeEach(async () => {
+      delete (globalThis as Record<string, unknown>).window;
+
+      resetAddressSearchCache();
+
+      const loadModule = await import('./loadAddressIndex');
+      mockLoadAddressIndex = vi.mocked(loadModule.loadAddressIndex);
+    });
+
+    it('should use FlexSearch index on server', async () => {
+      const mockIndex = {
+        search: vi.fn().mockReturnValue([0, 1])
+      };
+
+      mockLoadAddressIndex.mockResolvedValue({
+        index: mockIndex,
+        parcelIds: mockAddressData.map((addr) => addr.id),
+        addressData: Object.fromEntries(
+          mockAddressData.map((addr) => [addr.id, addr.display_name])
+        )
+      });
+
+      const results = await searchAddresses('riverview');
+
+      expect(mockLoadAddressIndex).toHaveBeenCalled();
+      expect(mockIndex.search).toHaveBeenCalledWith('riverview', {
+        bool: 'and',
+        limit: 10
+      });
+      expect(results).toHaveLength(2);
+    });
+
+    it('should normalize queries before searching', async () => {
+      const mockIndex = {
+        search: vi.fn().mockReturnValue([0])
+      };
+
+      mockLoadAddressIndex.mockResolvedValue({
+        index: mockIndex,
+        parcelIds: [mockAddressData[0].id],
+        addressData: {
+          [mockAddressData[0].id]: mockAddressData[0].display_name
+        }
+      });
+
+      await searchAddresses('RIVERVIEW, MO!');
+
+      expect(mockIndex.search).toHaveBeenCalledWith('riverview mo', {
+        bool: 'and',
+        limit: 10
+      });
+    });
+
+    it('should respect limit parameter', async () => {
+      const mockIndex = {
+        search: vi.fn().mockReturnValue([0, 1, 2, 3])
+      };
+
+      mockLoadAddressIndex.mockResolvedValue({
+        index: mockIndex,
+        parcelIds: mockAddressData.map((addr) => addr.id),
+        addressData: Object.fromEntries(
+          mockAddressData.map((addr) => [addr.id, addr.display_name])
+        )
+      });
+
+      const results = await searchAddresses('test', 2);
+
+      expect(mockIndex.search).toHaveBeenCalledWith('test', {
+        bool: 'and',
+        limit: 2
+      });
+      expect(results).toHaveLength(2);
+    });
+
+    it('should handle server-side errors gracefully', async () => {
+      mockLoadAddressIndex.mockRejectedValue(new Error('Index loading failed'));
+
+      const consoleSpy = vi
+        .spyOn(console, 'error')
+        .mockImplementation(() => {});
+
+      const results = await searchAddresses('test');
+
+      expect(results).toEqual([]);
+      expect(consoleSpy).toHaveBeenCalledWith(
+        'Address search error:',
+        expect.any(Error)
+      );
+
+      consoleSpy.mockRestore();
+    });
+
+    it('should format search results correctly', async () => {
+      const mockIndex = {
+        search: vi.fn().mockReturnValue([0])
+      };
+
+      mockLoadAddressIndex.mockResolvedValue({
+        index: mockIndex,
+        parcelIds: [mockAddressData[0].id],
+        addressData: {
+          [mockAddressData[0].id]: mockAddressData[0].display_name
+        }
+      });
+
+      const results = await searchAddresses('riverview');
+
+      expect(results[0]).toEqual({
+        id: mockAddressData[0].id,
+        display_name: mockAddressData[0].display_name,
+        region: mockAddressData[0].region,
+        normalized: expect.any(String)
+      });
+    });
+
+    it('should cache the address index bundle', async () => {
+      const mockIndex = {
+        search: vi.fn().mockReturnValue([0])
+      };
+
+      mockLoadAddressIndex.mockResolvedValue({
+        index: mockIndex,
+        parcelIds: [mockAddressData[0].id],
+        addressData: {
+          [mockAddressData[0].id]: mockAddressData[0].display_name
+        }
+      });
+
+      await searchAddresses('test1');
+      await searchAddresses('test2');
+
+      expect(mockLoadAddressIndex).toHaveBeenCalledTimes(1);
+      expect(mockIndex.search).toHaveBeenCalledTimes(2);
     });
   });
 
-  it('logs errors during search', async () => {
-    await expect(searchShard('city', 'Z', '123 MAIN')).rejects.toThrow(
-      'Failed to load or process shard city-Z.'
-    );
-    expect(logEvent).toHaveBeenCalledWith('shard_load_error', {
-      shard: 'city-Z',
-      error: 'File not found'
+  describe('Query Validation', () => {
+    it('should trim whitespace from queries', async () => {
+      (globalThis as Record<string, unknown>).window = {};
+      const mockResponse = {
+        ok: true,
+        json: vi.fn().mockResolvedValue({ results: [] })
+      };
+      (globalThis as Record<string, unknown>).fetch = vi
+        .fn()
+        .mockResolvedValue(mockResponse);
+
+      await searchAddresses('  test query  ');
+
+      expect(globalThis.fetch).toHaveBeenCalledWith(
+        '/api/lookup?query=test%20query'
+      );
+    });
+
+    it('should reject queries shorter than 2 characters after trimming', async () => {
+      const results = await searchAddresses('  a  ');
+
+      expect(results).toEqual([]);
     });
   });
 });

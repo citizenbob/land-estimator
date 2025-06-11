@@ -21,8 +21,6 @@ Landscape Estimator is a tool that uses **AI, GIS data, and aerial imagery** to 
 - **Frontend:** Next.js (App Router), React, TypeScript
 - **Backend:** GIS APIs, AI/ML models (TBD)
 - **Mapping:** Google Maps API / Leaflet.js
-- **Analytics:** Type-safe event tracking with custom TypeScript types
-- **Analytics:** Mixpanel, Firestore
 
 ## 🔽 Installation
 
@@ -32,19 +30,6 @@ cd landscape-estimator
 yarn install
 yarn dev
 ```
-
-## 📊 Analytics
-
-We've implemented a comprehensive analytics system to track user behavior, system performance, and errors:
-
-- **Mixpanel:** Tracks user interactions and product analytics
-- **Firestore:** Stores detailed event data for business intelligence
-- **Privacy-focused:** No PII is tracked without explicit consent
-
-For details on the analytics implementation:
-
-- [Services Documentation](./src/services/README.md)
-- [Hooks Documentation](./src/hooks/README.md)
 
 ## 🤝 Contributing
 

@@ -4,6 +4,7 @@ import { render, screen, fireEvent } from '@testing-library/react';
 import '@testing-library/jest-dom';
 import { EstimateCalculator } from './EstimateCalculator';
 import { useLandscapeEstimator } from '@hooks/useLandscapeEstimator';
+import { MOCK_ADDRESS_DATA } from '../../lib/testData';
 import type { EnrichedAddressSuggestion } from '@typez/addressMatchTypes';
 import type {
   LandscapeEstimatorOptions,
@@ -22,16 +23,7 @@ describe('EstimateCalculator', () => {
     ) => Promise<EstimateResult>
   >;
 
-  const mockAddressData: EnrichedAddressSuggestion = {
-    address: {
-      city: 'Testville',
-      state: 'TS',
-      postcode: '12345',
-      country_code: 'US'
-    },
-    place_id: 1234,
-    display_name: '123 Test Street, Testville, TS, 12345, US'
-  };
+  const mockAddressData = MOCK_ADDRESS_DATA;
 
   beforeEach(() => {
     calculateEstimateMock.mockImplementation(() => Promise.resolve());
@@ -130,7 +122,6 @@ describe('EstimateCalculator', () => {
   });
 
   it('allows users to override the lot size value', async () => {
-    // Mock with a specific lot size
     mockUseLandscapeEstimator.mockReturnValue({
       estimate: {
         lotSizeSqFt: 5000,
@@ -146,22 +137,17 @@ describe('EstimateCalculator', () => {
 
     render(<EstimateCalculator addressData={mockAddressData} />);
 
-    // Verify the lot size is displayed
     expect(screen.getByText('Lot Size:')).toBeInTheDocument();
     expect(screen.getByText('5,000 sq ft')).toBeInTheDocument();
 
-    // Find the input field and override the lot size
     const lotSizeInput = screen.getByLabelText(
       'Override lot size square footage'
     );
     expect(lotSizeInput).toBeInTheDocument();
 
-    // Empty the input field first
     fireEvent.change(lotSizeInput, { target: { value: '' } });
-    // Then enter a new value
     fireEvent.change(lotSizeInput, { target: { value: '7500' } });
 
-    // Verify calculateEstimate was called with overridden value
     expect(calculateEstimateMock).toHaveBeenCalledWith(mockAddressData, {
       serviceTypes: ['design', 'installation'],
       overrideLotSizeSqFt: 7500
@@ -185,10 +171,67 @@ describe('EstimateCalculator', () => {
       'Override lot size square footage'
     );
 
-    // Try entering alphanumeric text
     fireEvent.change(lotSizeInput, { target: { value: '1000abc' } });
 
-    // Only the numeric part should remain
     expect(lotSizeInput).toHaveValue('1000');
+  });
+
+  it('handles incomplete address data gracefully', () => {
+    const incompleteAddressData = {
+      ...mockAddressData,
+      calc: undefined
+    } as EnrichedAddressSuggestion;
+
+    const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+    render(<EstimateCalculator addressData={incompleteAddressData} />);
+
+    expect(
+      screen.getByText('Customize Your Landscaping Services')
+    ).toBeInTheDocument();
+    expect(calculateEstimateMock).not.toHaveBeenCalled();
+
+    consoleSpy.mockRestore();
+  });
+
+  it('handles missing landscapable area data', () => {
+    const incompleteCalcData = {
+      ...mockAddressData,
+      calc: {
+        landarea: 5000,
+        building_sqft: 1000,
+        estimated_landscapable_area: undefined,
+        property_type: 'residential'
+      }
+    } as EnrichedAddressSuggestion;
+
+    const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+    render(<EstimateCalculator addressData={incompleteCalcData} />);
+
+    expect(
+      screen.getByText('Customize Your Landscaping Services')
+    ).toBeInTheDocument();
+    expect(calculateEstimateMock).not.toHaveBeenCalled();
+
+    consoleSpy.mockRestore();
+  });
+
+  it('calculates estimates with valid address data', () => {
+    const validAddressData = {
+      ...mockAddressData,
+      calc: {
+        landarea: 5000,
+        building_sqft: 1000,
+        estimated_landscapable_area: 3500,
+        property_type: 'residential'
+      }
+    };
+
+    render(<EstimateCalculator addressData={validAddressData} />);
+
+    expect(calculateEstimateMock).toHaveBeenCalledWith(validAddressData, {
+      serviceTypes: ['design', 'installation']
+    });
   });
 });

@@ -11,13 +11,15 @@ export default defineConfig({
       '@app': path.resolve(dirname, 'src/app'),
       '@components': path.resolve(dirname, 'src/components'),
       '@config': path.resolve(dirname, 'src/config'),
+      '@data': path.resolve(dirname, 'src/data'),
       '@hooks': path.resolve(dirname, 'src/hooks'),
       '@hocs': path.resolve(dirname, 'src/hocs'),
       '@lib': path.resolve(dirname, 'src/lib'),
       '@services': path.resolve(dirname, 'src/services'),
       '@store': path.resolve(dirname, 'src/store'),
       '@tokens': path.resolve(dirname, 'src/tokens'),
-      '@types': path.resolve(dirname, 'src/types')
+      '@types': path.resolve(dirname, 'src/types'),
+      '@typez': path.resolve(dirname, 'src/types')
     }
   },
 

@@ -1,0 +1,12 @@
+{
+  "query": "621 Market",
+  "results": [
+    {
+      "id": "COM_AFFLUENT",
+      "display_name": "621 Market St, St. Louis, MO 63103",
+      "region": "St. Louis City",
+      "normalized": "621 Market St, St. Louis, MO 63103"
+    }
+  ],
+  "count": 1
+}

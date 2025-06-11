@@ -5,12 +5,14 @@ import {
   mockSuccessResponse,
   mockErrorResponse,
   mockNetworkError,
-  setupConsoleMocks
+  setupConsoleMocks,
+  createMockFetch,
+  setupTestTimers,
+  cleanupTestTimers
 } from '@lib/testUtils';
-import { ButtonClickEvent } from '../types/analytics';
+import { MOCK_ANALYTICS_EVENTS } from '@lib/testData';
 
-const mockFetch = vi.fn();
-global.fetch = mockFetch;
+const mockFetch = createMockFetch();
 
 const setupLoggerMocks = () => {
   vi.mock('mixpanel-browser', () => ({
@@ -35,17 +37,16 @@ describe('logEvent', () => {
     vi.clearAllMocks();
     mockFetch.mockReset();
     consoleSpies = setupConsoleMocks();
-    vi.useFakeTimers();
-    vi.setSystemTime(new Date(2025, 5, 1, 12, 0, 0));
+    setupTestTimers();
   });
 
   afterEach(() => {
     vi.restoreAllMocks();
-    vi.useRealTimers();
+    cleanupTestTimers();
   });
 
-  const testEvent = 'button_clicked';
-  const testData: ButtonClickEvent = { button_id: 'test_button' };
+  const testEvent = 'address_selected';
+  const testData = MOCK_ANALYTICS_EVENTS.ADDRESS_SELECTED;
 
   it('logs the event name and data to Mixpanel', async () => {
     await logEvent(testEvent, testData, {
@@ -56,7 +57,9 @@ describe('logEvent', () => {
     expect(mockMixpanelTrack).toHaveBeenCalledWith(
       testEvent,
       expect.objectContaining({
-        button_id: testData.button_id,
+        query: testData.query,
+        address_id: testData.address_id,
+        position_in_results: testData.position_in_results,
         timestamp: expect.any(Number)
       })
     );
@@ -77,9 +80,13 @@ describe('logEvent', () => {
       headers: {
         'Content-Type': 'application/json'
       },
-      body: expect.stringMatching(
-        /{"eventName":"button_clicked","data":{"button_id":"test_button","timestamp":\d+}}/
-      )
+      body: JSON.stringify({
+        eventName: testEvent,
+        data: {
+          ...testData,
+          timestamp: Date.now()
+        }
+      })
     });
     expect(mockMixpanelTrack).not.toHaveBeenCalled();
   });
@@ -186,8 +193,8 @@ describe('logEvent', () => {
 
   it('preserves existing timestamp if one is provided', async () => {
     const existingTimestamp = 1622540400000;
-    const dataWithTimestamp: ButtonClickEvent = {
-      button_id: 'test_button',
+    const dataWithTimestamp = {
+      ...testData,
       timestamp: existingTimestamp
     };
 

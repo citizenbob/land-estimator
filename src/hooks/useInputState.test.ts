@@ -45,7 +45,7 @@ describe('useInputState', () => {
   it('should return correct state when showing suggestions', () => {
     const query = 'test';
     const suggestions: AddressSuggestion[] = [
-      { place_id: 1, display_name: 'test location' }
+      { place_id: '1', display_name: 'test location' }
     ];
     const isFetching = false;
     const hasFetched = true;
@@ -66,7 +66,7 @@ describe('useInputState', () => {
   it('should return correct state for locked state', () => {
     const query = 'test location';
     const suggestions: AddressSuggestion[] = [
-      { place_id: 1, display_name: 'test location' }
+      { place_id: '1', display_name: 'test location' }
     ];
     const isFetching = false;
     const hasFetched = true;
@@ -87,9 +87,9 @@ describe('useInputState', () => {
   it('should deduplicate suggestions by display_name', () => {
     const query = 'test';
     const suggestions: AddressSuggestion[] = [
-      { place_id: 1, display_name: 'test location' },
-      { place_id: 2, display_name: 'test location' },
-      { place_id: 3, display_name: 'another location' }
+      { place_id: '1', display_name: 'test location' },
+      { place_id: '2', display_name: 'test location' },
+      { place_id: '3', display_name: 'another location' }
     ];
     const isFetching = false;
     const hasFetched = true;
@@ -105,7 +105,7 @@ describe('useInputState', () => {
   it('should not show suggestions if query matches a suggestion display_name', () => {
     const query = 'test location';
     const suggestions: AddressSuggestion[] = [
-      { place_id: 1, display_name: 'test location' }
+      { place_id: '1', display_name: 'test location' }
     ];
     const isFetching = false;
     const hasFetched = true;

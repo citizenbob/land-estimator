@@ -14,17 +14,26 @@ interface InputState {
 }
 
 /**
- * Converts an AddressSuggestion to an EnrichedAddressSuggestion by ensuring lat/lon properties
+ * Converts an AddressSuggestion to an EnrichedAddressSuggestion by ensuring latitude/longitude properties
  * @param suggestion The base suggestion to enrich
- * @returns An enriched suggestion with lat/lon properties
+ * @returns An enriched suggestion with latitude/longitude properties
  */
 export function enrichSuggestion(
   suggestion: AddressSuggestion
 ): EnrichedAddressSuggestion {
   return {
     ...suggestion,
-    lat: (suggestion as EnrichedAddressSuggestion).lat ?? 0,
-    lon: (suggestion as EnrichedAddressSuggestion).lon ?? 0
+    latitude: (suggestion as EnrichedAddressSuggestion).latitude ?? 0,
+    longitude: (suggestion as EnrichedAddressSuggestion).longitude ?? 0,
+    region: (suggestion as EnrichedAddressSuggestion).region ?? 'Unknown',
+    calc: (suggestion as EnrichedAddressSuggestion).calc ?? {
+      landarea: 0,
+      building_sqft: 0,
+      estimated_landscapable_area: 0,
+      property_type: 'unknown'
+    },
+    affluence_score:
+      (suggestion as EnrichedAddressSuggestion).affluence_score ?? 0
   };
 }
 

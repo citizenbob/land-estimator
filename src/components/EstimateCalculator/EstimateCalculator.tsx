@@ -1,11 +1,15 @@
-// EstimateCalculator.tsx
-
 import React, { useState, useEffect } from 'react';
 import { useLandscapeEstimator } from '@hooks/useLandscapeEstimator';
 import { EnrichedAddressSuggestion } from '@typez/addressMatchTypes';
-import { motion } from 'framer-motion';
 import Alert from '@components/Alert/Alert';
 import InputField from '@components/InputField/InputField';
+import { EstimateLineItem } from '@components/EstimateLineItem/EstimateLineItem';
+import {
+  formatCurrency,
+  formatSquareFeet,
+  formatPriceRange,
+  formatMonthlyPrice
+} from '@lib/formatUtils';
 import {
   CalculatorContainer,
   Title,
@@ -15,20 +19,15 @@ import {
   StatusContainer,
   Spinner,
   EstimateBreakdown,
-  LineItem,
   Total,
   Disclaimer
 } from './EstimateCalculator.styles';
 
-// Define the services array
 const services = [
   { value: 'design', label: 'Design' },
   { value: 'installation', label: 'Installation' },
   { value: 'maintenance', label: 'Maintenance' }
 ];
-
-// Update to use motion.create() instead of deprecated motion() function
-const MotionLineItem = motion.create(LineItem);
 
 interface EstimateCalculatorProps {
   addressData: EnrichedAddressSuggestion;
@@ -43,6 +42,13 @@ export function EstimateCalculator({ addressData }: EstimateCalculatorProps) {
     useLandscapeEstimator();
 
   useEffect(() => {
+    if (!addressData.calc || !addressData.calc.estimated_landscapable_area) {
+      console.error(
+        'Insufficient data: estimated_landscapable_area is missing or invalid.'
+      );
+      return;
+    }
+
     calculateEstimate(addressData, {
       serviceTypes: selectedServices,
       overrideLotSizeSqFt: lotSizeSqFt ? Number(lotSizeSqFt) : undefined
@@ -60,7 +66,6 @@ export function EstimateCalculator({ addressData }: EstimateCalculatorProps) {
   };
 
   const handleLotSizeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    // Allow only numeric input
     const value = e.target.value.replace(/[^0-9]/g, '');
     setLotSizeSqFt(value);
   };
@@ -112,63 +117,56 @@ export function EstimateCalculator({ addressData }: EstimateCalculatorProps) {
       )}
 
       {error && (
-        <Alert role="alert" type="error">
-          {error}
+        <Alert
+          role="alert"
+          type={error === 'INSUFFICIENT_DATA' ? 'warning' : 'error'}
+        >
+          {error === 'INSUFFICIENT_DATA' ? (
+            <div>
+              <p>
+                <strong>Unable to provide automatic estimate</strong>
+              </p>
+              <p>
+                This address requires an in-person consultation to accurately
+                assess the landscaping potential. Please contact us to schedule
+                a site visit for a detailed estimate.
+              </p>
+            </div>
+          ) : (
+            error
+          )}
         </Alert>
       )}
 
       {estimate && (
         <EstimateBreakdown>
-          {estimate.lotSizeSqFt && (
-            <MotionLineItem
-              initial={{ opacity: 0, y: -10 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -10 }}
-            >
-              <span>Lot Size:</span>
-              <span>{estimate.lotSizeSqFt.toLocaleString()} sq ft</span>
-            </MotionLineItem>
-          )}
+          <EstimateLineItem
+            label="Lot Size"
+            value={formatSquareFeet(estimate.lotSizeSqFt)}
+            show={!!estimate.lotSizeSqFt && estimate.lotSizeSqFt > 0}
+          />
 
-          {selectedServices.includes('design') && (
-            <MotionLineItem
-              initial={{ opacity: 0, y: -10 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -10 }}
-            >
-              <span>Design:</span>
-              <span>${estimate.designFee.toFixed(2)}</span>
-            </MotionLineItem>
-          )}
+          <EstimateLineItem
+            label="Design"
+            value={formatCurrency(estimate.designFee)}
+            show={selectedServices.includes('design')}
+          />
 
-          {selectedServices.includes('installation') && (
-            <MotionLineItem
-              initial={{ opacity: 0, y: -10 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -10 }}
-            >
-              <span>Installation:</span>
-              <span>${estimate.installationCost.toFixed(2)}</span>
-            </MotionLineItem>
-          )}
+          <EstimateLineItem
+            label="Installation"
+            value={formatCurrency(estimate.installationCost)}
+            show={selectedServices.includes('installation')}
+          />
 
-          {selectedServices.includes('maintenance') && (
-            <MotionLineItem
-              initial={{ opacity: 0, y: -10 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -10 }}
-            >
-              <span>Maintenance:</span>
-              <span>${estimate.maintenanceMonthly.toFixed(2)} / month</span>
-            </MotionLineItem>
-          )}
+          <EstimateLineItem
+            label="Maintenance"
+            value={formatMonthlyPrice(estimate.maintenanceMonthly)}
+            show={selectedServices.includes('maintenance')}
+          />
 
           <Total>
             <strong>Total Estimate:</strong>
-            <span>
-              ${estimate.finalEstimate.min.toFixed(2)} - $
-              {estimate.finalEstimate.max.toFixed(2)}
-            </span>
+            <span>{formatPriceRange(estimate.finalEstimate)}</span>
           </Total>
 
           <Disclaimer>

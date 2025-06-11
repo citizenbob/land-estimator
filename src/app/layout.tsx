@@ -43,7 +43,9 @@ export default function RootLayout({
   if (typeof window === 'undefined') {
     return (
       <html lang="en" className={getThemeClass(clientTheme)}>
-        <head></head>
+        <head>
+          {/* Removed FlexSearch index preload since clients now use API */}
+        </head>
         <body
           className={`${geistSans.variable} ${geistMono.variable} antialiased`}
         >
@@ -55,6 +57,9 @@ export default function RootLayout({
   }
   return (
     <html lang="en" className={getThemeClass(clientTheme)}>
+      <head>
+        {/* Removed FlexSearch index preload since clients now use API */}
+      </head>
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >

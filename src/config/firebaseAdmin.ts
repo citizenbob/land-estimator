@@ -1,15 +1,12 @@
 import * as admin from 'firebase-admin';
 
-// Only attempt to initialize Firebase if we have credentials
 const hasCredentials =
   process.env.FIREBASE_PROJECT_ID &&
   process.env.FIREBASE_CLIENT_EMAIL &&
   process.env.FIREBASE_PRIVATE_KEY;
 
-// Process the private key to handle escaped newlines
 const privateKey = process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, '\n');
 
-// Create a safe initialization function
 function initializeFirebase() {
   if (!hasCredentials) {
     console.warn(
@@ -41,10 +38,8 @@ function initializeFirebase() {
   return true;
 }
 
-// Initialize Firebase
 const isInitialized = initializeFirebase();
 
-// Get Firestore instance, but safely return a mock if Firebase isn't initialized
 const firestoreAdmin = isInitialized
   ? admin.firestore()
   : ({

@@ -1,122 +1,221 @@
-# Services Architecture
+# Services
 
-This document explains the core services used in the Land Estimator application and how they interact.
+This directory contains core service modules for data loading, search, logging, and estimation used throughout the application. Each module exports functions and types intended for specific tasks.
 
-## Overview
+---
 
-The application uses a set of services to handle different aspects of functionality:
+## loadAddressIndex.ts
 
-1. `addressSearch` - Provides address search capabilities with FlexSearch
-2. `landscapeEstimator` - Calculates price estimates for landscaping services
-3. `logger` - Centralized logging service for analytics
-4. `nominatimApi` - Client for geocoding and address lookups
-5. `parcelSearch` - Additional parcel data search capabilities
+**Exports**
 
-## Analytics Integration
+- `loadAddressIndex(): Promise<FlexSearch.FlexSearchIndexBundle>`
+- `clearAddressIndexCache(): void`
+- `importNodeModules(): Promise<{ fs; path }>`
+- `_setTestMockNodeModules(mock): void` (testing only)
 
-The application uses a comprehensive analytics system to track user behavior and system performance. This helps us to:
+Loads a precomputed address search index for address lookup, compatible with both browser and Node.js environments. Caches the loaded bundle for performance.
 
-1. Understand user search patterns and preferences
-2. Monitor system performance and identify bottlenecks
-3. Detect and diagnose errors
-4. Track lead generation and conversion
+**Usage**
 
-### Logger Service
+```ts
+import {
+  loadAddressIndex,
+  clearAddressIndexCache
+} from '../services/loadAddressIndex';
 
-The `logger.ts` service provides centralized logging functionality:
+async function initSearch() {
+  // Load or reuse the cached index bundle
+  const bundle = await loadAddressIndex();
+  const { index, parcelIds, addressData } = bundle;
+  // Use index.search(), parcelIds, and addressData as needed
+}
 
-```typescript
-// Key function
-logEvent(eventName: string, data: Record<string, any>, options?: LogOptions): void
+// Clear cache if you need to force reload (e.g., in tests)
+clearIndexCache();
 ```
 
-- Sends events to Mixpanel for product analytics
-- Records events in Firestore for business intelligence
-- Handles error cases gracefully to avoid disrupting user experience
+---
 
-### Logged Events
+## addressSearch.ts
 
-#### Address Search Events
+**Exports**
 
-| Event Name         | Description                                    | Data Points                                             |
-| ------------------ | ---------------------------------------------- | ------------------------------------------------------- |
-| `cache_hit`        | Shard was already loaded and served from cache | `{ shard: string }`                                     |
-| `shard_loaded`     | New shard successfully loaded                  | `{ shard: string, recordCount: number }`                |
-| `shard_load_error` | Error occurred during shard loading            | `{ shard: string, error: string }`                      |
-| `search_performed` | Search query executed                          | `{ shard: string, query: string, resultCount: number }` |
-| `search_error`     | Error during search                            | `{ shard: string, query: string, error: string }`       |
+- `AddressLookupRecord` (interface)
+- `searchAddresses(query: string, limit?: number): Promise<AddressLookupRecord[]>`
 
-#### UI Interaction Events
+Performs normalized address search using the FlexSearch index. Automatically loads the index on first call, formats results, and handles errors gracefully.
 
-| Event Name                | Description                               | Data Points                             |
-| ------------------------- | ----------------------------------------- | --------------------------------------- |
-| `address_selected`        | User selected an address from suggestions | `{ query: string, address_id: string }` |
-| `estimate_button_clicked` | User clicked the estimate button          | `{ address_id: string }`                |
-| `service_type_selected`   | User selected a service type              | `{ service_type: string }`              |
+**Usage**
 
-## Implementation Details
+```ts
+import { searchAddresses } from '../services/addressSearch';
 
-### Address Search Service
-
-The `addressSearch.ts` service uses FlexSearch to provide fast, client-side address searching:
-
-- Uses a shard-based approach to manage memory usage
-- Implements caching to improve performance on repeated searches
-- Logs analytics events at key points in the search process
-
-```typescript
-// Example workflow with analytics
-try {
-  // Check cache first
-  if (cached) {
-    logEvent('cache_hit', { shard: key });
-    // Return cached data
-  }
-
-  // Load shard data
-  const data = await loadShardData();
-
-  // Log successful load
-  logEvent('shard_loaded', { shard: key, recordCount: data.length });
-
-  // Return data
-} catch (error) {
-  // Log error
-  logEvent('shard_load_error', { shard: key, error: errorMessage });
-  throw new Error('Failed to load shard');
+async function fetchAddresses() {
+  const results = await searchAddresses('100 Main St', 5);
+  results.forEach((record) => {
+    console.log(record.id, record.display_name, record.region);
+  });
 }
 ```
 
-### Testing Strategy
+---
 
-Services have comprehensive test coverage that includes:
+## parcelMetadata.ts
 
-- Unit tests for core functionality
-- Tests that verify logging calls are made correctly
-- Error case handling tests
-- Mock implementations of external dependencies
+**Exports**
 
-For analytics-specific testing, we:
+- `getParcelMetadata(parcelId: string): Promise<ParcelMetadata | null>`
+- `getBulkParcelMetadata(parcelIds: string[]): Promise<ParcelMetadata[]>`
+- `createBoundingBoxFromParcel(parcel: ParcelMetadata): [string, string, string, string]`
 
-- Mock the `logEvent` function to verify it's called with correct parameters
-- Test both success and error paths to ensure proper logging
-- Validate that logging errors don't disrupt the main application flow
+Loads and caches parcel metadata from a static JSON file. Provides lookup by ID and helper to compute a simple geographic bounding box for a parcel.
 
-## Privacy Considerations
+**Usage**
 
-Our analytics implementation follows these privacy principles:
+```ts
+import {
+  getParcelMetadata,
+  getBulkParcelMetadata,
+  createBoundingBoxFromParcel
+} from '../services/parcelMetadata';
 
-1. No personally identifiable information (PII) is logged without explicit consent
-2. Address data is anonymized where possible
-3. Analytics are used to improve the product, not for targeted advertising
-4. Users can opt-out of analytics through account settings
+async function example() {
+  const parcel = await getParcelMetadata('12345');
+  if (parcel) {
+    const box = createBoundingBoxFromParcel(parcel);
+    console.log('Bounding box:', box);
+  }
 
-## Adding New Analytics Events
+  const many = await getBulkParcelMetadata(['12345', '67890']);
+  console.log('Loaded parcels:', many.length);
+}
+```
 
-When adding new events, follow these guidelines:
+---
 
-1. Use descriptive, consistent event names (`noun_verb` format)
-2. Include contextual data that will be useful for analysis
-3. Document the new event in this README
-4. Add appropriate tests to verify logging behavior
-5. Consider privacy implications of any new data points
+## landscapeEstimator.ts
+
+**Exports**
+
+- `estimateLandscapingPrice(boundingBox, options?): PriceBreakdown`
+- `estimateLandscapingPriceFromParcel(parcelData, options?): PriceBreakdown`
+- `calculateAffluenceMultiplier(affluenceScore: number): number`
+
+Provides functions to calculate detailed landscaping cost estimates. Supports design, installation, and maintenance services, with configurable residential/commercial options and affluence-based adjustments.
+
+**Default Configuration Values**
+
+- Residential Base Rate per sq ft: min = 4.5, max = 12
+- Commercial Multiplier: 0.85
+- Design Fee Percentage of Installation: 0.2 (20%)
+- Maintenance Monthly Rate (Residential): min = 100, max = 400
+- Minimum Service Fee: 400
+- Affluence Multiplier Parameters:
+  - minMultiplier = 0.85
+  - maxMultiplier = 1.25
+  - baselineScore = 50
+
+**How It Works with Formulas**
+
+1. **Area Calculation** (`calculateAreaFromBoundingBox`):
+   - avgLat = ((latMin + latMax) / 2) × (π / 180)
+   - latDiff = |latMax − latMin| × (π / 180)
+   - lonDiff = |lonMax − lonMin| × (π / 180)
+   - widthFt = R × lonDiff × cos(avgLat)
+   - heightFt = R × latDiff
+   - areaSqFt = |widthFt × heightFt|
+     where R ≈ 20,925,524.9 ft (Earth radius)
+2. **Affluence Multiplier** (`calculateAffluenceMultiplier`):
+   - Let m_min = 0.85, m_max = 1.25, baseline = 50
+   - If score ≤ baseline:
+     m = m_min + (1 − m_min) × (score / baseline)
+   - Else:
+     m = 1 + (m_max − 1) × ((score − baseline) / (100 − baseline))
+3. **Combined Multiplier**:
+   m_combined = (isCommercial ? commercialMultiplier : 1) × m
+4. **Base Rates**:
+   base_min = residential.baseRate.min × m_combined
+   base_max = residential.baseRate.max × m_combined
+5. **Service Costs**:
+   - **Installation**:
+     install_min = areaSqFt × base_min
+     install_max = areaSqFt × base_max
+   - **Design**:
+     raw_min = install_min × designPercentOfInstall
+     raw_max = install_max × designPercentOfInstall
+     fee_min = max(raw_min, minimumServiceFee)
+     fee_max = max(raw_max, minimumServiceFee)
+     designFee = (fee_min + fee_max) / 2
+   - **Maintenance**:
+     maintenance_min = residential.maintenanceMonthly.min × m_combined
+     maintenance_max = residential.maintenanceMonthly.max × m_combined
+6. **Subtotal & Minimum Fee**:
+   subtotal_min = install_min + fee_min + maintenance_min
+   subtotal_max = install_max + fee_max + maintenance_max
+   final_min = max(subtotal_min, minimumServiceFee)
+   final_max = max(subtotal_max, minimumServiceFee)
+7. **Final PriceBreakdown**:
+   Returns all component values and `{ min: final_min, max: final_max }` as `finalEstimate`.
+   Averages for display can be computed as `(min + max) / 2`.
+
+**Usage**
+
+```ts
+import {
+  estimateLandscapingPrice,
+  estimateLandscapingPriceFromParcel
+} from '../services/landscapeEstimator';
+
+// Using geographic bounding box
+const estimate1 = estimateLandscapingPrice(
+  ['38.6', '38.61', '-90.2', '-90.19'],
+  {
+    serviceTypes: ['design', 'installation', 'maintenance'],
+    isCommercial: false,
+    affluenceScore: 70
+  }
+);
+console.log('Estimate by box:', estimate1);
+
+// Using parcel data directly
+import { getParcelMetadata } from '../services/parcelMetadata';
+const parcel = await getParcelMetadata('12345');
+if (parcel) {
+  const estimate2 = estimateLandscapingPriceFromParcel(parcel, {
+    isCommercial: true
+  });
+  console.log('Estimate by parcel:', estimate2);
+}
+```
+
+---
+
+## logger.ts
+
+**Exports**
+
+- `logEvent<T extends keyof EventMap>(eventName: T, data: EventMap[T], options?): Promise<void>`
+
+Logs events to Mixpanel and via a Firestore API endpoint. Automatically enriches event data with a timestamp and handles errors internally.
+
+**Usage**
+
+```ts
+import { logEvent } from '../services/logger';
+
+await logEvent(
+  'page_view',
+  { page: 'Home', timestamp: Date.now() },
+  { toMixpanel: true, toFirestore: true }
+);
+```
+
+---
+
+### Contributing
+
+For any changes to services, please ensure:
+
+- All new exports are documented here.
+- Unit tests cover expected behaviors and edge cases.
+- JSDoc comments are included for complex logic.

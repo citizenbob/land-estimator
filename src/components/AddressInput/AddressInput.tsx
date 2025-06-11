@@ -106,7 +106,7 @@ const AddressInput = ({
     logAddressEvent(suggestion, 'address_selected');
   };
 
-  const onEstimateClick = () => {
+  const onEstimateClick = async () => {
     let matched = selectedSuggestion.current;
     if (!matched && suggestions.length > 0) {
       matched =
@@ -119,11 +119,55 @@ const AddressInput = ({
     }
 
     logAddressEvent(matched, 'estimate_button_clicked');
-    const fullData = getSuggestionData(
-      matched.place_id
-    ) as EnrichedAddressSuggestion;
-    if (fullData && onAddressSelect) {
-      onAddressSelect(fullData);
+
+    // Use API route instead of client-side parcel metadata loading
+    try {
+      const response = await fetch(`/api/parcel-metadata/${matched.place_id}`);
+      if (!response.ok) {
+        throw new Error(`Failed to fetch parcel data: ${response.status}`);
+      }
+
+      const rawData = await response.json();
+
+      if (rawData && onAddressSelect) {
+        const enrichedData: EnrichedAddressSuggestion = {
+          place_id: matched.place_id,
+          display_name: matched.display_name,
+          latitude: rawData.latitude,
+          longitude: rawData.longitude,
+          region: rawData.region || 'Unknown',
+          calc: {
+            landarea: rawData.calc.landarea,
+            building_sqft: rawData.calc.building_sqft,
+            estimated_landscapable_area:
+              rawData.calc.estimated_landscapable_area,
+            property_type: rawData.calc.property_type
+          },
+          affluence_score: rawData.affluence_score
+        };
+        onAddressSelect(enrichedData);
+      }
+    } catch (error) {
+      console.error('Error fetching parcel metadata:', error);
+      const rawData = await getSuggestionData(matched.place_id);
+      if (rawData && onAddressSelect) {
+        const enrichedData: EnrichedAddressSuggestion = {
+          place_id: matched.place_id,
+          display_name: matched.display_name,
+          latitude: rawData.latitude,
+          longitude: rawData.longitude,
+          region: rawData.region || 'Unknown',
+          calc: {
+            landarea: rawData.calc.landarea,
+            building_sqft: rawData.calc.building_sqft,
+            estimated_landscapable_area:
+              rawData.calc.estimated_landscapable_area,
+            property_type: rawData.calc.property_type
+          },
+          affluence_score: rawData.affluence_score
+        };
+        onAddressSelect(enrichedData);
+      }
     }
   };
 

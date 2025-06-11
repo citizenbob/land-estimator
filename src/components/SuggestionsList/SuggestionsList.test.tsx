@@ -5,7 +5,6 @@ import SuggestionsList from './SuggestionsList';
 import { MOCK_SUGGESTIONS } from '@lib/testData';
 import { setupConsoleMocks } from '@lib/testUtils';
 
-// Create refs for all suggestions
 const mockRefs: React.RefObject<HTMLLIElement>[] = MOCK_SUGGESTIONS.map(() =>
   React.createRef<HTMLLIElement>()
 ) as React.RefObject<HTMLLIElement>[];

@@ -1,28 +1,18 @@
 import { useState, useEffect, useRef } from 'react';
-import { NominatimApiClient } from '@services/nominatimApi';
+import { searchAddresses, AddressLookupRecord } from '@services/addressSearch';
+import { LocalAddressRecord } from '@typez/localAddressTypes';
 
-/**
- * Hook that manages address lookup functionality
- *
- * Provides stateful management of address search queries, suggestions retrieval,
- * and selection. Handles API communication with throttling, error handling,
- * and maintains the raw suggestion data for later reference.
- *
- * @returns Object containing the address lookup state and handler functions
- */
 export function useAddressLookup() {
   const [query, setQuery] = useState<string>('');
   const [suggestions, setSuggestions] = useState<
-    { place_id: number; display_name: string }[]
+    { place_id: string; display_name: string }[]
   >([]);
   const [isFetching, setIsFetching] = useState<boolean>(false);
   const [locked, setLocked] = useState<boolean>(false);
   const [hasFetched, setHasFetched] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
 
-  const rawDataRef = useRef<
-    Record<number, { place_id: number; display_name: string }>
-  >({});
+  const rawDataRef = useRef<Record<string, AddressLookupRecord>>({});
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const handleChange = (value: string) => {
@@ -40,12 +30,12 @@ export function useAddressLookup() {
         return;
       }
       try {
-        const data = await NominatimApiClient.fetchSuggestions(value);
-        type Suggestion = { place_id: number; display_name: string };
-        const simplified = (data as Suggestion[]).map((item) => {
-          rawDataRef.current[item.place_id] = item;
+        const results: AddressLookupRecord[] = await searchAddresses(value, 10);
+
+        const simplified = results.map((item) => {
+          rawDataRef.current[item.id] = item;
           return {
-            place_id: item.place_id,
+            place_id: item.id,
             display_name: item.display_name
           };
         });
@@ -71,8 +61,59 @@ export function useAddressLookup() {
     setLocked(true);
   };
 
-  const getSuggestionData = (id: number) => {
-    return rawDataRef.current[id];
+  const getSuggestionData = async (
+    id: string
+  ): Promise<LocalAddressRecord | undefined> => {
+    const record = rawDataRef.current[id];
+    if (!record) return undefined;
+
+    try {
+      const response = await fetch(`/api/parcel-metadata/${id}`);
+
+      if (response.ok) {
+        const parcelMetadata = await response.json();
+
+        if (parcelMetadata) {
+          return {
+            id: parcelMetadata.id,
+            full_address: record.display_name,
+            region: parcelMetadata.region,
+            latitude: parcelMetadata.latitude,
+            longitude: parcelMetadata.longitude,
+            calc: parcelMetadata.calc,
+            owner: parcelMetadata.owner || {
+              name: 'Unknown'
+            },
+            affluence_score: parcelMetadata.affluence_score || 0,
+            source_file: parcelMetadata.source_file || 'Unknown',
+            processed_date:
+              parcelMetadata.processed_date || new Date().toISOString()
+          };
+        }
+      }
+    } catch (error) {
+      console.error('Failed to fetch parcel metadata for ID:', id, error);
+    }
+
+    return {
+      id: record.id,
+      full_address: record.display_name,
+      region: record.region,
+      latitude: 0,
+      longitude: 0,
+      calc: {
+        landarea: 0,
+        building_sqft: 0,
+        estimated_landscapable_area: 0,
+        property_type: 'unknown'
+      },
+      owner: {
+        name: 'Unknown'
+      },
+      affluence_score: 0,
+      source_file: 'Unknown',
+      processed_date: new Date().toISOString()
+    };
   };
 
   useEffect(() => {

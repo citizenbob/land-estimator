@@ -25,11 +25,11 @@ export const Default: Story = {
       suggestions={[
         {
           display_name: '1600 Amphitheatre Parkway',
-          place_id: 1
+          place_id: '1'
         },
         {
           display_name: '1 Infinite Loop',
-          place_id: 2
+          place_id: '2'
         }
       ]}
       onSelect={() => {}}

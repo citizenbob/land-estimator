@@ -79,9 +79,9 @@ export function useLandscapeEstimator() {
   /**
    * Calculates a landscaping estimate based on address data
    *
-   * @param addressData - Enriched address suggestion with bounding box data
+   * @param addressData - Enriched address suggestion with land area data
    * @param options - Optional configuration for estimate calculation
-   * @returns Promise resolving to the estimate result
+   * @returns Promise resolving to the estimate result or throws if data insufficient
    */
   const calculateEstimate = async (
     addressData: EnrichedAddressSuggestion,
@@ -91,34 +91,41 @@ export function useLandscapeEstimator() {
       setStatus('calculating');
       setError(null);
 
-      // Validate that we have the required bounding box data
-      if (!addressData.boundingbox || addressData.boundingbox.length < 4) {
-        throw new Error('Missing bounding box data for address');
+      if (
+        !addressData.calc?.estimated_landscapable_area ||
+        addressData.calc.estimated_landscapable_area === 0
+      ) {
+        throw new Error('INSUFFICIENT_DATA');
       }
 
-      // Extract the boundingbox coordinates
+      const landAreaSqFt = addressData.calc.estimated_landscapable_area;
+
+      const latOffset = 0.001;
+      const lonOffset = 0.001;
       const boundingBox: [string, string, string, string] = [
-        addressData.boundingbox[0],
-        addressData.boundingbox[1],
-        addressData.boundingbox[2],
-        addressData.boundingbox[3]
+        (addressData.latitude - latOffset).toString(),
+        (addressData.latitude + latOffset).toString(),
+        (addressData.longitude - lonOffset).toString(),
+        (addressData.longitude + lonOffset).toString()
       ];
 
+      const estimatorOptions = {
+        ...options,
+        overrideLotSizeSqFt: landAreaSqFt
+      };
+
       // Calculate the price estimate using the service
-      const priceBreakdown = estimateLandscapingPrice(boundingBox, options);
+      const priceBreakdown = estimateLandscapingPrice(
+        boundingBox,
+        estimatorOptions
+      );
 
       // Create the result with address information
       const result: EstimateResult = {
         address: {
           display_name: addressData.display_name,
-          lat:
-            typeof addressData.lat === 'string'
-              ? parseFloat(addressData.lat)
-              : (addressData.lat as number),
-          lon:
-            typeof addressData.lon === 'string'
-              ? parseFloat(addressData.lon)
-              : (addressData.lon as number)
+          lat: addressData.latitude,
+          lon: addressData.longitude
         },
         ...priceBreakdown
       };
@@ -127,6 +134,14 @@ export function useLandscapeEstimator() {
       setStatus('complete');
       return result;
     } catch (err) {
+      if (err instanceof Error && err.message === 'INSUFFICIENT_DATA') {
+        setError('INSUFFICIENT_DATA');
+        setStatus('error');
+        throw new Error(
+          'Insufficient data for automatic estimate. In-person consultation required.'
+        );
+      }
+
       const errorMessage =
         err instanceof Error
           ? err.message

@@ -4,15 +4,10 @@ import { EventMap, LogOptions } from '../types/analytics';
 /**
  * Logs an event to tracking and analytics platforms
  *
- * Sends the event data to Mixpanel and/or Firestore based on provided options.
- * Handles errors gracefully to prevent application failures during logging.
- *
  * @template T - The event name (keyof EventMap)
- * @param eventName - Name of the event to log
- * @param data - Object containing event properties and values
- * @param options - Configuration object to determine destinations
- * @param options.toMixpanel - Whether to log to Mixpanel (defaults to true)
- * @param options.toFirestore - Whether to log to Firestore (defaults to true)
+ * @param {T} eventName - Name of the event to log
+ * @param {EventMap[T]} data - Object containing event properties and values
+ * @param {LogOptions} options - Configuration object to determine destinations
  */
 export async function logEvent<T extends keyof EventMap>(
   eventName: T,
@@ -23,7 +18,10 @@ export async function logEvent<T extends keyof EventMap>(
 
   const enrichedData = {
     ...data,
-    timestamp: data.timestamp || Date.now()
+    timestamp:
+      'timestamp' in data
+        ? (data as { timestamp: number }).timestamp
+        : Date.now()
   };
 
   if (toMixpanel) {

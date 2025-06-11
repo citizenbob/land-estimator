@@ -69,15 +69,31 @@ export const WithSuggestions: Story = {
       suggestions: [
         {
           display_name: '1600 Amphitheatre Parkway, Mountain View, CA',
-          place_id: 1234,
-          lat: '37.4221',
-          lon: '-122.0841'
+          place_id: '1234',
+          latitude: 37.4221,
+          longitude: -122.0841,
+          region: 'Mountain View',
+          calc: {
+            landarea: 10000,
+            building_sqft: 2000,
+            estimated_landscapable_area: 8000,
+            property_type: 'commercial'
+          },
+          affluence_score: 85
         } as EnrichedAddressSuggestion,
         {
           display_name: '1600 Pennsylvania Avenue NW, Washington, DC',
-          place_id: 5678,
-          lat: '38.8977',
-          lon: '-77.0365'
+          place_id: '5678',
+          latitude: 38.8977,
+          longitude: -77.0365,
+          region: 'Washington DC',
+          calc: {
+            landarea: 15000,
+            building_sqft: 5000,
+            estimated_landscapable_area: 10000,
+            property_type: 'government'
+          },
+          affluence_score: 95
         } as EnrichedAddressSuggestion
       ]
     }
@@ -103,9 +119,17 @@ export const LockedWithCTA: Story = {
       locked: true,
       selectedSuggestion: {
         display_name: '1600 Amphitheatre Parkway, Mountain View, CA',
-        place_id: 1234,
-        lat: '37.4221',
-        lon: '-122.0841'
+        place_id: '1234',
+        latitude: 37.4221,
+        longitude: -122.0841,
+        region: 'Mountain View',
+        calc: {
+          landarea: 10000,
+          building_sqft: 2000,
+          estimated_landscapable_area: 8000,
+          property_type: 'commercial'
+        },
+        affluence_score: 85
       } as EnrichedAddressSuggestion
     }
   }

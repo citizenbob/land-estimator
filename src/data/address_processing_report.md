@@ -1,16 +1,1 @@
-# Address Processing Report
-Generated on: 2025-06-01 18:07:43.713568
-
-## Summary Statistics
-- Total records processed: 401140
-- Valid addresses: 400600 (99.9%)
-
-## Address Quality Issues
-- Missing street numbers: 0 (0.0%)
-- Missing street names: 540 (0.1%)
-- PO Box addresses: 0 (0.0%)
-- Hyphenated address ranges: 0 (0.0%)
-- Fractional addresses: 0 (0.0%)
-- Invalid ZIP codes: 0 (0.0%)
-- Foreign/non-standard addresses: 1 (0.0%)
-- Address variants preserved: 0
+# Address Processing Report\nGenerated on: 2025-06-19 21:48:00.494454\n\n## Overall Summary\n- Total Records Processed (City + County): 535,840\n- Total Valid Standardized Addresses: 535,007 (99.8%)\n\n## City Data Summary\n- City Records Processed: 134,700\n- City Records with Valid Standardized Address: 134,407 (99.8%)\n- City Records Missing Number/Street Name: 293\n\n## County Data Summary\n- County Records Processed: 401,140\n- County Records with Valid Standardized Address: 400,600 (99.9%)\n- County Records Missing PROP_ADD (Full Address): 540\n\n## Address Quality Issues\n- Standardization Failures: 0\n- PO Box Addresses Encountered: 0\n- Invalid ZIP Codes Encountered: 0\n

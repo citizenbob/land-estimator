@@ -1,3 +1,10 @@
+import { ParcelMetadata } from './parcelMetadata';
+import {
+  sumByProperty,
+  sumMinMaxProperty,
+  firstDefinedProperty
+} from '@lib/arrayUtils';
+
 /**
  * Type definition for bounding box coordinates in the format [latMin, latMax, lonMin, lonMax]
  */
@@ -45,8 +52,33 @@ const PRICING = {
     maintenanceMonthly: { min: 100, max: 400 },
     minimumServiceFee: 400
   },
-  commercialMultiplier: 0.85
+  commercialMultiplier: 0.85,
+  affluence: {
+    minMultiplier: 0.85,
+    maxMultiplier: 1.25,
+    baselineScore: 50
+  }
 };
+
+/**
+ * Calculates pricing multiplier based on affluence score
+ *
+ * @param affluenceScore - Score from 0-100 indicating area affluence
+ * @returns Multiplier between 0.85 and 1.25 based on affluence
+ */
+export function calculateAffluenceMultiplier(affluenceScore: number): number {
+  const { minMultiplier, maxMultiplier, baselineScore } = PRICING.affluence;
+
+  const clampedScore = Math.max(0, Math.min(100, affluenceScore));
+
+  if (clampedScore <= baselineScore) {
+    const ratio = clampedScore / baselineScore;
+    return minMultiplier + (1.0 - minMultiplier) * ratio;
+  } else {
+    const ratio = (clampedScore - baselineScore) / (100 - baselineScore);
+    return 1.0 + (maxMultiplier - 1.0) * ratio;
+  }
+}
 
 /**
  * Earth's radius in feet for geographical calculations
@@ -149,23 +181,20 @@ function calculateAverage(range: { min: number; max: number }): number {
  */
 function mergeBreakdowns(breakdowns: PriceBreakdown[]): PriceBreakdown {
   const first = breakdowns[0];
-  const lotSizeSqFt = first.lotSizeSqFt;
-  const baseRatePerSqFt = first.baseRatePerSqFt;
-  const minimumServiceFee = first.minimumServiceFee;
+  const lotSizeSqFt =
+    firstDefinedProperty(breakdowns, 'lotSizeSqFt') ?? first.lotSizeSqFt;
+  const baseRatePerSqFt =
+    firstDefinedProperty(breakdowns, 'baseRatePerSqFt') ??
+    first.baseRatePerSqFt;
+  const minimumServiceFee =
+    firstDefinedProperty(breakdowns, 'minimumServiceFee') ??
+    first.minimumServiceFee;
 
-  const designFee = breakdowns.reduce((sum, b) => sum + b.designFee, 0);
-  const installationCost = breakdowns.reduce(
-    (sum, b) => sum + b.installationCost,
-    0
-  );
-  const maintenanceMonthly = breakdowns.reduce(
-    (sum, b) => sum + b.maintenanceMonthly,
-    0
-  );
+  const designFee = sumByProperty(breakdowns, 'designFee');
+  const installationCost = sumByProperty(breakdowns, 'installationCost');
+  const maintenanceMonthly = sumByProperty(breakdowns, 'maintenanceMonthly');
 
-  const subtotalMin = breakdowns.reduce((sum, b) => sum + b.subtotal.min, 0);
-  const subtotalMax = breakdowns.reduce((sum, b) => sum + b.subtotal.max, 0);
-  const mergedSubtotal = { min: subtotalMin, max: subtotalMax };
+  const mergedSubtotal = sumMinMaxProperty(breakdowns, 'subtotal');
 
   const finalEstimate = applyMinimumServiceFee(
     mergedSubtotal,
@@ -190,16 +219,28 @@ function mergeBreakdowns(breakdowns: PriceBreakdown[]): PriceBreakdown {
 function computeSingleService(
   boundingBox: BoundingBox,
   type: 'design' | 'installation' | 'maintenance',
-  options?: { isCommercial?: boolean; overrideLotSizeSqFt?: number }
+  options?: {
+    isCommercial?: boolean;
+    overrideLotSizeSqFt?: number;
+    affluenceScore?: number;
+  }
 ): PriceBreakdown {
-  const { isCommercial = false, overrideLotSizeSqFt } = options || {};
+  const {
+    isCommercial = false,
+    overrideLotSizeSqFt,
+    affluenceScore = 50
+  } = options || {};
   const config = PRICING.residential;
   const lotSizeSqFt =
     overrideLotSizeSqFt || calculateAreaFromBoundingBox(boundingBox);
-  const multiplier = isCommercial ? PRICING.commercialMultiplier : 1;
+
+  const commercialMultiplier = isCommercial ? PRICING.commercialMultiplier : 1;
+  const affluenceMultiplier = calculateAffluenceMultiplier(affluenceScore);
+  const combinedMultiplier = commercialMultiplier * affluenceMultiplier;
+
   const baseRate = {
-    min: config.baseRate.min * multiplier,
-    max: config.baseRate.max * multiplier
+    min: config.baseRate.min * combinedMultiplier,
+    max: config.baseRate.max * combinedMultiplier
   };
   const breakdown = createBasePriceBreakdown(
     lotSizeSqFt,
@@ -274,6 +315,7 @@ export function estimateLandscapingPrice(
     isCommercial?: boolean;
     serviceTypes?: Array<'design' | 'installation' | 'maintenance'>;
     overrideLotSizeSqFt?: number;
+    affluenceScore?: number;
   }
 ): PriceBreakdown {
   const types: Array<'design' | 'installation' | 'maintenance'> =
@@ -284,4 +326,32 @@ export function estimateLandscapingPrice(
     computeSingleService(boundingBox, t, options)
   );
   return mergeBreakdowns(breakdowns);
+}
+
+/**
+ * Estimates landscaping prices using parcel metadata for accurate lot sizing
+ *
+ * @param parcelData - Detailed parcel metadata with land area calculations
+ * @param options - Configuration options for the price estimate
+ * @returns Detailed price breakdown using actual parcel land area
+ */
+export function estimateLandscapingPriceFromParcel(
+  parcelData: ParcelMetadata,
+  options?: {
+    isCommercial?: boolean;
+    serviceTypes?: Array<'design' | 'installation' | 'maintenance'>;
+  }
+): PriceBreakdown {
+  const landscapableAreaSqFt = parcelData.calc.estimated_landscapable_area;
+
+  const isCommercial =
+    options?.isCommercial ?? parcelData.calc.property_type === 'commercial';
+
+  const dummyBoundingBox: BoundingBox = ['0', '0', '0', '0'];
+
+  return estimateLandscapingPrice(dummyBoundingBox, {
+    ...options,
+    isCommercial,
+    overrideLotSizeSqFt: landscapableAreaSqFt
+  });
 }

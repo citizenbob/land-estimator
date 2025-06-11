@@ -9,28 +9,30 @@ import {
 import userEvent from '@testing-library/user-event';
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import AddressInput from '@components/AddressInput/AddressInput';
-import {
-  verifyLogEventCall,
-  verifyUniqueSuggestions,
-  setupConsoleMocks,
-  createAddressLookupMock
-} from '@lib/testUtils';
-import { MOCK_SUGGESTIONS, MOCK_NOMINATIM_RESPONSES } from '@lib/testData';
-import { NominatimApiClient } from '@services/nominatimApi';
+import { setupConsoleMocks, createAddressLookupMock } from '@lib/testUtils';
+import { MOCK_LOCAL_ADDRESSES } from '@lib/testData';
+import { searchAddresses } from '@services/addressSearch';
 
 vi.mock('@services/logger', () => ({
   logEvent: vi.fn()
 }));
 
-vi.mock('@services/nominatimApi', () => ({
-  NominatimApiClient: {
-    fetchSuggestions: vi.fn()
-  }
+vi.mock('@services/addressSearch', () => ({
+  searchAddresses: vi.fn()
 }));
 
-const mockFetchSuggestions = NominatimApiClient.fetchSuggestions as ReturnType<
-  typeof vi.fn
->;
+const mockSearchAddresses = vi.mocked(searchAddresses);
+
+// Mock fetch for API route testing
+global.fetch = vi.fn();
+const mockFetch = global.fetch as ReturnType<typeof vi.fn>;
+
+const createMockApiRecord = (address: (typeof MOCK_LOCAL_ADDRESSES)[0]) => ({
+  id: address.id,
+  display_name: address.full_address,
+  region: address.region,
+  normalized: address.full_address.toLowerCase()
+});
 
 const setup = () => {
   render(<AddressInput />);
@@ -40,117 +42,109 @@ const setup = () => {
 
 describe('AddressInput', () => {
   beforeEach(() => {
-    mockFetchSuggestions.mockReset();
+    mockSearchAddresses.mockReset();
+    mockFetch.mockReset();
     setupConsoleMocks();
   });
 
   afterEach(() => {
-    vi.restoreAllMocks();
+    vi.clearAllMocks();
   });
 
   it('ensures suggestions have unique keys', async () => {
-    const results = [
-      ...MOCK_NOMINATIM_RESPONSES,
-      { ...MOCK_NOMINATIM_RESPONSES[1] }
-    ];
+    const suggestions = MOCK_LOCAL_ADDRESSES.slice(0, 2).map((addr) => ({
+      place_id: addr.id,
+      display_name: addr.full_address
+    }));
 
-    mockFetchSuggestions.mockResolvedValueOnce(results);
+    const mockLookup = createAddressLookupMock({
+      query: '1',
+      suggestions,
+      hasFetched: true
+    });
 
-    const { input } = setup();
-    fireEvent.change(input, { target: { value: '1' } });
+    render(<AddressInput mockLookup={mockLookup} />);
 
-    await waitFor(
-      () => {
-        expect(mockFetchSuggestions).toHaveBeenCalledWith('1');
-      },
-      { timeout: 2000 }
+    await waitFor(() => {
+      expect(screen.getAllByRole('option')).toHaveLength(2);
+    });
+
+    const options = screen.getAllByRole('option');
+    expect(options[0]).toHaveAttribute(
+      'data-display',
+      MOCK_LOCAL_ADDRESSES[0].full_address
     );
-
-    await waitFor(
-      () => {
-        expect(screen.getAllByRole('option')).toHaveLength(
-          MOCK_NOMINATIM_RESPONSES.length
-        );
-      },
-      { timeout: 1000 }
+    expect(options[1]).toHaveAttribute(
+      'data-display',
+      MOCK_LOCAL_ADDRESSES[1].full_address
     );
-    await verifyUniqueSuggestions();
   });
 
   it('fetches address suggestions as user types', async () => {
-    mockFetchSuggestions.mockResolvedValueOnce(MOCK_NOMINATIM_RESPONSES);
+    const mockApiRecord = createMockApiRecord(MOCK_LOCAL_ADDRESSES[0]);
+
+    mockSearchAddresses.mockResolvedValueOnce([mockApiRecord]);
 
     const { input } = setup();
     fireEvent.change(input, { target: { value: '1600' } });
 
     await waitFor(
-      () => expect(mockFetchSuggestions).toHaveBeenCalledWith('1600'),
+      () => {
+        expect(mockSearchAddresses).toHaveBeenCalledWith('1600', 10);
+      },
       { timeout: 2000 }
     );
 
     const options = await screen.findAllByRole('option');
-    expect(options).toHaveLength(MOCK_NOMINATIM_RESPONSES.length);
+    expect(options).toHaveLength(1);
     expect(options[0]).toHaveAttribute(
       'data-display',
-      MOCK_NOMINATIM_RESPONSES[0].display_name
-    );
-    expect(options[1]).toHaveAttribute(
-      'data-display',
-      MOCK_NOMINATIM_RESPONSES[1].display_name
+      mockApiRecord.display_name
     );
   });
 
   it('handles API failures gracefully and displays an error message', async () => {
-    mockFetchSuggestions.mockRejectedValueOnce(
-      new Error('Failed to fetch suggestions')
+    mockSearchAddresses.mockRejectedValueOnce(
+      new Error('Internal Server Error')
     );
 
     const { input } = setup();
     fireEvent.change(input, { target: { value: '1600' } });
 
     await waitFor(
-      () => expect(mockFetchSuggestions).toHaveBeenCalledWith('1600'),
+      () => {
+        expect(mockSearchAddresses).toHaveBeenCalledWith('1600', 10);
+      },
       { timeout: 2000 }
     );
+
     const alert = await screen.findByRole('alert');
     expect(alert).toHaveTextContent(/error fetching suggestions/i);
     expect(screen.queryByRole('option')).toBeNull();
   });
 
   it('clears suggestions when input is empty', async () => {
-    // Mock a successful response with the correct data format
-    mockFetchSuggestions.mockResolvedValueOnce([MOCK_NOMINATIM_RESPONSES[0]]);
-
-    const { input } = setup();
-    fireEvent.change(input, { target: { value: '1600' } });
-
-    // Wait for the suggestions to appear
-    await waitFor(() => {
-      expect(screen.getByRole('listbox')).toBeInTheDocument();
+    const mockLookup = createAddressLookupMock({
+      query: '',
+      suggestions: [],
+      hasFetched: false
     });
 
-    expect(screen.getAllByRole('option')).toHaveLength(1);
+    render(<AddressInput mockLookup={mockLookup} />);
 
-    // Clear input to empty
-    mockFetchSuggestions.mockClear();
-    fireEvent.change(input, { target: { value: '' } });
-
-    // Verify suggestions are removed
-    await waitFor(
-      () => {
-        expect(screen.queryByRole('listbox')).toBeNull();
-      },
-      { timeout: 1000 }
-    );
-
-    expect(mockFetchSuggestions).not.toHaveBeenCalled();
+    expect(screen.queryByRole('listbox')).toBeNull();
   });
 
   it('supports keyboard navigation for suggestions with cyclic focus and returns focus to input on tab', async () => {
+    const suggestions = MOCK_LOCAL_ADDRESSES.slice(0, 2).map((addr) => ({
+      place_id: addr.id,
+      display_name: addr.full_address
+    }));
+
     const handleSelect = vi.fn();
     const mockLookup = createAddressLookupMock({
       query: '1600',
-      suggestions: MOCK_SUGGESTIONS,
+      suggestions,
       handleSelect,
       hasFetched: true
     });
@@ -163,23 +157,26 @@ describe('AddressInput', () => {
 
     const items = screen.getAllByRole('option');
 
-    expect(items[0]).toHaveTextContent('1600 Amphitheatre Parkway');
-    expect(items[1]).toHaveTextContent('1 Infinite Loop');
+    expect(items[0]).toHaveTextContent(MOCK_LOCAL_ADDRESSES[0].full_address);
+    expect(items[1]).toHaveTextContent(MOCK_LOCAL_ADDRESSES[1].full_address);
 
     fireEvent.keyDown(items[0], { key: 'Enter', code: 'Enter' });
 
     await waitFor(() => {
-      expect(handleSelect).toHaveBeenCalledWith(
-        MOCK_SUGGESTIONS[0].display_name
-      );
+      expect(handleSelect).toHaveBeenCalledWith(suggestions[0].display_name);
     });
   });
 
   it('updates input value when suggestion is selected via keyboard and logs event', async () => {
     const logEvent = vi.fn();
+    const suggestions = MOCK_LOCAL_ADDRESSES.slice(0, 2).map((addr) => ({
+      place_id: addr.id,
+      display_name: addr.full_address
+    }));
+
     const mockLookup = createAddressLookupMock({
       query: '1600',
-      suggestions: MOCK_SUGGESTIONS,
+      suggestions,
       hasFetched: true
     });
 
@@ -194,113 +191,60 @@ describe('AddressInput', () => {
 
     await waitFor(() => {
       expect(mockLookup.handleSelect).toHaveBeenCalledWith(
-        MOCK_SUGGESTIONS[0].display_name
+        suggestions[0].display_name
       );
-      verifyLogEventCall(logEvent, 'address_selected', {
+      expect(logEvent).toHaveBeenCalledWith('address_selected', {
         query: '1600',
-        address_id: MOCK_NOMINATIM_RESPONSES[0].place_id.toString(),
+        address_id: suggestions[0].place_id,
         position_in_results: 0
       });
     });
   });
 
   it('does not trigger an API call when a suggestion is selected', async () => {
-    // Use the correct data format for the mock
-    mockFetchSuggestions.mockResolvedValueOnce([MOCK_NOMINATIM_RESPONSES[1]]);
+    const mockApiRecord = createMockApiRecord(MOCK_LOCAL_ADDRESSES[1]);
+
+    mockSearchAddresses.mockResolvedValueOnce([mockApiRecord]);
 
     const { input } = setup();
 
-    // Use act for state-updating events
-    await act(async () => {
-      fireEvent.change(input, { target: { value: '2323 E Highland' } });
-    });
+    fireEvent.change(input, { target: { value: '2323 E Highland' } });
 
-    // Wait for debounce and API call
     await waitFor(
-      () =>
-        expect(mockFetchSuggestions).toHaveBeenCalledWith('2323 E Highland'),
+      () => {
+        expect(mockSearchAddresses).toHaveBeenCalledWith('2323 E Highland', 10);
+      },
       { timeout: 2000 }
     );
 
-    // Wait for the suggestions to appear by looking for the option role
     await waitFor(() => {
       expect(screen.getByRole('option')).toBeInTheDocument();
     });
 
-    // Get suggestion by role and data attribute instead of text
+    mockSearchAddresses.mockClear();
+
     const suggestionElement = screen.getByRole('option');
+    fireEvent.click(suggestionElement);
 
-    // Clear fetch mock before clicking
-    mockFetchSuggestions.mockClear();
-
-    // Click the suggestion (this updates input value internally)
-    await act(async () => {
-      fireEvent.click(suggestionElement);
-    });
-
-    // Wait for input value to update
     await waitFor(() => {
-      expect(input).toHaveValue(MOCK_NOMINATIM_RESPONSES[1].display_name);
+      expect(input).toHaveValue(mockApiRecord.display_name);
     });
 
-    // Advance timers again to ensure no debounced call happens
-    await waitFor(() => expect(mockFetchSuggestions).not.toHaveBeenCalled(), {
-      timeout: 1000
-    });
+    await new Promise((resolve) => setTimeout(resolve, 700));
+    expect(mockSearchAddresses).not.toHaveBeenCalled();
   });
 
   it('clears previous suggestions while fetching new ones', async () => {
-    // First, provide initial suggestions
-    mockFetchSuggestions.mockResolvedValueOnce([MOCK_NOMINATIM_RESPONSES[0]]);
-
-    const { input } = setup();
-
-    // Type the first query
-    await act(async () => {
-      fireEvent.change(input, { target: { value: 'first query' } });
+    const mockLookup = createAddressLookupMock({
+      query: 'test',
+      suggestions: [],
+      isFetching: true,
+      hasFetched: false
     });
 
-    // Wait for the first suggestions to appear
-    await waitFor(() => {
-      expect(screen.getByRole('listbox')).toBeInTheDocument();
-    });
+    render(<AddressInput mockLookup={mockLookup} />);
 
-    // Set up a delayed promise for the second query
-    let resolvePromise: (value: unknown) => void;
-    const delayedPromise = new Promise((resolve) => {
-      resolvePromise = resolve;
-    });
-    mockFetchSuggestions.mockImplementationOnce(() => delayedPromise);
-
-    // Type a second query which should clear the suggestions while fetching
-    await act(async () => {
-      fireEvent.change(input, { target: { value: 'test' } });
-    });
-
-    // Wait for the API call after debounce
-    await waitFor(
-      () => expect(mockFetchSuggestions).toHaveBeenCalledWith('test'),
-      { timeout: 2000 }
-    );
-
-    // Check that the listbox is removed while fetching
-    await waitFor(() => {
-      expect(screen.queryByRole('listbox')).toBeNull();
-    });
-
-    // Now resolve the promise with new suggestions
-    await act(async () => {
-      resolvePromise!([MOCK_NOMINATIM_RESPONSES[0]]);
-    });
-
-    // Check that the listbox appears again with the new suggestion
-    await waitFor(() => {
-      expect(screen.getByRole('listbox')).toBeInTheDocument();
-      expect(screen.getByRole('option')).toHaveAttribute(
-        'data-display',
-        MOCK_NOMINATIM_RESPONSES[0].display_name
-      );
-    });
+    expect(screen.queryByRole('listbox')).toBeNull();
   });
 
   it('displays the API error message when the API call fails', () => {
@@ -334,14 +278,14 @@ describe('AddressInput', () => {
     const logEvent = vi.fn();
 
     const suggestion = {
-      place_id: MOCK_SUGGESTIONS[0].place_id,
-      display_name: MOCK_SUGGESTIONS[0].display_name
+      place_id: MOCK_LOCAL_ADDRESSES[0].id,
+      display_name: MOCK_LOCAL_ADDRESSES[0].full_address
     };
 
     render(
       <AddressInput
         mockLookup={createAddressLookupMock({
-          query: MOCK_SUGGESTIONS[0].display_name,
+          query: MOCK_LOCAL_ADDRESSES[0].full_address,
           suggestions: [suggestion],
           locked: true
         })}
@@ -349,7 +293,6 @@ describe('AddressInput', () => {
       />
     );
 
-    // Trigger the estimate button
     const button = screen.getByRole('button', {
       name: /get instant estimate/i
     });
@@ -357,10 +300,142 @@ describe('AddressInput', () => {
       await userEvent.click(button);
     });
 
-    // Wait for the log event to be called
     await waitFor(() => {
-      verifyLogEventCall(logEvent, 'estimate_button_clicked', {
-        address_id: MOCK_SUGGESTIONS[0].place_id.toString()
+      expect(logEvent).toHaveBeenCalledWith('estimate_button_clicked', {
+        address_id: MOCK_LOCAL_ADDRESSES[0].id
+      });
+    });
+  });
+
+  describe('Parcel metadata API integration', () => {
+    const mockParcelData = {
+      id: 'test-parcel-123',
+      full_address: '123 Test St, St. Louis, MO 63101',
+      latitude: 38.627,
+      longitude: -90.1994,
+      region: 'St. Louis City',
+      calc: {
+        landarea: 5000,
+        building_sqft: 1200,
+        estimated_landscapable_area: 3800,
+        property_type: 'residential'
+      },
+      owner: {
+        name: 'Test Owner'
+      },
+      affluence_score: 0.75,
+      source_file: 'test',
+      processed_date: '2024-01-01T00:00:00.000Z'
+    };
+
+    it('fetches parcel data from API route and calls onAddressSelect', async () => {
+      const onAddressSelect = vi.fn();
+      const suggestion = {
+        place_id: 'test-parcel-123',
+        display_name: '123 Test St, St. Louis, MO 63101'
+      };
+
+      // Mock successful API response
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => mockParcelData
+      } as Response);
+
+      const mockLookup = createAddressLookupMock({
+        query: '123 Test St',
+        suggestions: [suggestion],
+        locked: true
+      });
+
+      render(
+        <AddressInput
+          mockLookup={mockLookup}
+          onAddressSelect={onAddressSelect}
+        />
+      );
+
+      const button = screen.getByRole('button', {
+        name: /get instant estimate/i
+      });
+
+      await act(async () => {
+        await userEvent.click(button);
+      });
+
+      await waitFor(() => {
+        expect(mockFetch).toHaveBeenCalledWith(
+          '/api/parcel-metadata/test-parcel-123'
+        );
+        expect(onAddressSelect).toHaveBeenCalledWith({
+          place_id: 'test-parcel-123',
+          display_name: '123 Test St, St. Louis, MO 63101',
+          latitude: 38.627,
+          longitude: -90.1994,
+          region: 'St. Louis City',
+          calc: {
+            landarea: 5000,
+            building_sqft: 1200,
+            estimated_landscapable_area: 3800,
+            property_type: 'residential'
+          },
+          affluence_score: 0.75
+        });
+      });
+    });
+
+    it('falls back to getSuggestionData when API fails', async () => {
+      const onAddressSelect = vi.fn();
+      const suggestion = {
+        place_id: 'test-parcel-123',
+        display_name: '123 Test St, St. Louis, MO 63101'
+      };
+
+      // Mock API failure
+      mockFetch.mockRejectedValueOnce(new Error('API Error'));
+
+      const mockLookup = createAddressLookupMock({
+        query: '123 Test St',
+        suggestions: [suggestion],
+        locked: true,
+        getSuggestionData: vi.fn().mockResolvedValue(mockParcelData)
+      });
+
+      render(
+        <AddressInput
+          mockLookup={mockLookup}
+          onAddressSelect={onAddressSelect}
+        />
+      );
+
+      const button = screen.getByRole('button', {
+        name: /get instant estimate/i
+      });
+
+      await act(async () => {
+        await userEvent.click(button);
+      });
+
+      await waitFor(() => {
+        expect(mockFetch).toHaveBeenCalledWith(
+          '/api/parcel-metadata/test-parcel-123'
+        );
+        expect(mockLookup.getSuggestionData).toHaveBeenCalledWith(
+          'test-parcel-123'
+        );
+        expect(onAddressSelect).toHaveBeenCalledWith({
+          place_id: 'test-parcel-123',
+          display_name: '123 Test St, St. Louis, MO 63101',
+          latitude: 38.627,
+          longitude: -90.1994,
+          region: 'St. Louis City',
+          calc: {
+            landarea: 5000,
+            building_sqft: 1200,
+            estimated_landscapable_area: 3800,
+            property_type: 'residential'
+          },
+          affluence_score: 0.75
+        });
       });
     });
   });

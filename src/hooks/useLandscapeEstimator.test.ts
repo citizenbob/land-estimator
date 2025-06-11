@@ -3,26 +3,19 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { useLandscapeEstimator } from './useLandscapeEstimator';
 import * as estimatorModule from '@services/landscapeEstimator';
 import { EnrichedAddressSuggestion } from '@typez/addressMatchTypes';
+import {
+  MOCK_PRICE_BREAKDOWN,
+  MOCK_ENRICHED_ADDRESS_DATA,
+  MOCK_NOMINATIM_FALLBACK_DATA
+} from '@lib/testData';
 
 describe('useLandscapeEstimator', () => {
-  const mockPriceBreakdown = {
-    lotSizeSqFt: 10000,
-    baseRatePerSqFt: { min: 4.5, max: 12 },
-    designFee: 900,
-    installationCost: 82500,
-    maintenanceMonthly: 0,
-    subtotal: { min: 45000, max: 120000 },
-    minimumServiceFee: 400,
-    finalEstimate: { min: 45000, max: 120000 }
-  };
+  const mockPriceBreakdown = MOCK_PRICE_BREAKDOWN;
 
-  const mockAddressData: EnrichedAddressSuggestion = {
-    place_id: 12345,
-    display_name: '1234 Test Street, City, State, 12345',
-    lat: '37.7749',
-    lon: '-122.4194',
-    boundingbox: ['37.7748', '37.7750', '-122.4195', '-122.4193']
-  };
+  const mockAddressData: EnrichedAddressSuggestion = MOCK_ENRICHED_ADDRESS_DATA;
+
+  const mockNominatimFallbackData: EnrichedAddressSuggestion =
+    MOCK_NOMINATIM_FALLBACK_DATA;
 
   beforeEach(() => {
     vi.resetAllMocks();
@@ -39,7 +32,7 @@ describe('useLandscapeEstimator', () => {
     expect(result.current.error).toBeNull();
   });
 
-  it('calculates estimate with address data', async () => {
+  it('calculates estimate with enriched local address data', async () => {
     const { result } = renderHook(() => useLandscapeEstimator());
 
     await act(async () => {
@@ -47,8 +40,14 @@ describe('useLandscapeEstimator', () => {
     });
 
     expect(estimatorModule.estimateLandscapingPrice).toHaveBeenCalledWith(
-      ['37.7748', '37.7750', '-122.4195', '-122.4193'],
-      undefined
+      // Expect a generated bounding box around the lat/lon
+      expect.arrayContaining([
+        expect.any(String),
+        expect.any(String),
+        expect.any(String),
+        expect.any(String)
+      ]),
+      { overrideLotSizeSqFt: 8000 }
     );
 
     expect(result.current.status).toBe('complete');
@@ -75,29 +74,33 @@ describe('useLandscapeEstimator', () => {
     });
 
     expect(estimatorModule.estimateLandscapingPrice).toHaveBeenCalledWith(
-      ['37.7748', '37.7750', '-122.4195', '-122.4193'],
-      options
+      expect.arrayContaining([
+        expect.any(String),
+        expect.any(String),
+        expect.any(String),
+        expect.any(String)
+      ]),
+      { ...options, overrideLotSizeSqFt: 8000 }
     );
   });
 
-  it('handles missing boundingbox data', async () => {
+  it('handles insufficient data for automatic estimates (Nominatim fallback)', async () => {
     const { result } = renderHook(() => useLandscapeEstimator());
-    const invalidAddressData = { ...mockAddressData, boundingbox: undefined };
 
     await act(async () => {
       try {
-        await result.current.calculateEstimate(invalidAddressData);
+        await result.current.calculateEstimate(mockNominatimFallbackData);
         fail('Should have thrown an error');
       } catch (err) {
         expect(err instanceof Error).toBe(true);
         expect((err as Error).message).toBe(
-          'Missing bounding box data for address'
+          'Insufficient data for automatic estimate. In-person consultation required.'
         );
       }
     });
 
     expect(result.current.status).toBe('error');
-    expect(result.current.error).toBe('Missing bounding box data for address');
+    expect(result.current.error).toBe('INSUFFICIENT_DATA');
   });
 
   it('resets the estimate state', async () => {
@@ -118,22 +121,118 @@ describe('useLandscapeEstimator', () => {
     expect(result.current.error).toBeNull();
   });
 
-  it('handles numeric lat/lon values', async () => {
+  it('uses latitude/longitude from EnrichedAddressSuggestion', async () => {
     const { result } = renderHook(() => useLandscapeEstimator());
-    const numericLatLonAddress = {
-      ...mockAddressData,
-      lat: 37.7749,
-      lon: -122.4194
-    };
 
     await act(async () => {
-      await result.current.calculateEstimate(numericLatLonAddress);
+      await result.current.calculateEstimate(mockAddressData);
     });
 
     expect(result.current.estimate?.address).toEqual({
       display_name: '1234 Test Street, City, State, 12345',
       lat: 37.7749,
       lon: -122.4194
+    });
+  });
+
+  describe('Anti-regression tests for insufficient data validation', () => {
+    it('should throw INSUFFICIENT_DATA error when estimated_landscapable_area is 0', async () => {
+      const dataWithZeroArea: EnrichedAddressSuggestion = {
+        ...mockAddressData,
+        calc: {
+          ...mockAddressData.calc,
+          estimated_landscapable_area: 0
+        }
+      };
+
+      const { result } = renderHook(() => useLandscapeEstimator());
+
+      await act(async () => {
+        try {
+          await result.current.calculateEstimate(dataWithZeroArea);
+          fail('Should have thrown INSUFFICIENT_DATA error');
+        } catch (err) {
+          expect(err instanceof Error).toBe(true);
+          expect((err as Error).message).toBe(
+            'Insufficient data for automatic estimate. In-person consultation required.'
+          );
+        }
+      });
+
+      expect(result.current.status).toBe('error');
+      expect(result.current.error).toBe('INSUFFICIENT_DATA');
+    });
+
+    it('should throw INSUFFICIENT_DATA error when calc object is missing', async () => {
+      const dataWithoutCalc = {
+        ...mockAddressData
+      };
+      // @ts-expect-error - intentionally creating invalid data for testing
+      delete dataWithoutCalc.calc;
+
+      const { result } = renderHook(() => useLandscapeEstimator());
+
+      await act(async () => {
+        try {
+          await result.current.calculateEstimate(dataWithoutCalc);
+          fail('Should have thrown INSUFFICIENT_DATA error');
+        } catch (err) {
+          expect(err instanceof Error).toBe(true);
+          expect((err as Error).message).toBe(
+            'Insufficient data for automatic estimate. In-person consultation required.'
+          );
+        }
+      });
+
+      expect(result.current.status).toBe('error');
+      expect(result.current.error).toBe('INSUFFICIENT_DATA');
+    });
+
+    it('should throw INSUFFICIENT_DATA error when estimated_landscapable_area is null or undefined', async () => {
+      const dataWithNullArea: EnrichedAddressSuggestion = {
+        ...mockAddressData,
+        calc: {
+          ...mockAddressData.calc,
+          estimated_landscapable_area: null as unknown as number
+        }
+      };
+
+      const { result } = renderHook(() => useLandscapeEstimator());
+
+      await act(async () => {
+        try {
+          await result.current.calculateEstimate(dataWithNullArea);
+          fail('Should have thrown INSUFFICIENT_DATA error');
+        } catch (err) {
+          expect(err instanceof Error).toBe(true);
+          expect((err as Error).message).toBe(
+            'Insufficient data for automatic estimate. In-person consultation required.'
+          );
+        }
+      });
+
+      expect(result.current.status).toBe('error');
+      expect(result.current.error).toBe('INSUFFICIENT_DATA');
+    });
+
+    it('should succeed with valid estimated_landscapable_area > 0', async () => {
+      const dataWithValidArea: EnrichedAddressSuggestion = {
+        ...mockAddressData,
+        calc: {
+          ...mockAddressData.calc,
+          estimated_landscapable_area: 5000
+        }
+      };
+
+      const { result } = renderHook(() => useLandscapeEstimator());
+
+      await act(async () => {
+        await result.current.calculateEstimate(dataWithValidArea);
+      });
+
+      expect(result.current.status).toBe('complete');
+      expect(result.current.error).toBeNull();
+      expect(result.current.estimate).not.toBeNull();
     });
   });
 });

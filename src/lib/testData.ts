@@ -1,113 +1,265 @@
-export const MOCK_SUGGESTIONS = [
+import type {
+  LocalAddressRecord,
+  AddressSuggestion
+} from '@typez/localAddressTypes';
+
+export const MOCK_LOCAL_ADDRESSES: LocalAddressRecord[] = [
   {
-    place_id: 365107046,
-    display_name:
-      '1600 Amphitheatre Parkway, San Fernando Valley, Mountain View, CA, USA'
+    id: '10001000005',
+    full_address: '626 1st, St. Louis, MO 63103',
+    region: 'St. Louis City',
+    latitude: 4278231.181849,
+    longitude: 744902.380139,
+    calc: {
+      landarea: 7143.04,
+      building_sqft: 0.0,
+      estimated_landscapable_area: 6071.58,
+      property_type: 'unknown'
+    },
+    owner: {
+      name: 'CITY OF ST LOUIS'
+    },
+    affluence_score: 0.25,
+    source_file: 'saint_louis_city-optimized.json',
+    processed_date: '2025-06-11T19:25:52.542814'
   },
   {
-    place_id: 159616984,
-    display_name: '1 Infinite Loop, Cupertino County, Cupertino, CA 95014, USA'
+    id: '10D530151',
+    full_address:
+      '11308 Dunn View Dr., St. Louis County (Unincorporated), MO 63102',
+    region: 'Unincorporated',
+    latitude: 4294879.84416,
+    longitude: 743862.085717,
+    calc: {
+      landarea: 15051.81435199549,
+      building_sqft: 2830.0,
+      estimated_landscapable_area: 11214.31,
+      property_type: 'unknown'
+    },
+    owner: {
+      name: 'EDWARDS BRAD & VANESSA T/E'
+    },
+    affluence_score: 2.75,
+    source_file: 'Unknown',
+    processed_date: '2025-06-11T19:25:54.225408'
+  },
+  {
+    id: '25L440198',
+    full_address: '907 Volz Dr, Crestwood, MO 63126',
+    region: 'Crestwood',
+    latitude: 4271623.637581,
+    longitude: 728460.487376,
+    calc: {
+      landarea: 9105.61,
+      building_sqft: 1250.0,
+      estimated_landscapable_area: 7605.61,
+      property_type: 'unknown'
+    },
+    owner: {
+      name: 'DUEBELBEIS THOMAS P ETAL J/T'
+    },
+    affluence_score: 3.25,
+    source_file: 'saint_louis_county-optimized.json',
+    processed_date: '2025-06-11T19:25:53.685665'
   }
 ];
 
-// Common test locations
+export const MOCK_SUGGESTIONS: AddressSuggestion[] = [
+  {
+    place_id: '10001000005',
+    display_name: '626 1st, St. Louis, MO 63103'
+  },
+  {
+    place_id: '10D530151',
+    display_name:
+      '11308 Dunn View Dr., St. Louis County (Unincorporated), MO 63102'
+  },
+  {
+    place_id: '25L440198',
+    display_name: '907 Volz Dr, Crestwood, MO 63126'
+  }
+];
+
 export const TEST_LOCATIONS = {
-  GOOGLE: '1600 Amphitheatre Parkway, Mountain View, CA',
-  APPLE: '1 Infinite Loop, Cupertino, CA',
-  MICROSOFT: 'One Microsoft Way, Redmond, WA',
-  FACEBOOK: '1 Hacker Way, Menlo Park, CA'
+  FIRST_STREET: '626 1st, St. Louis, MO 63103',
+  DUNN_VIEW: '11308 Dunn View Dr., St. Louis County (Unincorporated), MO 63102',
+  SPRING_GARDEN: '600 Spring Garden, St. Louis, MO 63108',
+  PARTIAL_SEARCH: '1st street',
+  VOLZ_DRIVE: '907 Volz Dr, Crestwood, MO 63126'
 };
 
 export const TEST_COORDINATES = {
-  GOOGLE: { lat: '37.422', lon: '-122.084' },
-  APPLE: { lat: '37.331', lon: '-122.031' },
-  MICROSOFT: { lat: '47.639', lon: '-122.131' },
-  FACEBOOK: { lat: '37.484', lon: '-122.148' }
+  FIRST_STREET: { lat: 4278231.181849, lon: 744902.380139 },
+  DUNN_VIEW: { lat: 4294879.84416, lon: 743862.085717 },
+  VOLZ_DRIVE: { lat: 4271623.637581, lon: 728460.487376 }
 };
 
-export const MOCK_NOMINATIM_RESPONSES = [
+export const MOCK_ADDRESS_DATA = MOCK_LOCAL_ADDRESSES.find(
+  (address) => address.id === '25L440198'
+);
+
+/**
+ * Mock FlexSearch address lookup data
+ */
+export const MOCK_ADDRESS_LOOKUP_DATA = [
   {
-    place_id: 365107046,
-    license: 'Data © OpenStreetMap contributors, ODbL 1.0.',
-    osm_type: 'way',
-    osm_id: 436773192,
-    lat: '37.422',
-    lon: '-122.084',
-    boundingbox: ['37.4215', '37.4225', '-122.0845', '-122.0835'],
-    display_name:
-      '11600 Amphitheatre Parkway, San Fernando Valley, Mountain View, CA, USA',
-    address: {
-      house_number: '1600',
-      road: 'Amphitheatre Parkway',
-      city: 'Mountain View',
-      state: 'California',
-      postcode: '94043',
-      country: 'United States',
-      country_code: 'us'
-    }
+    id: '19115000300',
+    display_name: '9015 RIVERVIEW, ST. LOUIS CITY, MO',
+    region: 'ST. LOUIS CITY',
+    normalized: '9015 riverview st louis city mo'
   },
   {
-    place_id: 159616984,
-    license: 'Data © OpenStreetMap contributors, ODbL 1.0.',
-    osm_type: 'way',
-    osm_id: 225576598,
-    lat: '37.331',
-    lon: '-122.031',
-    display_name: '1 Infinite Loop, Cupertino County, Cupertino, CA 95014, USA',
-    boundingbox: ['37.3305', '37.3315', '-122.0315', '-122.0305'],
-    address: {
-      house_number: '1',
-      road: 'Infinite Loop',
-      city: 'Cupertino',
-      state: 'California',
-      postcode: '95014',
-      country: 'United States',
-      country_code: 'us'
-    }
+    id: '19119000030',
+    display_name: '10176 LOOKAWAY, ST. LOUIS CITY, MO',
+    region: 'ST. LOUIS CITY',
+    normalized: '10176 lookaway st louis city mo'
+  },
+  {
+    id: '29001000100',
+    display_name: '123 MAIN STREET, ST. LOUIS COUNTY, MO',
+    region: 'ST. LOUIS COUNTY',
+    normalized: '123 main street st louis county mo'
+  },
+  {
+    id: '29001000200',
+    display_name: '456 MAPLE AVE, ST. LOUIS COUNTY, MO',
+    region: 'ST. LOUIS COUNTY',
+    normalized: '456 maple ave st louis county mo'
   }
 ];
 
-export const MOCK_NOMINATIM_RESPONSE = {
-  place_id: 365107046,
-  licence: 'Data © OpenStreetMap contributors, ODbL 1.0.',
-  osm_type: 'way',
-  osm_id: 436773192,
-  lat: '37.422',
-  lon: '-122.084',
-  display_name:
-    '11600 Amphitheatre Parkway, San Fernando Valley, Mountain View, CA, USA',
-  boundingbox: ['37.3305', '37.3315', '-122.0315', '-122.0305'],
-  address: {
-    house_number: '1600',
-    road: 'Amphitheatre Parkway',
-    city: 'Mountain View',
-    state: 'California',
-    postcode: '94043',
-    country: 'United States',
-    country_code: 'us'
+/**
+ * Mock address index precomputed data
+ */
+export const MOCK_ADDRESS_INDEX_INDEX_DATA = {
+  parcelIds: ['12345', '67890', '11111'],
+  searchStrings: [
+    '123 Main St, St. Louis City, MO 12345',
+    '456 Oak Ave, St. Louis County, MO 67890',
+    '789 Elm Dr, St. Louis City, MO 11111'
+  ],
+  timestamp: '2025-06-18T10:00:00.000Z',
+  recordCount: 3,
+  version: '3.0',
+  exportMethod: 'index_optimized'
+};
+
+/**
+ * Mock address data for address index loader tests
+ */
+export const MOCK_ADDRESS_INDEX_ADDRESS_DATA = {
+  '12345': '123 Main St, St. Louis City, MO',
+  '67890': '456 Oak Ave, St. Louis County, MO',
+  '11111': '789 Elm Dr, St. Louis City, MO'
+};
+
+/**
+ * Mock landscape estimator test data
+ */
+export const MOCK_PRICE_BREAKDOWN = {
+  lotSizeSqFt: 10000,
+  baseRatePerSqFt: { min: 4.5, max: 12 },
+  designFee: 900,
+  installationCost: 82500,
+  maintenanceMonthly: 0,
+  subtotal: { min: 45000, max: 120000 },
+  minimumServiceFee: 400,
+  finalEstimate: { min: 45000, max: 120000 }
+};
+
+/**
+ * Mock enriched address data for estimator tests
+ */
+export const MOCK_ENRICHED_ADDRESS_DATA = {
+  place_id: '12345',
+  display_name: '1234 Test Street, City, State, 12345',
+  latitude: 37.7749,
+  longitude: -122.4194,
+  region: 'Missouri',
+  calc: {
+    landarea: 10000,
+    building_sqft: 2000,
+    estimated_landscapable_area: 8000,
+    property_type: 'residential' as const
+  },
+  affluence_score: 75
+};
+
+/**
+ * Mock Nominatim fallback data
+ */
+export const MOCK_NOMINATIM_FALLBACK_DATA = {
+  place_id: '67890',
+  display_name: '5678 Another Street, City, State, 12345',
+  latitude: 37.775,
+  longitude: -122.4195,
+  region: 'Unknown',
+  calc: {
+    landarea: 0,
+    building_sqft: 0,
+    estimated_landscapable_area: 0,
+    property_type: 'unknown' as const
+  },
+  affluence_score: 0
+};
+
+/**
+ * Simple mock address record for basic tests
+ */
+export const MOCK_SIMPLE_ADDRESS_RECORD = {
+  id: '1',
+  full_address: '123 Main St',
+  region: 'Downtown',
+  latitude: 38.627,
+  longitude: -90.199,
+  calc: {
+    landarea: 5000,
+    building_sqft: 1500,
+    estimated_landscapable_area: 3500,
+    property_type: 'residential' as const
+  },
+  owner: {
+    name: 'John Doe'
+  },
+  affluence_score: 75,
+  source_file: 'mock.json',
+  processed_date: '2025-06-12T00:00:00.000Z'
+};
+
+/**
+ * Mock bounding box data for landscape estimator tests
+ */
+export const MOCK_BOUNDING_BOXES = {
+  ONE_ACRE: {
+    lat_min: 38.627,
+    lat_max: 38.637,
+    lon_min: -90.199,
+    lon_max: -90.189
+  },
+  SMALL_AREA: {
+    lat_min: 38.627,
+    lat_max: 38.629,
+    lon_min: -90.199,
+    lon_max: -90.197
+  },
+  TINY_AREA: {
+    lat_min: 38.627,
+    lat_max: 38.627,
+    lon_min: -90.199,
+    lon_max: -90.199
   }
 };
 
-// Standardized error responses for different scenarios
-export const MOCK_NOMINATIM_ERRORS = {
-  SERVICE_UNAVAILABLE: {
-    message: 'Service temporarily unavailable',
-    status: 503
+/**
+ * Mock analytics events for testing
+ */
+export const MOCK_ANALYTICS_EVENTS = {
+  ADDRESS_SELECTED: {
+    query: 'test query',
+    address_id: 'test_id',
+    position_in_results: 0
   },
-  NOT_FOUND: {
-    message: 'Address not found',
-    status: 404
-  },
-  RATE_LIMIT: {
-    message: 'Rate limit exceeded',
-    status: 429
-  },
-  SERVER_ERROR: {
-    message: 'Internal server error',
-    status: 500
-  },
-  NETWORK_ERROR: new Error('Network connection failed')
+  ESTIMATE_BUTTON_CLICKED: {
+    address_id: 'test_id'
+  }
 };
-
-// Legacy export to maintain backward compatibility
-export const MOCK_NOMINATIM_ERROR = MOCK_NOMINATIM_ERRORS.SERVICE_UNAVAILABLE;
