@@ -1,5 +1,15 @@
 describe('Capture Address Inquiries and Log Shopper Behavior', () => {
   beforeEach(() => {
+    cy.intercept('POST', '/api/log', { statusCode: 200 }).as('log');
+
+    cy.intercept('GET', '/api/lookup?query=621%20Market*', {
+      fixture: 'lookups/query_market.json'
+    }).as('marketLookup');
+
+    cy.intercept('GET', '/api/lookup?query=907%20Volz*', {
+      fixture: 'lookups/query_volz.json'
+    }).as('volzLookup');
+
     cy.visit('/');
   });
 
@@ -12,17 +22,17 @@ describe('Capture Address Inquiries and Log Shopper Behavior', () => {
   it('Shopper enters a St. Louis City address and receives suggested matches', () => {
     cy.get('input[placeholder="Enter address"]').clear().type('621 Market');
 
-    cy.get('ul', { timeout: 10000 }).should('be.visible');
+    cy.wait('@marketLookup');
 
-    cy.contains('ul li', '621 Market St., St. Louis, MO 63101')
+    cy.get('ul[role="listbox"]', { timeout: 10000 }).should('be.visible');
+
+    cy.contains('li[role="option"]', '621 Market St., St. Louis, MO 63101')
       .should('be.visible')
-      // Shopper makes a selection from the suggested matches
       .click();
 
-    // THEN the system logs the address match to BI storage
     cy.wait('@log').then((interception) => {
       expect(interception.request.body.eventName).to.equal('address_selected');
-      expect(interception.request.body.data).to.include({
+      expect(interception.request.body.data).to.deep.include({
         query: '621 Market',
         address_id: '10131000022',
         position_in_results: 0
@@ -44,7 +54,11 @@ describe('Capture Address Inquiries and Log Shopper Behavior', () => {
   it('Shopper clears their selected suggestion', () => {
     cy.get('input[placeholder="Enter address"]').clear().type('621 Market');
 
-    cy.contains('ul li', '621 Market St., St. Louis, MO 63101').click();
+    cy.wait('@marketLookup');
+    cy.contains(
+      'li[role="option"]',
+      '621 Market St., St. Louis, MO 63101'
+    ).click();
     cy.wait('@log');
 
     cy.get('button')
@@ -56,7 +70,7 @@ describe('Capture Address Inquiries and Log Shopper Behavior', () => {
       expect(interception.request.body.eventName).to.equal(
         'estimate_button_clicked'
       );
-      expect(interception.request.body.data).to.include({
+      expect(interception.request.body.data).to.deep.include({
         address_id: '10131000022'
       });
     });
@@ -67,12 +81,17 @@ describe('Capture Address Inquiries and Log Shopper Behavior', () => {
    * GIVEN a user enters a St. Louis County address
    * WHEN they select a suggestion and click for an estimate
    * THEN both address_selected and estimate_button_clicked events are logged
+   * THEN enhanced BI data for lead follow-up is logged
    */
   it('Shopper enters a St. Louis County address and receives suggested matches', () => {
     cy.get('input[placeholder="Enter address"]').clear().type('907 Volz');
 
-    cy.get('ul', { timeout: 10000 }).should('be.visible');
-    cy.contains('ul li', '907 Volz Dr., Crestwood, MO 63126').click();
+    cy.wait('@volzLookup');
+    cy.get('ul[role="listbox"]', { timeout: 10000 }).should('be.visible');
+    cy.contains(
+      'li[role="option"]',
+      '907 Volz Dr., Crestwood, MO 63126'
+    ).click();
 
     cy.wait('@log').then((interception) => {
       expect(interception.request.body.eventName).to.equal('address_selected');

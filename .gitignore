@@ -25,10 +25,7 @@
 # misc
 .DS_Store
 *.pem
-<<<<<<< HEAD
 logs/
-=======
->>>>>>> 1c5df74 (Initial commit from Create Next App)
 
 # debug
 npm-debug.log*
@@ -64,3 +61,20 @@ next-env.d.ts
 .idea/
 
 *storybook.log*
+
+# Large data files - exclude from git (source data only)
+/src/data/parcel_metadata.json
+/src/data/parcel_geometry_index.json
+/src/data/saint_louis_city/saint_louis_city-processed.json
+/src/data/saint_louis_county/saint_louis_county-processed.json
+/src/data/saint_louis_county/saint_louis_county-optimized.json
+/src/data/saint_louis_city/shapefiles/*.dbf
+/src/data/saint_louis_county/shapefiles/*.dbf
+/src/data/saint_louis_county/shapefiles/*.shp
+
+# Generated index files - keep optimized versions, exclude raw/large versions
+/public/parcel-metadata.json
+/public/parcel-metadata.backup.json
+/public/address-index.json
+/public/address-index.backup.json
+# Note: Keep the .gz files as they're optimized and small enough for GitHub

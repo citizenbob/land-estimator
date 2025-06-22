@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useLandscapeEstimator } from '@hooks/useLandscapeEstimator';
 import { EnrichedAddressSuggestion } from '@typez/addressMatchTypes';
+import { logEvent } from '@services/logger';
 import Alert from '@components/Alert/Alert';
 import InputField from '@components/InputField/InputField';
 import { EstimateLineItem } from '@components/EstimateLineItem/EstimateLineItem';
@@ -54,6 +55,63 @@ export function EstimateCalculator({ addressData }: EstimateCalculatorProps) {
       overrideLotSizeSqFt: lotSizeSqFt ? Number(lotSizeSqFt) : undefined
     });
   }, [addressData, selectedServices, lotSizeSqFt, calculateEstimate]);
+
+  useEffect(() => {
+    if (status === 'complete' && estimate && addressData.place_id) {
+      const avgEstimate =
+        (estimate.finalEstimate.min + estimate.finalEstimate.max) / 2;
+      let marketSegment: 'budget' | 'mid-market' | 'premium' | 'luxury';
+      if (avgEstimate < 5000) marketSegment = 'budget';
+      else if (avgEstimate < 15000) marketSegment = 'mid-market';
+      else if (avgEstimate < 50000) marketSegment = 'premium';
+      else marketSegment = 'luxury';
+
+      const estimateScore = Math.min(avgEstimate / 1000, 50);
+      const leadScore = Math.round(
+        (addressData.affluence_score || 0) * 10 + estimateScore
+      );
+
+      logEvent(
+        'estimate_generated',
+        {
+          address_id: addressData.place_id,
+          full_address: addressData.display_name || addressData.display_name,
+          region: addressData.region || 'Unknown',
+          latitude: addressData.latitude,
+          longitude: addressData.longitude,
+
+          lot_size_sqft: estimate.lotSizeSqFt,
+          building_size_sqft: addressData.calc?.building_sqft || 0,
+          estimated_landscapable_area:
+            addressData.calc?.estimated_landscapable_area || 0,
+          property_type: addressData.calc?.property_type || 'unknown',
+
+          affluence_score: addressData.affluence_score || 0,
+
+          selected_services: selectedServices,
+          design_fee: estimate.designFee,
+          installation_cost: estimate.installationCost,
+          maintenance_monthly: estimate.maintenanceMonthly,
+          estimate_min: estimate.finalEstimate.min,
+          estimate_max: estimate.finalEstimate.max,
+          estimate_range_size:
+            estimate.finalEstimate.max - estimate.finalEstimate.min,
+
+          price_per_sqft_min: estimate.finalEstimate.min / estimate.lotSizeSqFt,
+          price_per_sqft_max: estimate.finalEstimate.max / estimate.lotSizeSqFt,
+          is_commercial: false,
+          has_custom_lot_size: Boolean(lotSizeSqFt),
+
+          lead_score: leadScore,
+          market_segment: marketSegment
+        },
+        {
+          toFirestore: true,
+          toMixpanel: true
+        }
+      );
+    }
+  }, [status, estimate, addressData, selectedServices, lotSizeSqFt]);
 
   const handleServiceChange = (
     service: 'design' | 'installation' | 'maintenance'

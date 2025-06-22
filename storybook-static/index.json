@@ -1,1 +1,3 @@
-{"v":5,"entries":{"components-addressinput--default":{"type":"story","id":"components-addressinput--default","name":"Default","title":"Components/AddressInput","importPath":"./src/components/AddressInput/AddressInput.stories.tsx","componentPath":"./src/components/AddressInput/AddressInput.tsx","tags":["dev","test"]}}}
+version https://git-lfs.github.com/spec/v1
+oid sha256:d9ef51babbeb80117fa6472bf9591f0d902c9c57709ce19c405304abb2243b69
+size 319

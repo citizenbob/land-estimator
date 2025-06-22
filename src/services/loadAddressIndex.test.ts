@@ -118,9 +118,7 @@ describe('loadAddressIndex', () => {
       };
       mockFetch.mockResolvedValue(mockResponse as Response);
 
-      await expect(loadAddressIndex()).rejects.toThrow(
-        'Failed to fetch index: 404 Not Found'
-      );
+      await expect(loadAddressIndex()).rejects.toThrow('Bundle loading failed');
     });
 
     it('should throw error when fetch throws in browser', async () => {
@@ -129,7 +127,7 @@ describe('loadAddressIndex', () => {
 
       mockFetch.mockRejectedValue(new Error('Network error'));
 
-      await expect(loadAddressIndex()).rejects.toThrow('Index loading failed');
+      await expect(loadAddressIndex()).rejects.toThrow('Bundle loading failed');
     });
   });
 
@@ -203,7 +201,7 @@ describe('loadAddressIndex', () => {
 
       try {
         await expect(loadAddressIndex()).rejects.toThrow(
-          'Index file not found'
+          'Bundle loading failed'
         );
       } finally {
         loadModule._setTestMockNodeModules(null);
@@ -233,7 +231,7 @@ describe('loadAddressIndex', () => {
 
       try {
         await expect(loadAddressIndex()).rejects.toThrow(
-          'Index loading failed'
+          'Bundle loading failed'
         );
       } finally {
         loadModule._setTestMockNodeModules(null);
@@ -259,7 +257,7 @@ describe('loadAddressIndex', () => {
       };
       mockFetch.mockResolvedValue(mockResponse as Response);
 
-      await expect(loadAddressIndex()).rejects.toThrow('Index loading failed');
+      await expect(loadAddressIndex()).rejects.toThrow('Bundle loading failed');
     });
 
     it('should handle JSON parsing errors gracefully', async () => {
@@ -275,7 +273,7 @@ describe('loadAddressIndex', () => {
       };
       mockFetch.mockResolvedValue(mockResponse as Response);
 
-      await expect(loadAddressIndex()).rejects.toThrow('Index loading failed');
+      await expect(loadAddressIndex()).rejects.toThrow('Bundle loading failed');
     });
 
     it('should use fallback address extraction when import fails', async () => {
@@ -341,7 +339,6 @@ describe('loadAddressIndex', () => {
       await loadAddressIndex();
       expect(mockFetch).toHaveBeenCalledTimes(1);
 
-      // Use the imported function directly
       const { clearAddressIndexCache } = await import('./loadAddressIndex');
       clearAddressIndexCache();
 
@@ -403,12 +400,10 @@ describe('loadAddressIndex', () => {
         './loadAddressIndex'
       );
 
-      // Create invalid gzip data that would cause the "Unrecognized token '�'" error if passed to JSON.parse
       const invalidGzipData = new Uint8Array([
         0xef, 0xbf, 0xbd, 0x00, 0x01, 0x02
       ]);
 
-      // Make decompression fail for invalid data
       mockDecompressSync.mockImplementation(() => {
         throw new Error('Invalid gzip data');
       });
@@ -423,10 +418,8 @@ describe('loadAddressIndex', () => {
         }
       });
 
-      await expect(loadAddressIndex()).rejects.toThrow('Index loading failed');
-      // The error should be about decompression failure, not JSON parsing of compressed data
+      await expect(loadAddressIndex()).rejects.toThrow('Bundle loading failed');
 
-      // Reset mock behavior for subsequent tests
       mockDecompressSync.mockReturnValue(
         new Uint8Array(Buffer.from(JSON.stringify(mockIndexData)))
       );
@@ -438,20 +431,17 @@ describe('loadAddressIndex', () => {
       setupBrowserEnvironment();
       const { loadAddressIndex } = await import('./loadAddressIndex');
 
-      // Mock corrupted fetch response (empty arrayBuffer)
       global.fetch = vi.fn().mockResolvedValue({
         ok: true,
         arrayBuffer: () => Promise.resolve(new ArrayBuffer(0))
       });
 
-      // Make decompression fail for empty data
       mockDecompressSync.mockImplementation(() => {
         throw new Error('Empty or corrupted data');
       });
 
-      await expect(loadAddressIndex()).rejects.toThrow('Index loading failed');
+      await expect(loadAddressIndex()).rejects.toThrow('Bundle loading failed');
 
-      // Reset mock behavior for subsequent tests
       mockDecompressSync.mockReturnValue(
         new Uint8Array(Buffer.from(JSON.stringify(mockIndexData)))
       );
@@ -462,12 +452,9 @@ describe('loadAddressIndex', () => {
         './loadAddressIndex'
       );
 
-      // Create valid gzipped data (mock)
       const validJsonData = JSON.stringify(mockIndexData);
-      // Mock gzip header
       const validGzipData = new Uint8Array([0x1f, 0x8b, 0x08, 0x00]);
 
-      // Set up mock to return valid decompressed data
       mockDecompressSync.mockReturnValue(
         new Uint8Array(Buffer.from(validJsonData))
       );

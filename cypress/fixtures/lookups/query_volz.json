@@ -1,12 +1,3 @@
-{
-  "query": "907 Volz",
-  "results": [
-    {
-      "id": "RES_BASELINE",
-      "display_name": "907 Volz Dr, Crestwood, MO 63126",
-      "region": "St. Louis County",
-      "normalized": "907 Volz Dr., Crestwood, MO 63126"
-    }
-  ],
-  "count": 1
-}
+version https://git-lfs.github.com/spec/v1
+oid sha256:687dc45a156c7162accc2d44af054753c6c540c19693529b116d6a299ac411cb
+size 245

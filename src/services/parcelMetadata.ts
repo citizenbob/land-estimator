@@ -1,3 +1,6 @@
+import { createUniversalBundleLoader } from '@lib/universalBundleLoader';
+import type { NodeModules } from '@lib/universalLoader';
+
 export interface ParcelMetadata {
   id: string;
   full_address: string;
@@ -27,159 +30,127 @@ interface OptimizedParcelIndex {
   exportMethod: string;
 }
 
-let parcelData: ParcelMetadata[] | null = null;
-let parcelLookup: Record<string, ParcelMetadata> | null = null;
-
-/**
- * Determines if we're running in a Node.js environment
- */
-function isNode(): boolean {
-  return typeof process !== 'undefined' && process.versions?.node !== undefined;
+interface ParcelBundle {
+  data: ParcelMetadata[];
+  lookup: Record<string, ParcelMetadata>;
 }
 
-async function loadParcelMetadata(): Promise<void> {
-  if (parcelData && parcelLookup) {
-    return;
-  }
+/**
+ * Creates parcel lookup map for fast ID-based access
+ * @param parcels Array of parcel metadata
+ * @returns Map of parcel IDs to parcel metadata
+ */
+function createParcelLookupMap(
+  parcels: ParcelMetadata[]
+): Record<string, ParcelMetadata> {
+  const lookup: Record<string, ParcelMetadata> = {};
+  parcels.forEach((parcel) => {
+    lookup[parcel.id] = parcel;
+  });
+  return lookup;
+}
 
+/**
+ * Loads raw parcel data as fallback when optimized index is not available
+ * @returns Array of parcel metadata from raw data
+ * @throws When raw parcel data cannot be loaded or is invalid
+ */
+async function loadRawParcelData(): Promise<ParcelMetadata[]> {
   try {
-    try {
-      const optimizedIndex = await loadOptimizedIndex();
-      if (optimizedIndex) {
-        parcelData = optimizedIndex.parcels;
-        parcelLookup = {};
+    const parcelMetadataModule = await import('@data/parcel_metadata.json');
+    const rawData = parcelMetadataModule.default || parcelMetadataModule;
 
-        optimizedIndex.parcels.forEach((parcel) => {
-          parcelLookup![parcel.id] = parcel;
-        });
-
-        console.log(
-          `📦 Loaded ${optimizedIndex.recordCount} parcels from optimized index (v${optimizedIndex.version})`
-        );
-        return;
-      }
-    } catch (error) {
-      console.warn(
-        'Optimized parcel index not available, falling back to raw data:',
-        error
-      );
+    if (!Array.isArray(rawData)) {
+      throw new Error('Parcel metadata must be an array');
     }
 
-    await loadRawParcelData();
+    return rawData.map((item: Record<string, unknown>) => ({
+      id: String(item.id || ''),
+      full_address: String(
+        item.full_address || item.primary_full_address || ''
+      ),
+      latitude: Number(item.latitude || 0),
+      longitude: Number(item.longitude || 0),
+      region: String(item.region || ''),
+      calc: item.calc as ParcelMetadata['calc'],
+      owner: item.owner as ParcelMetadata['owner'],
+      affluence_score: Number(item.affluence_score || 0),
+      source_file: String(item.source_file || 'unknown'),
+      processed_date: String(item.processed_date || new Date().toISOString())
+    }));
   } catch (error) {
-    console.error('Failed to load parcel metadata:', error);
-    throw error;
+    throw new Error(`Failed to load raw parcel data: ${error}`);
   }
 }
 
+const parcelBundleLoader = createUniversalBundleLoader<
+  ParcelMetadata,
+  OptimizedParcelIndex,
+  ParcelBundle
+>({
+  gzippedFilename: 'parcel-metadata.json.gz',
+  createLookupMap: createParcelLookupMap,
+  loadRawData: loadRawParcelData,
+  extractDataFromIndex: (index) => index.parcels,
+  createBundle: (data, lookup) => ({ data, lookup })
+});
+
 /**
- * Attempts to load the optimized parcel index from the public directory
+ * Sets mock Node.js modules for testing
  */
-async function loadOptimizedIndex(): Promise<OptimizedParcelIndex | null> {
-  if (!isNode()) {
-    return null;
-  }
-
-  const fs = await import('fs');
-  const path = await import('path');
-  const { decompressSync } = await import('fflate');
-
-  const indexPath = path.join(
-    process.cwd(),
-    'public',
-    'parcel-metadata.json.gz'
-  );
-
-  if (!fs.existsSync(indexPath)) {
-    return null;
-  }
-
-  const compressedData = fs.readFileSync(indexPath);
-  const decompressedData = decompressSync(compressedData);
-  const jsonString = new TextDecoder().decode(decompressedData);
-
-  return JSON.parse(jsonString) as OptimizedParcelIndex;
+export function _setTestMockParcelNodeModules(
+  mockModules: NodeModules | null
+): void {
+  parcelBundleLoader.setTestMockModules(mockModules);
 }
 
 /**
- * Loads raw parcel data as fallback
+ * Universal parcel metadata loader that works in both browser and Node.js environments
+ * @returns Complete parcel bundle with data array and lookup map
+ * @throws When parcel files cannot be loaded, decompressed, or parsed
  */
-async function loadRawParcelData(): Promise<void> {
-  const parcelMetadataModule = await import('@data/parcel_metadata.json');
-  const rawData = parcelMetadataModule.default || parcelMetadataModule;
+export async function loadParcelMetadata(): Promise<ParcelBundle> {
+  return parcelBundleLoader.loadBundle();
+}
 
-  if (!Array.isArray(rawData)) {
-    throw new Error('Parcel metadata must be an array');
-  }
-
-  console.log('🔄 Processing raw parcel data...');
-
-  parcelData = rawData.map((item: Record<string, unknown>) => ({
-    id: String(item.id || ''),
-    full_address: String(item.full_address || item.primary_full_address || ''),
-    latitude: Number(item.latitude || 0),
-    longitude: Number(item.longitude || 0),
-    region: String(item.region || ''),
-    calc: item.calc as ParcelMetadata['calc'],
-    owner: item.owner as ParcelMetadata['owner'],
-    affluence_score: Number(item.affluence_score || 0),
-    source_file: String(item.source_file || 'unknown'),
-    processed_date: String(item.processed_date || new Date().toISOString())
-  }));
-
-  parcelLookup = {};
-  if (parcelData) {
-    parcelData.forEach((parcel) => {
-      parcelLookup![parcel.id] = parcel;
-    });
-  }
-
-  console.log(`📦 Loaded ${parcelData.length} parcels from raw data`);
+/**
+ * Clears the cached parcel bundle
+ */
+export function clearParcelMetadataCache(): void {
+  parcelBundleLoader.clearCache();
 }
 
 /**
  * Get detailed parcel metadata by ID
- *
- * @param {string} parcelId - The parcel ID to look up
- * @returns {Promise<ParcelMetadata | null>} ParcelMetadata object or null if not found
+ * @param parcelId The parcel ID to look up
+ * @returns ParcelMetadata object or null if not found
  */
 export async function getParcelMetadata(
   parcelId: string
 ): Promise<ParcelMetadata | null> {
-  await loadParcelMetadata();
-
-  if (!parcelLookup) {
-    return null;
-  }
-
-  return parcelLookup[parcelId] || null;
+  const bundle = await loadParcelMetadata();
+  return bundle.lookup[parcelId] || null;
 }
 
 /**
  * Get parcel metadata for multiple IDs
- *
- * @param {string[]} parcelIds - Array of parcel IDs to look up
- * @returns {Promise<ParcelMetadata[]>} Array of ParcelMetadata objects (excludes not found)
+ * @param parcelIds Array of parcel IDs to look up
+ * @returns Array of ParcelMetadata objects (excludes not found)
  */
 export async function getBulkParcelMetadata(
   parcelIds: string[]
 ): Promise<ParcelMetadata[]> {
-  await loadParcelMetadata();
-
-  if (!parcelLookup) {
-    return [];
-  }
+  const bundle = await loadParcelMetadata();
 
   return parcelIds
-    .map((id) => parcelLookup![id])
+    .map((id) => bundle.lookup[id])
     .filter((parcel): parcel is ParcelMetadata => parcel !== undefined);
 }
 
 /**
- * Calculate landscape estimate using parcel data
- *
- * @param {ParcelMetadata} parcel - The parcel metadata
- * @returns {[string, string, string, string]} Bounding box coordinates as strings
+ * Create bounding box coordinates from parcel data
+ * @param parcel The parcel metadata
+ * @returns Bounding box coordinates as strings [minLat, maxLat, minLon, maxLon]
  */
 export function createBoundingBoxFromParcel(
   parcel: ParcelMetadata
