@@ -120,7 +120,7 @@ async function writeIndexFiles(
   indexData: OptimizedParcelIndex,
   startTime: number
 ): Promise<void> {
-  console.log('💾 Writing files...');
+  console.log('💾 Writing optimized files...');
 
   const projectRoot = path.join(__dirname, '..', '..');
   const publicDir = path.join(projectRoot, 'public');
@@ -129,32 +129,21 @@ async function writeIndexFiles(
     fs.mkdirSync(publicDir, { recursive: true });
   }
 
-  const rawOutputPath = path.join(publicDir, 'parcel-metadata.json');
   const gzipOutputPath = path.join(publicDir, 'parcel-metadata.json.gz');
 
-  if (fs.existsSync(rawOutputPath)) {
-    const backupPath = rawOutputPath.replace('.json', '.backup.json');
-    fs.copyFileSync(rawOutputPath, backupPath);
-  }
-
-  const jsonString = JSON.stringify(indexData, null, 2);
-  fs.writeFileSync(rawOutputPath, jsonString);
-
+  const jsonString = JSON.stringify(indexData);
   const gzipped = zlib.gzipSync(jsonString, { level: 9 });
   fs.writeFileSync(gzipOutputPath, gzipped);
 
-  const rawFileStats = fs.statSync(rawOutputPath);
   const gzipFileStats = fs.statSync(gzipOutputPath);
-  const rawSize = formatFileSize(rawFileStats.size);
   const gzipSize = formatFileSize(gzipFileStats.size);
 
-  logCompletionSummary(startTime, indexData.recordCount, rawSize, gzipSize);
+  logCompletionSummary(startTime, indexData.recordCount, gzipSize);
 }
 
 function logCompletionSummary(
   startTime: number,
   recordCount: number,
-  rawSize: string,
   gzipSize: string
 ): void {
   const endTime = performance.now();
@@ -162,7 +151,7 @@ function logCompletionSummary(
 
   console.log(`✅ Build completed in ${(totalTime / 1000).toFixed(1)}s`);
   console.log(`📊 ${formatNumber(recordCount)} parcel records processed`);
-  console.log(`💽 Output: ${rawSize} raw, ${gzipSize} gzipped`);
+  console.log(`💽 Output: ${gzipSize} gzipped (production-ready)`);
   console.log('🚀 Ready for ultra-fast parcel metadata lookups!');
 }
 

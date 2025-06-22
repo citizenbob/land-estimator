@@ -72,9 +72,9 @@ next-env.d.ts
 /src/data/saint_louis_county/shapefiles/*.dbf
 /src/data/saint_louis_county/shapefiles/*.shp
 
-# Generated index files - keep optimized versions, exclude raw/large versions
+# Generated index files - only commit optimized .gz versions
 /public/parcel-metadata.json
-/public/parcel-metadata.backup.json
 /public/address-index.json
 /public/address-index.backup.json
-# Note: Keep the .gz files as they're optimized and small enough for GitHub
+/public/parcel-metadata.backup.json
+# Keep: address-index.json.gz and parcel-metadata.json.gz (small, optimized)

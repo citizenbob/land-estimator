@@ -28,28 +28,20 @@ function logSuccess(message) {
 console.log('🚀 FlexSearch Performance Validation\n');
 
 async function validateIndexFiles() {
-  console.log('📂 Checking index files...');
+  console.log('📂 Checking optimized index files...');
 
   const publicDir = join(__dirname, 'public');
-  const jsonPath = join(publicDir, 'address-index.json');
   const gzPath = join(publicDir, 'address-index.json.gz');
 
-  const files = [
-    { path: jsonPath, name: 'address-index.json' },
-    { path: gzPath, name: 'address-index.json.gz' }
-  ];
-
-  for (const file of files) {
-    if (fs.existsSync(file.path)) {
-      const stats = fs.statSync(file.path);
-      const sizeInMB = (stats.size / (1024 * 1024)).toFixed(2);
-      logSuccess(`${file.name}: ${sizeInMB} MB`);
-    } else {
-      logError(`${file.name}: Not found`);
-    }
+  if (fs.existsSync(gzPath)) {
+    const stats = fs.statSync(gzPath);
+    const sizeInMB = (stats.size / (1024 * 1024)).toFixed(2);
+    logSuccess(`address-index.json.gz: ${sizeInMB} MB (production-ready)`);
+    return true;
+  } else {
+    logError('address-index.json.gz: Not found');
+    return false;
   }
-
-  return files.every((file) => fs.existsSync(file.path));
 }
 
 async function testLoadFlexSearchIndex() {
