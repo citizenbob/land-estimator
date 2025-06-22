@@ -31,6 +31,58 @@ yarn install
 yarn dev
 ```
 
+## 📦 Large Files & Git LFS
+
+This project uses **Git LFS (Large File Storage)** to handle essential compressed data files required for the application to function. The application only uses optimized `.gz` files - no raw data fallbacks.
+
+### What's stored in LFS:
+
+- `public/address-index.json.gz` (6MB) - Optimized address search index
+- `public/parcel-metadata.json.gz` (36MB) - Optimized parcel lookup data
+
+### What's excluded (too large, not essential):
+
+- Raw GIS shapefiles (`.shp`, `.dbf` files)
+- Raw JSON source data files (`parcel_metadata.json`, etc.)
+- Processed intermediate data files
+- Geometry indices and other derived data
+- These files are generated locally during development but not committed
+
+### Setting up Git LFS:
+
+1. **Install Git LFS** (if not already installed):
+
+```sh
+# macOS
+brew install git-lfs
+
+# Ubuntu/Debian
+sudo apt install git-lfs
+
+# Windows
+# Download from https://git-lfs.github.io/
+```
+
+2. **Initialize LFS in your clone**:
+
+```sh
+git lfs install
+git lfs pull
+```
+
+3. **Build missing data files** (if needed):
+
+```sh
+yarn build:address-index
+yarn build:parcel-index
+```
+
+### For contributors:
+
+- LFS files are automatically handled when you clone/pull
+- When you push changes to LFS-tracked files, they'll be uploaded to LFS storage
+- The build process will regenerate these files during deployment
+
 ## 🤝 Contributing
 
 We’re building this **in public**—contributions, feedback, and issues are welcome!  

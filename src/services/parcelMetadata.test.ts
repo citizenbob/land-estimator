@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { MOCK_PARCEL_METADATA } from '@lib/testData';
 import {
   getParcelMetadata,
   getBulkParcelMetadata,
@@ -6,38 +7,18 @@ import {
   ParcelMetadata
 } from './parcelMetadata';
 
-// Mock the JSON data import
-vi.mock('@data/parcel_metadata.json', () => ({
-  default: [
-    {
-      id: 'p1',
-      latitude: 10,
-      longitude: 20,
-      region: 'TestRegion',
-      calc: {
-        landarea: 100,
-        building_sqft: 50,
-        estimated_landscapable_area: 80,
-        property_type: 'residential'
-      },
-      source_file: 'file1',
-      processed_date: '2025-01-01'
-    },
-    {
-      id: 'p2',
-      latitude: -5,
-      longitude: 30,
-      region: 'Region2',
-      calc: {
-        landarea: 200,
-        building_sqft: 75,
-        estimated_landscapable_area: 150,
-        property_type: 'commercial'
-      },
-      source_file: 'file2',
-      processed_date: '2025-01-02'
-    }
-  ]
+vi.mock('@lib/universalBundleLoader', () => ({
+  createUniversalBundleLoader: () => ({
+    loadBundle: vi.fn().mockResolvedValue({
+      data: MOCK_PARCEL_METADATA,
+      lookup: {
+        p1: MOCK_PARCEL_METADATA[0],
+        p2: MOCK_PARCEL_METADATA[1]
+      }
+    }),
+    clearCache: vi.fn(),
+    setTestMockModules: vi.fn()
+  })
 }));
 
 describe('parcelMetadata service', () => {
@@ -66,6 +47,7 @@ describe('parcelMetadata service', () => {
   it('createBoundingBoxFromParcel returns correct bounds as strings', () => {
     const parcel: ParcelMetadata = {
       id: 'test',
+      full_address: '789 Test Blvd',
       latitude: 50,
       longitude: -100,
       region: 'R',
@@ -75,6 +57,10 @@ describe('parcelMetadata service', () => {
         estimated_landscapable_area: 0,
         property_type: 'unknown'
       },
+      owner: {
+        name: 'Test Owner'
+      },
+      affluence_score: 0,
       source_file: '',
       processed_date: ''
     };

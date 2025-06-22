@@ -48,13 +48,15 @@ function createSearchIndex(
 }
 
 /**
- * Loads raw address data as fallback
- * @returns Empty array (no raw fallback for address index)
+ * Address index requires optimized data - no raw fallback available
+ * @throws Always throws as raw fallback is not supported
  */
 async function loadRawAddressData(): Promise<
   FlexSearch.PrecomputedIndexData[]
 > {
-  throw new Error('Address index requires optimized data');
+  throw new Error(
+    'Address index requires optimized .gz data - no raw fallback available'
+  );
 }
 
 const addressIndexLoader = createUniversalBundleLoader<

@@ -263,3 +263,47 @@ export const MOCK_ANALYTICS_EVENTS = {
     address_id: 'test_id'
   }
 };
+
+/**
+ * Mock parcel metadata for testing parcel services
+ */
+export const MOCK_PARCEL_METADATA = [
+  {
+    id: 'p1',
+    full_address: '123 Test St',
+    latitude: 10,
+    longitude: 20,
+    region: 'TestRegion',
+    calc: {
+      landarea: 100,
+      building_sqft: 50,
+      estimated_landscapable_area: 80,
+      property_type: 'residential'
+    },
+    owner: {
+      name: 'Test Owner'
+    },
+    affluence_score: 75,
+    source_file: 'file1',
+    processed_date: '2025-01-01'
+  },
+  {
+    id: 'p2',
+    full_address: '456 Test Ave',
+    latitude: -5,
+    longitude: 30,
+    region: 'Region2',
+    calc: {
+      landarea: 200,
+      building_sqft: 75,
+      estimated_landscapable_area: 150,
+      property_type: 'commercial'
+    },
+    owner: {
+      name: 'Test Owner 2'
+    },
+    affluence_score: 50,
+    source_file: 'file2',
+    processed_date: '2025-01-02'
+  }
+];

@@ -51,36 +51,13 @@ function createParcelLookupMap(
 }
 
 /**
- * Loads raw parcel data as fallback when optimized index is not available
- * @returns Array of parcel metadata from raw data
- * @throws When raw parcel data cannot be loaded or is invalid
+ * Parcel metadata requires optimized data - no raw fallback available
+ * @throws Always throws as raw fallback is not supported
  */
 async function loadRawParcelData(): Promise<ParcelMetadata[]> {
-  try {
-    const parcelMetadataModule = await import('@data/parcel_metadata.json');
-    const rawData = parcelMetadataModule.default || parcelMetadataModule;
-
-    if (!Array.isArray(rawData)) {
-      throw new Error('Parcel metadata must be an array');
-    }
-
-    return rawData.map((item: Record<string, unknown>) => ({
-      id: String(item.id || ''),
-      full_address: String(
-        item.full_address || item.primary_full_address || ''
-      ),
-      latitude: Number(item.latitude || 0),
-      longitude: Number(item.longitude || 0),
-      region: String(item.region || ''),
-      calc: item.calc as ParcelMetadata['calc'],
-      owner: item.owner as ParcelMetadata['owner'],
-      affluence_score: Number(item.affluence_score || 0),
-      source_file: String(item.source_file || 'unknown'),
-      processed_date: String(item.processed_date || new Date().toISOString())
-    }));
-  } catch (error) {
-    throw new Error(`Failed to load raw parcel data: ${error}`);
-  }
+  throw new Error(
+    'Parcel metadata requires optimized .gz data - no raw fallback available'
+  );
 }
 
 const parcelBundleLoader = createUniversalBundleLoader<
