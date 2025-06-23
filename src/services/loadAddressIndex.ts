@@ -12,16 +12,11 @@ async function createAddressLookupMap(
 ): Promise<Record<string, string>> {
   const addressData: Record<string, string> = {};
 
-  try {
-    const addressIndexModule = await import('@data/address_index.json');
-    Object.assign(addressData, addressIndexModule.default);
-  } catch {
-    indexData.parcelIds.forEach((parcelId, idx) => {
-      const searchString = indexData.searchStrings[idx];
-      const address = searchString.replace(` ${parcelId}`, '');
-      addressData[parcelId] = address;
-    });
-  }
+  indexData.parcelIds.forEach((parcelId, idx) => {
+    const searchString = indexData.searchStrings[idx];
+    const address = searchString.replace(` ${parcelId}`, '');
+    addressData[parcelId] = address;
+  });
 
   return addressData;
 }
