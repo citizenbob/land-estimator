@@ -1,5 +1,4 @@
 # Git LFS configuration for large data files
 
-# Only the essential optimized index files (production-ready, compressed)
-public/address-index.json.gz filter=lfs diff=lfs merge=lfs -text
-public/parcel-metadata.json.gz filter=lfs diff=lfs merge=lfs -text
+# Note: Vercel does not support Git LFS for public assets
+# All .gz files are now tracked as regular Git files for deployment compatibility
