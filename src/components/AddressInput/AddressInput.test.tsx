@@ -11,17 +11,10 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import AddressInput from '@components/AddressInput/AddressInput';
 import { setupConsoleMocks, createAddressLookupMock } from '@lib/testUtils';
 import { MOCK_LOCAL_ADDRESSES } from '@lib/testData';
-import { searchAddresses } from '@services/addressSearch';
 
 vi.mock('@services/logger', () => ({
   logEvent: vi.fn()
 }));
-
-vi.mock('@services/addressSearch', () => ({
-  searchAddresses: vi.fn()
-}));
-
-const mockSearchAddresses = vi.mocked(searchAddresses);
 
 // Mock fetch for API route testing
 global.fetch = vi.fn();
@@ -42,7 +35,6 @@ const setup = () => {
 
 describe('AddressInput', () => {
   beforeEach(() => {
-    mockSearchAddresses.mockReset();
     mockFetch.mockReset();
     setupConsoleMocks();
   });
@@ -83,14 +75,21 @@ describe('AddressInput', () => {
   it('fetches address suggestions as user types', async () => {
     const mockApiRecord = createMockApiRecord(MOCK_LOCAL_ADDRESSES[0]);
 
-    mockSearchAddresses.mockResolvedValueOnce([mockApiRecord]);
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({
+        query: '1600',
+        results: [mockApiRecord],
+        count: 1
+      })
+    });
 
     const { input } = setup();
     fireEvent.change(input, { target: { value: '1600' } });
 
     await waitFor(
       () => {
-        expect(mockSearchAddresses).toHaveBeenCalledWith('1600', 10);
+        expect(mockFetch).toHaveBeenCalledWith('/api/lookup?query=1600');
       },
       { timeout: 2000 }
     );
@@ -104,16 +103,15 @@ describe('AddressInput', () => {
   });
 
   it('handles API failures gracefully and displays an error message', async () => {
-    mockSearchAddresses.mockRejectedValueOnce(
-      new Error('Internal Server Error')
-    );
+    // Mock fetch to reject with an error
+    mockFetch.mockRejectedValueOnce(new Error('Internal Server Error'));
 
     const { input } = setup();
     fireEvent.change(input, { target: { value: '1600' } });
 
     await waitFor(
       () => {
-        expect(mockSearchAddresses).toHaveBeenCalledWith('1600', 10);
+        expect(mockFetch).toHaveBeenCalledWith('/api/lookup?query=1600');
       },
       { timeout: 2000 }
     );
@@ -204,7 +202,15 @@ describe('AddressInput', () => {
   it('does not trigger an API call when a suggestion is selected', async () => {
     const mockApiRecord = createMockApiRecord(MOCK_LOCAL_ADDRESSES[1]);
 
-    mockSearchAddresses.mockResolvedValueOnce([mockApiRecord]);
+    // Mock the initial fetch call
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({
+        query: '2323 E Highland',
+        results: [mockApiRecord],
+        count: 1
+      })
+    });
 
     const { input } = setup();
 
@@ -212,7 +218,9 @@ describe('AddressInput', () => {
 
     await waitFor(
       () => {
-        expect(mockSearchAddresses).toHaveBeenCalledWith('2323 E Highland', 10);
+        expect(mockFetch).toHaveBeenCalledWith(
+          '/api/lookup?query=2323%20E%20Highland'
+        );
       },
       { timeout: 2000 }
     );
@@ -221,7 +229,7 @@ describe('AddressInput', () => {
       expect(screen.getByRole('option')).toBeInTheDocument();
     });
 
-    mockSearchAddresses.mockClear();
+    mockFetch.mockClear();
 
     const suggestionElement = screen.getByRole('option');
     fireEvent.click(suggestionElement);
@@ -231,7 +239,7 @@ describe('AddressInput', () => {
     });
 
     await new Promise((resolve) => setTimeout(resolve, 700));
-    expect(mockSearchAddresses).not.toHaveBeenCalled();
+    expect(mockFetch).not.toHaveBeenCalled();
   });
 
   it('clears previous suggestions while fetching new ones', async () => {

@@ -13,18 +13,27 @@ describe('Estimate Calculation Flow for Residential and Commercial Parcels', () 
       fixture: 'parcels/residential_baseline.json'
     }).as('parcelMetadata');
 
+    cy.intercept('GET', '**/api/lookup**', (req) => {
+      let fixture: string | null = null;
+      if (req.url.includes('123')) fixture = 'lookups/query_test.json';
+      else if (req.url.includes('456')) fixture = 'lookups/query_business.json';
+      else if (req.url.includes('789')) fixture = 'lookups/query_missing.json';
+      else if (req.url.includes('999')) fixture = 'lookups/query_broken.json';
+
+      if (fixture) {
+        req.reply({ fixture });
+      }
+    }).as('lookup');
+
     cy.visit('/');
   });
 
   it('Shopper requests estimate for Residential parcel with baseline affluence', () => {
     // GIVEN I am requesting an instant estimate for a residential parcel with affluence_score = 50 (baseline)
     // AND my parcel metadata provides a valid bounding box
-    cy.intercept('GET', '/api/lookup?query=123%20Test*', {
-      fixture: 'lookups/query_test.json'
-    }).as('testLookup');
 
     cy.get('input[placeholder="Enter address"]').type('123 Test');
-    cy.wait('@testLookup');
+    cy.wait('@lookup');
     cy.get('ul[role="listbox"]').should('be.visible');
     cy.contains(
       'li[role="option"]',
@@ -69,12 +78,8 @@ describe('Estimate Calculation Flow for Residential and Commercial Parcels', () 
       fixture: 'parcels/commercial_affluent.json'
     }).as('commercialMetadata');
 
-    cy.intercept('GET', '/api/lookup?query=456%20Business*', {
-      fixture: 'lookups/query_business.json'
-    }).as('commercialLookup');
-
     cy.get('input[placeholder="Enter address"]').type('456 Business');
-    cy.wait('@commercialLookup');
+    cy.wait('@lookup');
     cy.get('ul[role="listbox"]').should('be.visible');
     cy.contains(
       'li[role="option"]',
@@ -116,12 +121,8 @@ describe('Estimate Calculation Flow for Residential and Commercial Parcels', () 
       fixture: 'parcels/missing_area.json'
     }).as('nullAreaMetadata');
 
-    cy.intercept('GET', '/api/lookup?query=789%20Missing*', {
-      fixture: 'lookups/query_missing.json'
-    }).as('nullAreaLookup');
-
     cy.get('input[placeholder="Enter address"]').type('789 Missing');
-    cy.wait('@nullAreaLookup');
+    cy.wait('@lookup');
     cy.get('ul[role="listbox"]').should('be.visible');
     cy.contains(
       'li[role="option"]',
@@ -160,12 +161,8 @@ describe('Estimate Calculation Flow for Residential and Commercial Parcels', () 
       fixture: 'parcels/malformed_bounds.json'
     }).as('malformedMetadata');
 
-    cy.intercept('GET', '/api/lookup?query=999%20Broken*', {
-      fixture: 'lookups/query_broken.json'
-    }).as('malformedLookup');
-
     cy.get('input[placeholder="Enter address"]').type('999 Broken');
-    cy.wait('@malformedLookup');
+    cy.wait('@lookup');
     cy.get('ul[role="listbox"]').should('be.visible');
     cy.contains(
       'li[role="option"]',

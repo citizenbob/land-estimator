@@ -4,26 +4,17 @@ import { render, screen, fireEvent } from '@testing-library/react';
 import '@testing-library/jest-dom';
 import { EstimateCalculator } from './EstimateCalculator';
 import { useLandscapeEstimator } from '@hooks/useLandscapeEstimator';
-import { MOCK_ADDRESS_DATA } from '../../lib/testData';
+import { MOCK_ENRICHED_ADDRESS_DATA } from '../../lib/testData';
 import type { EnrichedAddressSuggestion } from '@typez/addressMatchTypes';
-import type {
-  LandscapeEstimatorOptions,
-  EstimateResult
-} from '@typez/landscapeEstimatorTypes';
 
 vi.mock('@hooks/useLandscapeEstimator');
 const mockUseLandscapeEstimator =
   useLandscapeEstimator as unknown as ReturnType<typeof vi.fn>;
 
 describe('EstimateCalculator', () => {
-  const calculateEstimateMock = vi.fn() as vi.MockedFunction<
-    (
-      addressData: EnrichedAddressSuggestion,
-      options?: LandscapeEstimatorOptions
-    ) => Promise<EstimateResult>
-  >;
+  const calculateEstimateMock = vi.fn();
 
-  const mockAddressData = MOCK_ADDRESS_DATA;
+  const mockAddressData = MOCK_ENRICHED_ADDRESS_DATA;
 
   beforeEach(() => {
     calculateEstimateMock.mockImplementation(() => Promise.resolve());
@@ -180,7 +171,7 @@ describe('EstimateCalculator', () => {
     const incompleteAddressData = {
       ...mockAddressData,
       calc: undefined
-    } as EnrichedAddressSuggestion;
+    } as unknown as EnrichedAddressSuggestion;
 
     const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
 
@@ -198,12 +189,10 @@ describe('EstimateCalculator', () => {
     const incompleteCalcData = {
       ...mockAddressData,
       calc: {
-        landarea: 5000,
-        building_sqft: 1000,
-        estimated_landscapable_area: undefined,
-        property_type: 'residential'
+        ...mockAddressData.calc,
+        estimated_landscapable_area: undefined
       }
-    } as EnrichedAddressSuggestion;
+    } as unknown as EnrichedAddressSuggestion;
 
     const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
 
@@ -221,6 +210,7 @@ describe('EstimateCalculator', () => {
     const validAddressData = {
       ...mockAddressData,
       calc: {
+        ...mockAddressData.calc,
         landarea: 5000,
         building_sqft: 1000,
         estimated_landscapable_area: 3500,

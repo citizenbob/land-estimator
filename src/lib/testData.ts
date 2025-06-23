@@ -96,7 +96,7 @@ export const TEST_COORDINATES = {
 
 export const MOCK_ADDRESS_DATA = MOCK_LOCAL_ADDRESSES.find(
   (address) => address.id === '25L440198'
-);
+)!;
 
 /**
  * Mock FlexSearch address lookup data

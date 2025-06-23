@@ -2,7 +2,7 @@ import { renderHook, act } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { useEventLogger } from './useEventLogger';
 import * as loggerModule from '@services/logger';
-import { ButtonClickEvent } from '../types/analytics';
+import { EstimateButtonClickedEvent } from '../types/analytics';
 
 describe('useEventLogger', () => {
   const mockLogEvent = vi.fn().mockResolvedValue(undefined);
@@ -16,41 +16,46 @@ describe('useEventLogger', () => {
   it('uses the logger service with default options', async () => {
     const { result } = renderHook(() => useEventLogger());
 
-    const testEvent: ButtonClickEvent = {
-      button_id: 'submit_button',
-      button_text: 'Submit'
+    const testEvent: EstimateButtonClickedEvent = {
+      address_id: '123-abc'
     };
 
     await act(async () => {
-      await result.current.logEvent('button_clicked', testEvent);
+      await result.current.logEvent('estimate_button_clicked', testEvent);
     });
 
-    expect(mockLogEvent).toHaveBeenCalledWith('button_clicked', testEvent, {
-      toMixpanel: true,
-      toFirestore: true
-    });
+    expect(mockLogEvent).toHaveBeenCalledWith(
+      'estimate_button_clicked',
+      testEvent,
+      {
+        toMixpanel: true,
+        toFirestore: true
+      }
+    );
   });
 
   it('applies provided options to the log event', async () => {
     const { result } = renderHook(() => useEventLogger());
 
-    const testEvent: ButtonClickEvent = {
-      button_id: 'cancel_button',
-      button_text: 'Cancel',
-      page_section: 'checkout'
+    const testEvent: EstimateButtonClickedEvent = {
+      address_id: '456-def'
     };
 
     await act(async () => {
-      await result.current.logEvent('button_clicked', testEvent, {
+      await result.current.logEvent('estimate_button_clicked', testEvent, {
         toMixpanel: false,
         toFirestore: true
       });
     });
 
-    expect(mockLogEvent).toHaveBeenCalledWith('button_clicked', testEvent, {
-      toMixpanel: false,
-      toFirestore: true
-    });
+    expect(mockLogEvent).toHaveBeenCalledWith(
+      'estimate_button_clicked',
+      testEvent,
+      {
+        toMixpanel: false,
+        toFirestore: true
+      }
+    );
   });
 
   it('handles errors gracefully', async () => {
@@ -59,16 +64,16 @@ describe('useEventLogger', () => {
 
     const { result } = renderHook(() => useEventLogger());
 
-    const errorEvent: ButtonClickEvent = {
-      button_id: 'error_button'
+    const errorEvent: EstimateButtonClickedEvent = {
+      address_id: '789-ghi'
     };
 
     await act(async () => {
-      await result.current.logEvent('button_clicked', errorEvent);
+      await result.current.logEvent('estimate_button_clicked', errorEvent);
     });
 
     expect(console.error).toHaveBeenCalledWith(
-      'Error logging event: button_clicked',
+      'Error logging event: estimate_button_clicked',
       testError
     );
   });

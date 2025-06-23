@@ -2,13 +2,16 @@ describe('Capture Address Inquiries and Log Shopper Behavior', () => {
   beforeEach(() => {
     cy.intercept('POST', '/api/log', { statusCode: 200 }).as('log');
 
-    cy.intercept('GET', '/api/lookup?query=621%20Market*', {
-      fixture: 'lookups/query_market.json'
-    }).as('marketLookup');
-
-    cy.intercept('GET', '/api/lookup?query=907%20Volz*', {
-      fixture: 'lookups/query_volz.json'
-    }).as('volzLookup');
+    cy.intercept('GET', '**/api/lookup**', (req) => {
+      const query = req.url.includes('621')
+        ? 'query_market.json'
+        : req.url.includes('907')
+          ? 'query_volz.json'
+          : null;
+      if (query) {
+        req.reply({ fixture: `lookups/${query}` });
+      }
+    }).as('lookup');
 
     cy.visit('/');
   });
@@ -22,7 +25,7 @@ describe('Capture Address Inquiries and Log Shopper Behavior', () => {
   it('Shopper enters a St. Louis City address and receives suggested matches', () => {
     cy.get('input[placeholder="Enter address"]').clear().type('621 Market');
 
-    cy.wait('@marketLookup');
+    cy.wait('@lookup');
 
     cy.get('ul[role="listbox"]', { timeout: 10000 }).should('be.visible');
 
@@ -54,7 +57,7 @@ describe('Capture Address Inquiries and Log Shopper Behavior', () => {
   it('Shopper clears their selected suggestion', () => {
     cy.get('input[placeholder="Enter address"]').clear().type('621 Market');
 
-    cy.wait('@marketLookup');
+    cy.wait('@lookup');
     cy.contains(
       'li[role="option"]',
       '621 Market St., St. Louis, MO 63101'
@@ -86,7 +89,7 @@ describe('Capture Address Inquiries and Log Shopper Behavior', () => {
   it('Shopper enters a St. Louis County address and receives suggested matches', () => {
     cy.get('input[placeholder="Enter address"]').clear().type('907 Volz');
 
-    cy.wait('@volzLookup');
+    cy.wait('@lookup');
     cy.get('ul[role="listbox"]', { timeout: 10000 }).should('be.visible');
     cy.contains(
       'li[role="option"]',

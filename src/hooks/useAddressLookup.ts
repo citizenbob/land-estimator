@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { searchAddresses, AddressLookupRecord } from '@services/addressSearch';
+import { AddressLookupRecord } from '@services/addressSearch';
 import { LocalAddressRecord } from '@typez/localAddressTypes';
 
 export function useAddressLookup() {
@@ -30,7 +30,20 @@ export function useAddressLookup() {
         return;
       }
       try {
-        const results: AddressLookupRecord[] = await searchAddresses(value, 10);
+        const response = await fetch(
+          `/api/lookup?query=${encodeURIComponent(value)}`
+        );
+        if (!response.ok) {
+          throw new Error(
+            `Failed to fetch address suggestions: ${response.status} ${response.statusText}`
+          );
+        }
+        const responseData = await response.json();
+        console.log('📥 API response:', responseData);
+
+        const results: AddressLookupRecord[] = Array.isArray(responseData)
+          ? responseData
+          : responseData.results || [];
 
         const simplified = results.map((item) => {
           rawDataRef.current[item.id] = item;
@@ -42,6 +55,7 @@ export function useAddressLookup() {
         setSuggestions(simplified);
         setHasFetched(true);
       } catch (err: unknown) {
+        console.error('Failed to fetch or process address suggestions:', err);
         if (err instanceof Error) {
           setError(err.message);
         } else {

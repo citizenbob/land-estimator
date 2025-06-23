@@ -6,31 +6,52 @@ import {
   MOCK_LOCAL_ADDRESSES,
   MOCK_SIMPLE_ADDRESS_RECORD
 } from '@lib/testData';
-import { setupConsoleMocks } from '@lib/testUtils';
-import { searchAddresses } from '@services/addressSearch';
-import { LocalAddressRecord } from '@typez/localAddressTypes';
+import {
+  setupConsoleMocks,
+  createMockFetch,
+  mockSuccessResponse,
+  mockNetworkError,
+  createMockApiRecord,
+  setupTestTimers,
+  cleanupTestTimers
+} from '@lib/testUtils';
 
-vi.mock('@services/addressSearch', () => ({
-  searchAddresses: vi.fn()
-}));
+const createLookupApiResponse = (
+  query: string,
+  results: Array<{ id: string; display_name: string; region: string }>,
+  count = results.length
+) => ({
+  query,
+  results,
+  count
+});
 
-const mockFetch = vi.fn();
-global.fetch = mockFetch;
+const performDebouncedApiCall = async (
+  result: { current: ReturnType<typeof useAddressLookup> },
+  query: string
+) => {
+  act(() => {
+    result.current.handleChange(query);
+  });
 
-const mockData: Record<string, LocalAddressRecord> = {
-  '1': MOCK_SIMPLE_ADDRESS_RECORD
+  expect(result.current.isFetching).toBe(true);
+
+  await act(async () => {
+    vi.advanceTimersByTime(600);
+  });
 };
+
+const mockFetch = createMockFetch();
 
 describe('useAddressLookup', () => {
   beforeEach(() => {
-    vi.useFakeTimers();
-    vi.mocked(searchAddresses).mockReset();
+    setupTestTimers();
     mockFetch.mockReset();
     setupConsoleMocks();
   });
 
   afterEach(() => {
-    vi.useRealTimers();
+    cleanupTestTimers();
     vi.clearAllMocks();
   });
 
@@ -45,36 +66,30 @@ describe('useAddressLookup', () => {
   });
 
   it('fetches suggestions using local API after debounce and updates state', async () => {
-    const mockApiRecord = {
+    const mockApiRecord = createMockApiRecord({
       id: MOCK_LOCAL_ADDRESSES[0].id,
-      display_name: MOCK_LOCAL_ADDRESSES[0].full_address,
-      region: MOCK_LOCAL_ADDRESSES[0].region,
-      normalized: MOCK_LOCAL_ADDRESSES[0].full_address.toLowerCase()
-    };
+      full_address: MOCK_LOCAL_ADDRESSES[0].full_address,
+      region: MOCK_LOCAL_ADDRESSES[0].region
+    });
 
-    vi.mocked(searchAddresses).mockResolvedValueOnce([mockApiRecord]);
+    const apiResponse = createLookupApiResponse(TEST_LOCATIONS.FIRST_STREET, [
+      mockApiRecord
+    ]);
+
+    mockSuccessResponse(mockFetch, apiResponse);
 
     const { result } = renderHook(() => useAddressLookup());
 
-    act(() => {
-      result.current.handleChange(TEST_LOCATIONS.FIRST_STREET);
-    });
-
-    expect(result.current.isFetching).toBe(true);
-
-    await act(async () => {
-      vi.advanceTimersByTime(600);
-    });
+    await performDebouncedApiCall(result, TEST_LOCATIONS.FIRST_STREET);
 
     await vi.waitFor(() => {
       expect(result.current.suggestions).toHaveLength(1);
       expect(result.current.isFetching).toBe(false);
     });
 
-    expect(searchAddresses).toHaveBeenCalledTimes(1);
-    expect(searchAddresses).toHaveBeenCalledWith(
-      TEST_LOCATIONS.FIRST_STREET,
-      10
+    expect(mockFetch).toHaveBeenCalledTimes(1);
+    expect(mockFetch).toHaveBeenCalledWith(
+      `/api/lookup?query=${encodeURIComponent(TEST_LOCATIONS.FIRST_STREET)}`
     );
 
     expect(result.current.suggestions[0]).toEqual({
@@ -99,29 +114,22 @@ describe('useAddressLookup', () => {
   });
 
   it('getSuggestionData returns stored raw data', async () => {
-    const mockApiRecord = {
+    const mockApiRecord = createMockApiRecord({
       id: MOCK_LOCAL_ADDRESSES[1].id,
-      display_name: MOCK_LOCAL_ADDRESSES[1].full_address,
-      region: MOCK_LOCAL_ADDRESSES[1].region,
-      normalized: MOCK_LOCAL_ADDRESSES[1].full_address.toLowerCase()
-    };
-
-    vi.mocked(searchAddresses).mockResolvedValueOnce([mockApiRecord]);
-
-    mockFetch.mockResolvedValueOnce({
-      ok: true,
-      json: async () => MOCK_LOCAL_ADDRESSES[1]
+      full_address: MOCK_LOCAL_ADDRESSES[1].full_address,
+      region: MOCK_LOCAL_ADDRESSES[1].region
     });
+
+    const lookupResponse = createLookupApiResponse(TEST_LOCATIONS.DUNN_VIEW, [
+      mockApiRecord
+    ]);
+
+    mockSuccessResponse(mockFetch, lookupResponse);
+    mockSuccessResponse(mockFetch, MOCK_LOCAL_ADDRESSES[1]);
 
     const { result } = renderHook(() => useAddressLookup());
 
-    act(() => {
-      result.current.handleChange(TEST_LOCATIONS.DUNN_VIEW);
-    });
-
-    await act(async () => {
-      vi.advanceTimersByTime(600);
-    });
+    await performDebouncedApiCall(result, TEST_LOCATIONS.DUNN_VIEW);
 
     await vi.waitFor(
       () => {
@@ -147,52 +155,36 @@ describe('useAddressLookup', () => {
   });
 
   it('handles API errors', async () => {
-    vi.mocked(searchAddresses).mockRejectedValueOnce(
-      new Error('API error: 500')
-    );
+    mockNetworkError(mockFetch, 'API error: 500');
 
     const { result } = renderHook(() => useAddressLookup());
 
-    act(() => {
-      result.current.handleChange(TEST_LOCATIONS.FIRST_STREET);
-    });
-
-    await act(async () => {
-      vi.advanceTimersByTime(600);
-    });
+    await performDebouncedApiCall(result, TEST_LOCATIONS.FIRST_STREET);
 
     await vi.waitFor(() => {
       expect(result.current.error).not.toBeNull();
       expect(result.current.isFetching).toBe(false);
     });
 
-    expect(searchAddresses).toHaveBeenCalledTimes(1);
+    expect(mockFetch).toHaveBeenCalledTimes(1);
     expect(result.current.suggestions).toEqual([]);
     expect(result.current.hasFetched).toBe(true);
     expect(result.current.error).toContain('API error: 500');
   });
 
   it('handles network errors during fetch', async () => {
-    vi.mocked(searchAddresses).mockRejectedValueOnce(
-      new Error('Network connection failed')
-    );
+    mockNetworkError(mockFetch, 'Network connection failed');
 
     const { result } = renderHook(() => useAddressLookup());
 
-    act(() => {
-      result.current.handleChange(TEST_LOCATIONS.SPRING_GARDEN);
-    });
-
-    await act(async () => {
-      vi.advanceTimersByTime(600);
-    });
+    await performDebouncedApiCall(result, TEST_LOCATIONS.SPRING_GARDEN);
 
     await vi.waitFor(() => {
       expect(result.current.error).not.toBeNull();
       expect(result.current.isFetching).toBe(false);
     });
 
-    expect(searchAddresses).toHaveBeenCalledTimes(1);
+    expect(mockFetch).toHaveBeenCalledTimes(1);
     expect(result.current.suggestions).toEqual([]);
     expect(result.current.hasFetched).toBe(true);
     expect(result.current.error).toBe('Network connection failed');
@@ -201,7 +193,9 @@ describe('useAddressLookup', () => {
   it('should retrieve enriched metadata for a given suggestion ID', () => {
     const { result } = renderHook(() => useAddressLookup());
 
-    const mockGetSuggestionData = vi.fn().mockReturnValue(mockData['1']);
+    const mockGetSuggestionData = vi
+      .fn()
+      .mockReturnValue(MOCK_SIMPLE_ADDRESS_RECORD);
     Object.defineProperty(result.current, 'getSuggestionData', {
       value: mockGetSuggestionData
     });
@@ -209,7 +203,7 @@ describe('useAddressLookup', () => {
     const data = result.current.getSuggestionData('1');
 
     expect(mockGetSuggestionData).toBeCalledWith('1');
-    expect(data).toEqual(mockData['1']);
+    expect(data).toEqual(MOCK_SIMPLE_ADDRESS_RECORD);
   });
 
   it('should return undefined for an unknown suggestion ID', () => {
@@ -227,29 +221,24 @@ describe('useAddressLookup', () => {
   });
 
   it('returns enriched data from parcel metadata', async () => {
-    const mockApiRecord = {
+    const mockApiRecord = createMockApiRecord({
       id: MOCK_LOCAL_ADDRESSES[0].id,
-      display_name: MOCK_LOCAL_ADDRESSES[0].full_address,
-      region: MOCK_LOCAL_ADDRESSES[0].region,
-      normalized: MOCK_LOCAL_ADDRESSES[0].full_address.toLowerCase()
-    };
-
-    vi.mocked(searchAddresses).mockResolvedValueOnce([mockApiRecord]);
-
-    mockFetch.mockResolvedValueOnce({
-      ok: true,
-      json: async () => MOCK_LOCAL_ADDRESSES[0]
+      full_address: MOCK_LOCAL_ADDRESSES[0].full_address,
+      region: MOCK_LOCAL_ADDRESSES[0].region
     });
+
+    const lookupResponse = createLookupApiResponse(
+      TEST_LOCATIONS.FIRST_STREET,
+      [mockApiRecord]
+    );
+
+    mockSuccessResponse(mockFetch, lookupResponse);
+    // Mock the parcel metadata API response
+    mockSuccessResponse(mockFetch, MOCK_LOCAL_ADDRESSES[0]);
 
     const { result } = renderHook(() => useAddressLookup());
 
-    act(() => {
-      result.current.handleChange(TEST_LOCATIONS.FIRST_STREET);
-    });
-
-    await act(async () => {
-      vi.advanceTimersByTime(600);
-    });
+    await performDebouncedApiCall(result, TEST_LOCATIONS.FIRST_STREET);
 
     await vi.waitFor(() => {
       expect(result.current.suggestions).toHaveLength(1);
@@ -267,24 +256,22 @@ describe('useAddressLookup', () => {
   });
 
   it('handles missing parcel metadata gracefully', async () => {
-    const mockApiRecord = {
+    const mockApiRecord = createMockApiRecord({
       id: 'nonexistent_id_12345',
-      display_name: 'Nonexistent Address',
-      region: 'Unknown',
-      normalized: 'nonexistent address'
-    };
+      full_address: 'Nonexistent Address',
+      region: 'Unknown'
+    });
 
-    vi.mocked(searchAddresses).mockResolvedValueOnce([mockApiRecord]);
+    const lookupResponse = createLookupApiResponse('nonexistent address', [
+      mockApiRecord
+    ]);
+
+    // Mock the lookup API response first
+    mockSuccessResponse(mockFetch, lookupResponse);
 
     const { result } = renderHook(() => useAddressLookup());
 
-    act(() => {
-      result.current.handleChange('nonexistent address');
-    });
-
-    await act(async () => {
-      vi.advanceTimersByTime(600);
-    });
+    await performDebouncedApiCall(result, 'nonexistent address');
 
     await vi.waitFor(() => {
       expect(result.current.suggestions).toHaveLength(1);
@@ -299,29 +286,24 @@ describe('useAddressLookup', () => {
   });
 
   it('properly joins data from parcel metadata service', async () => {
-    const mockApiRecord = {
+    const mockApiRecord = createMockApiRecord({
       id: MOCK_LOCAL_ADDRESSES[1].id,
-      display_name: MOCK_LOCAL_ADDRESSES[1].full_address,
-      region: MOCK_LOCAL_ADDRESSES[1].region,
-      normalized: MOCK_LOCAL_ADDRESSES[1].full_address.toLowerCase()
-    };
-
-    vi.mocked(searchAddresses).mockResolvedValueOnce([mockApiRecord]);
-
-    mockFetch.mockResolvedValueOnce({
-      ok: true,
-      json: async () => MOCK_LOCAL_ADDRESSES[1]
+      full_address: MOCK_LOCAL_ADDRESSES[1].full_address,
+      region: MOCK_LOCAL_ADDRESSES[1].region
     });
+
+    const lookupResponse = createLookupApiResponse(TEST_LOCATIONS.DUNN_VIEW, [
+      mockApiRecord
+    ]);
+
+    // Mock the lookup API response first
+    mockSuccessResponse(mockFetch, lookupResponse);
+    // Mock the parcel metadata API response
+    mockSuccessResponse(mockFetch, MOCK_LOCAL_ADDRESSES[1]);
 
     const { result } = renderHook(() => useAddressLookup());
 
-    act(() => {
-      result.current.handleChange(TEST_LOCATIONS.DUNN_VIEW);
-    });
-
-    await act(async () => {
-      vi.advanceTimersByTime(600);
-    });
+    await performDebouncedApiCall(result, TEST_LOCATIONS.DUNN_VIEW);
 
     await vi.waitFor(() => {
       expect(result.current.suggestions).toHaveLength(1);

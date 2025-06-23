@@ -177,7 +177,7 @@ describe('/api/lookup route', () => {
         error: 'Internal server error'
       });
       expect(consoleErrorSpy).toHaveBeenCalledWith(
-        'Address lookup error:',
+        '❌ Address lookup error:',
         expect.any(Error)
       );
 
