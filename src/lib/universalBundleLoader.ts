@@ -64,13 +64,21 @@ export function createUniversalBundleLoader<TData, TOptimizedIndex, TBundle>(
    */
   async function loadBundle(): Promise<TBundle> {
     if (cachedBundle) {
+      console.log('📦 Using cached bundle');
       return cachedBundle;
     }
 
+    console.log(`🔄 Loading bundle for: ${config.gzippedFilename}`);
+
     try {
       try {
+        console.log(`📁 Attempting to load: ${config.gzippedFilename}`);
         const gzippedData = await loadGzippedData(config.gzippedFilename);
+        console.log(`📊 Gzipped data size: ${gzippedData.byteLength} bytes`);
+
         const optimizedIndex = decompressJsonData<TOptimizedIndex>(gzippedData);
+        console.log('🗜️ Successfully decompressed data');
+
         const data = config.extractDataFromIndex(optimizedIndex);
         const lookup = config.createLookupMap(data);
 
@@ -88,13 +96,13 @@ export function createUniversalBundleLoader<TData, TOptimizedIndex, TBundle>(
           (indexWithMeta.recordCount as number) || data.length;
         const version = (indexWithMeta.version as string) || 'unknown';
         console.log(
-          `📦 Loaded ${recordCount} records from optimized index (v${version})`
+          `✅ Loaded ${recordCount} records from optimized index (v${version})`
         );
 
         return cachedBundle;
       } catch (error) {
-        console.warn(
-          `Optimized ${config.gzippedFilename} not available, falling back to raw data:`,
+        console.error(
+          `❌ Optimized ${config.gzippedFilename} failed, attempting fallback:`,
           error
         );
       }

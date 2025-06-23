@@ -6,14 +6,22 @@ export async function GET(request: NextRequest) {
     const searchParams = request.nextUrl.searchParams;
     const query = searchParams.get('query');
 
+    console.log('🔍 Lookup API called:', {
+      query,
+      timestamp: new Date().toISOString()
+    });
+
     if (!query || query.trim().length < 2) {
+      console.log('❌ Query too short:', query);
       return NextResponse.json(
         { error: 'Query parameter must be at least 2 characters' },
         { status: 400 }
       );
     }
 
+    console.log('🚀 Starting searchAddresses for:', query.trim());
     const results = await searchAddresses(query.trim(), 10);
+    console.log('✅ Search completed:', { resultCount: results.length });
 
     const response = NextResponse.json({
       query: query.trim(),
@@ -29,7 +37,11 @@ export async function GET(request: NextRequest) {
 
     return response;
   } catch (error) {
-    console.error('Address lookup error:', error);
+    console.error('❌ Address lookup error:', error);
+    console.error(
+      'Stack trace:',
+      error instanceof Error ? error.stack : 'Unknown error'
+    );
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }
