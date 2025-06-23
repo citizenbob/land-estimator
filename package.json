@@ -12,6 +12,7 @@
     "build:tokens": "npx style-dictionary build --config ./style-dictionary.config.mjs",
     "start": "next start",
     "clean": "npm run format && npm run lint:fix",
+    "hooks:setup": "bash setup-hooks.sh",
     "lint": "next lint",
     "lint:fix": "eslint . --ext .js,.jsx,.ts,.tsx --fix",
     "format": "prettier --write 'src/**/*.{ts,tsx,css,scss}' '!src/data/*.json'",

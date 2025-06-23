@@ -28,8 +28,62 @@ Landscape Estimator is a tool that uses **AI, GIS data, and aerial imagery** to 
 git clone https://github.com/citizenbob/land-estimator.git
 cd landscape-estimator
 yarn install
+
+# Set up git hooks (recommended)
+./setup-hooks.sh
+
 yarn dev
 ```
+
+## 🔒 Git Hooks & Quality Control
+
+This project includes comprehensive git hooks to ensure code quality and prevent deployment issues:
+
+### Pre-commit Hook (Fast feedback)
+
+Runs on every commit:
+
+- ✅ ESLint on staged files
+- ✅ Prettier formatting check
+- ✅ TypeScript compilation check
+
+### Pre-push Hook (Comprehensive validation)
+
+Runs before pushing to remote:
+
+- ✅ Full linting and formatting
+- ✅ TypeScript compilation
+- ✅ Unit tests
+- ✅ Production build test
+- ✅ E2E tests (if dev server available)
+- ✅ Data builds (if shapefiles changed)
+- ✅ File integrity checks
+
+### Hook Management
+
+```sh
+# Initial setup (run once after cloning)
+./setup-hooks.sh
+
+# Skip hooks during development
+SKIP_E2E=true git push              # Skip E2E tests only
+SKIP_DATA_BUILD=true git push       # Skip data builds only
+SKIP_HOOK=true git push             # Skip all pre-push checks
+
+# Skip pre-commit checks
+SKIP_COMMIT_HOOK=true git commit -m "message"
+
+# Emergency override (use sparingly)
+git push --no-verify               # Skip all hooks
+```
+
+**Why use hooks?**
+
+- 🚫 Prevents broken deployments
+- 🧹 Maintains consistent code quality
+- 🔍 Catches issues early in development
+- 📊 Ensures data files are properly built
+- 🎯 Reduces CI/CD failures
 
 ## 📦 Large Files & Git LFS
 
