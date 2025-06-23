@@ -1,3 +1,12 @@
-version https://git-lfs.github.com/spec/v1
-oid sha256:a3141be9890df71d6baf47c65d2e576f5c1bb395b3ff5e52328507306e90e00f
-size 250
+{
+  "query": "621 Market",
+  "results": [
+    {
+      "id": "10131000022",
+      "display_name": "621 Market St., St. Louis, MO 63101",
+      "region": "St. Louis City",
+      "normalized": "621 market st st louis mo 63101"
+    }
+  ],
+  "count": 1
+}

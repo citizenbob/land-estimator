@@ -1,3 +1,12 @@
-version https://git-lfs.github.com/spec/v1
-oid sha256:3440854824e0e05cbe848a3f9d1bf1faf8f3c468f1519d6e50ba4bfabd482682
-size 261
+{
+  "query": "789 Missing",
+  "results": [
+    {
+      "id": "NULL_AREA",
+      "display_name": "789 Missing Area St., St. Louis, MO 63101",
+      "region": "St. Louis City",
+      "normalized": "789 missing area st st louis mo 63101"
+    }
+  ],
+  "count": 1
+}

@@ -77,6 +77,7 @@ next-env.d.ts
 
 # Exclude large source data files (raw GIS data, processed files, etc.)
 # These are too large and not needed in the repository
+src/data/address_index.json
 src/data/parcel_metadata.json
 src/data/saint_louis_city/saint_louis_city-processed.json
 src/data/saint_louis_county/saint_louis_county-processed.json

@@ -1,3 +1,12 @@
-version https://git-lfs.github.com/spec/v1
-oid sha256:96126af300a0dc4ae4f69bec1815201d8be47b828060b0535f4e87761d6f50e3
-size 259
+{
+  "query": "456 Business",
+  "results": [
+    {
+      "id": "COM_AFFLUENT",
+      "display_name": "456 Business Ave., St. Louis, MO 63103",
+      "region": "St. Louis City",
+      "normalized": "456 business ave st louis mo 63103"
+    }
+  ],
+  "count": 1
+}

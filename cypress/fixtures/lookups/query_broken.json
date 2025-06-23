@@ -1,3 +1,12 @@
-version https://git-lfs.github.com/spec/v1
-oid sha256:98d9553855bf679cbecafd6a478c948a7b2a0b2dcde6113571351661be2a3112
-size 269
+{
+  "query": "999 Broken",
+  "results": [
+    {
+      "id": "MALFORMED_BOUNDS",
+      "display_name": "999 Broken Bounds St., St. Louis, MO 63101",
+      "region": "St. Louis City",
+      "normalized": "999 broken bounds st st louis mo 63101"
+    }
+  ],
+  "count": 1
+}

@@ -1,3 +1,12 @@
-version https://git-lfs.github.com/spec/v1
-oid sha256:f294dd64362ce4675ba4117cc9e87c5c19ad48c7cd7134b80e76d27f408b654c
-size 245
+{
+  "query": "123 Test",
+  "results": [
+    {
+      "id": "RES_BASELINE",
+      "display_name": "123 Test St., St. Louis, MO 63101",
+      "region": "St. Louis City",
+      "normalized": "123 test st st louis mo 63101"
+    }
+  ],
+  "count": 1
+}
