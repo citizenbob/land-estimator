@@ -30,6 +30,14 @@ async function buildParcelIndex(): Promise<void> {
 
   console.log('🔧 Building Parcel Metadata Index...');
 
+  const publicDir = path.join(__dirname, '../../public');
+  const outputPath = path.join(publicDir, 'parcel-metadata.json.gz');
+
+  if (fs.existsSync(outputPath)) {
+    console.log('✅ Parcel metadata index already exists, skipping build');
+    return;
+  }
+
   const parcelData = await loadParcelData();
   console.log(`📂 Loaded ${formatNumber(parcelData.length)} parcel records`);
 
