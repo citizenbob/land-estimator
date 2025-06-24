@@ -1,4 +1,0 @@
-# Git LFS configuration for large data files
-
-# Note: Vercel does not support Git LFS for public assets
-# All .gz files are now tracked as regular Git files for deployment compatibility

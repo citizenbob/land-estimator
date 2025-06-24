@@ -62,37 +62,25 @@ next-env.d.ts
 
 *storybook.log*
 
-# Large data files - track with Git LFS (see .gitattributes)
-# These files are essential for the application but handled by LFS:
-# - public/address-index.json.gz (6MB, production-ready)  
-# - public/parcel-metadata.json.gz (36MB, production-ready)
-# - src/data/parcel_metadata.json (source data for build)
-# - src/data/parcel_geometry_index.json (source data for build)
-
+# Large data files - track compressed versions only
 # Generated uncompressed files - exclude (we only need .gz versions)
 /public/parcel-metadata.json
 /public/address-index.json
 /public/address-index.backup.json
 /public/parcel-metadata.backup.json
 
-# Exclude large source data files (raw GIS data, processed files, etc.)
-# These are too large and not needed in the repository
-src/data/address_index.json
-src/data/parcel_metadata.json
+# Keep essential GIS source files for processing
+# Note: Shapefiles and CSV files are kept for processing
+
+# Exclude large intermediate processed files (keep essential source JSON files)
 src/data/saint_louis_city/saint_louis_city-processed.json
 src/data/saint_louis_county/saint_louis_county-processed.json
 src/data/saint_louis_county/saint_louis_county-optimized.json
 src/data/parcel_geometry_index.json
-
-# Exclude all shapefiles and related GIS data
-src/data/*/shapefiles/
-src/data/*/*.shp
-src/data/*/*.dbf
-src/data/*/*.shx
-src/data/*/*.prj
-src/data/*/*.cpg
-
-# Exclude any other large processed data files
 src/data/*-processed.json
 src/data/*-optimized.json
 src/data/*.geojson
+
+# Keep essential build source files:
+# - src/data/address_index.json (when regenerated)
+# - src/data/parcel_metadata.json (when regenerated)

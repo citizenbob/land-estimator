@@ -85,26 +85,48 @@ git push --no-verify               # Skip all hooks
 - 📊 Ensures data files are properly built
 - 🎯 Reduces CI/CD failures
 
+## 🐙 Git Hooks Quick Reference
+
+```bash
+# one-time setup
+npm run hooks:setup
+# or
+./setup-hooks.sh
+```
+
+**What Runs**
+
+- **Pre-commit** (every git commit):
+  - ESLint on staged files
+  - Prettier format check
+  - TypeScript compilation
+- **Pre-push** (every git push):
+  - Full lint + format
+  - Unit tests
+  - Production build test
+  - E2E tests
+  - Data builds (if shapefiles changed)
+  - File integrity checks
+
+**Skip Options**
+
+````bash
+# Dev shortcuts
+SKIP_E2E=true git push           # skip slow E2E
+SKIP_DATA_BUILD=true git push    # skip data builds
+SKIP_HOOK=true git push          # skip all checks
+SKIP_COMMIT_HOOK=true git commit # skip pre-commit only
+
+# Emergency override (use sparingly!)
+git push --no-verify
+
 ## 📦 Large Files & Git LFS
 
-This project uses **Git LFS (Large File Storage)** to handle essential compressed data files required for the application to function. The application only uses optimized `.gz` files - no raw data fallbacks.
-
-### What's stored in LFS:
-
-- `public/address-index.json.gz` (6MB) - Optimized address search index
-- `public/parcel-metadata.json.gz` (36MB) - Optimized parcel lookup data
-
-### What's excluded (too large, not essential):
-
-- Raw GIS shapefiles (`.shp`, `.dbf` files)
-- Raw JSON source data files (`parcel_metadata.json`, etc.)
-- Processed intermediate data files
-- Geometry indices and other derived data
-- These files are generated locally during development but not committed
+To keep the main repo lean, all raw GIS/shapefile data lives in a separate Git LFS–backed repo, which you symlink into `src/data`. The main repo’s `.gitignore` excludes `src/data`, so you never accidentally commit huge raw files.
 
 ### Setting up Git LFS:
 
-1. **Install Git LFS** (if not already installed):
+**Install Git LFS** (if not already installed):
 
 ```sh
 # macOS
@@ -114,21 +136,33 @@ brew install git-lfs
 sudo apt install git-lfs
 
 # Windows
-# Download from https://git-lfs.github.io/
+Download from https://git-lfs.github.io/
+````
+
+### Accessing Parcel Source Data:
+
+1. **Clone the Data Repo**
+
+````bash
+# alongside your main repo
+git clone git@github.com:<your-org>/land-estimator-data.git ../land-estimator-data
+cd ../land-estimator-data
+```
+git lfs pull
+````
+
+2. **Symlink into the Main Project**
+
+```bash
+cd path/to/land-estimator
+ln -s ../land-estimator-data src/data
 ```
 
-2. **Initialize LFS in your clone**:
+3. **Initialize LFS in your clone**:
 
 ```sh
 git lfs install
 git lfs pull
-```
-
-3. **Build missing data files** (if needed):
-
-```sh
-yarn build:address-index
-yarn build:parcel-index
 ```
 
 ### For contributors:
