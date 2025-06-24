@@ -21,6 +21,15 @@ async function buildAddressIndex(): Promise<void> {
 
   console.log('🔧 Building Address Index...');
 
+  // Check if output already exists
+  const publicDir = path.join(__dirname, '../../public');
+  const outputPath = path.join(publicDir, 'address-index.json.gz');
+
+  if (fs.existsSync(outputPath)) {
+    console.log('✅ Address index already exists, skipping build');
+    return;
+  }
+
   const addressData = await loadAddressData();
   const parcelIds = Object.keys(addressData);
 
