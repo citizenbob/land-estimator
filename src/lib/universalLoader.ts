@@ -90,13 +90,30 @@ export async function loadGzippedData(filename: string): Promise<Uint8Array> {
     const { fs, path } = await importNodeModules();
 
     const projectRoot = process.cwd();
-    const filePath = path.join(projectRoot, 'public', filename);
 
-    if (!fs.existsSync(filePath)) {
-      throw new Error(`File not found: ${filePath}`);
+    // Try multiple possible locations for the file
+    const possiblePaths = [
+      path.join(projectRoot, 'public', filename),
+      path.join(projectRoot, '.next', 'server', 'public', filename),
+      path.join(projectRoot, '.next', 'static', filename),
+      // Fallback to root
+      path.join(projectRoot, filename),
+      // AWS Lambda specific path
+      `/var/task/public/${filename}`,
+      // Relative path fallback
+      `./public/${filename}`
+    ];
+
+    for (const filePath of possiblePaths) {
+      if (fs.existsSync(filePath)) {
+        return fs.readFileSync(filePath);
+      }
     }
 
-    return fs.readFileSync(filePath);
+    // If no file found, throw error with all attempted paths
+    throw new Error(
+      `File not found: ${filename}. Tried paths: ${possiblePaths.join(', ')}`
+    );
   }
 }
 
