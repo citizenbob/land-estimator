@@ -140,6 +140,27 @@ export async function loadGzippedData(filename: string): Promise<Uint8Array> {
       const { fs, path } = await importNodeModules();
       const serverlessRoot = process.cwd();
 
+      // Debug: List what files are actually available
+      console.log('🔍 Debugging serverless file system...');
+      try {
+        const rootFiles = fs.readdirSync(serverlessRoot);
+        console.log('📂 Root directory contents:', rootFiles);
+
+        // Check if public directory exists
+        const publicPath = path.join(serverlessRoot, 'public');
+        if (fs.existsSync(publicPath)) {
+          const publicFiles = fs.readdirSync(publicPath);
+          console.log('📂 Public directory contents:', publicFiles);
+        } else {
+          console.log('❌ Public directory does not exist');
+        }
+      } catch (error) {
+        console.log(
+          '❌ Error listing files:',
+          error instanceof Error ? error.message : error
+        );
+      }
+
       // In Vercel serverless, files should be accessible at the function root
       const possiblePaths = [
         path.join(serverlessRoot, filename),
@@ -199,7 +220,9 @@ export async function loadGzippedData(filename: string): Promise<Uint8Array> {
       }
 
       throw new Error(
-        `Failed to load ${filename} in serverless environment. Tried filesystem paths: ${possiblePaths.join(', ')} and URLs: ${possibleUrls.join(', ')}`
+        `Failed to load ${filename} in serverless environment. Tried filesystem paths: ${possiblePaths.join(
+          ', '
+        )} and URLs: ${possibleUrls.join(', ')}`
       );
     } catch (error) {
       console.log(

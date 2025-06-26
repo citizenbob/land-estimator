@@ -2,13 +2,19 @@
   "buildCommand": "npm run build",
   "functions": {
     "src/app/api/lookup/route.ts": {
-      "includeFiles": "public/**/*.gz"
+      "includeFiles": [
+        "public/address-index.json.gz",
+        "public/parcel-metadata.json.gz",
+        "public/parcel-metadata-ultra.json.gz"
+      ]
     },
     "src/app/api/parcel-metadata/[id]/route.ts": {
-      "includeFiles": "public/**/*.gz"
+      "includeFiles": [
+        "public/address-index.json.gz",
+        "public/parcel-metadata.json.gz",
+        "public/parcel-metadata-ultra.json.gz"
+      ]
     },
-    "src/app/api/log/route.ts": {
-      "includeFiles": "public/**/*.gz"
-    }
+    "src/app/api/log/route.ts": {}
   }
 }
