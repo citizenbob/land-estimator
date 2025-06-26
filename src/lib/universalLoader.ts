@@ -102,6 +102,74 @@ export async function loadGzippedData(filename: string): Promise<Uint8Array> {
   if (isBrowser() || isServerless) {
     // Use HTTP fetch for both browser and serverless
     // Files in public/ should be served as static assets by Vercel
+
+    // Add deep debugging for serverless environment
+    if (isServerless) {
+      console.log('🔍 Deep serverless debugging...');
+      try {
+        const { fs, path } = await importNodeModules();
+
+        // Check what's actually in the serverless environment
+        const checkPaths = [
+          '/var/task',
+          '/var/runtime',
+          '/tmp',
+          process.cwd(),
+          '.',
+          '..'
+        ];
+
+        for (const checkPath of checkPaths) {
+          try {
+            if (fs.existsSync(checkPath)) {
+              const contents = fs.readdirSync(checkPath);
+              console.log(`📂 ${checkPath}:`, contents);
+            } else {
+              console.log(`❌ ${checkPath}: does not exist`);
+            }
+          } catch (error) {
+            console.log(
+              `❌ Error reading ${checkPath}:`,
+              error instanceof Error ? error.message : error
+            );
+          }
+        }
+
+        // Check if we can read the .next directory structure
+        try {
+          const nextPath = path.join(process.cwd(), '.next');
+          if (fs.existsSync(nextPath)) {
+            const nextContents = fs.readdirSync(nextPath);
+            console.log('📂 .next contents:', nextContents);
+
+            // Check .next/server if it exists
+            const serverPath = path.join(nextPath, 'server');
+            if (fs.existsSync(serverPath)) {
+              const serverContents = fs.readdirSync(serverPath);
+              console.log('📂 .next/server contents:', serverContents);
+            }
+
+            // Check .next/static if it exists
+            const staticPath = path.join(nextPath, 'static');
+            if (fs.existsSync(staticPath)) {
+              const staticContents = fs.readdirSync(staticPath);
+              console.log('📂 .next/static contents:', staticContents);
+            }
+          }
+        } catch (error) {
+          console.log(
+            '❌ Error exploring .next:',
+            error instanceof Error ? error.message : error
+          );
+        }
+      } catch (error) {
+        console.log(
+          '❌ Error in deep debugging:',
+          error instanceof Error ? error.message : error
+        );
+      }
+    }
+
     const possibleUrls = [`/${filename}`];
 
     console.log('🔍 Trying URLs:', possibleUrls);
