@@ -170,7 +170,17 @@ export async function loadGzippedData(filename: string): Promise<Uint8Array> {
       }
     }
 
-    const possibleUrls = [`/${filename}`];
+    const possibleUrls = isServerless
+      ? [
+          // For serverless, use absolute URLs
+          `https://${process.env.VERCEL_URL}/${filename}`,
+          // Try without custom domain as fallback
+          `https://land-estimator.vercel.app/${filename}`
+        ]
+      : [
+          // For browser, relative URLs work fine
+          `/${filename}`
+        ];
 
     console.log('🔍 Trying URLs:', possibleUrls);
 
