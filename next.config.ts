@@ -8,8 +8,10 @@ const nextConfig: NextConfig = {
   sassOptions: {
     includePaths: [path.join(__dirname, 'styles')]
   },
-  // Ensure data files are included in the build output
-  outputFileTracing: true,
+  // Include public files in serverless functions
+  experimental: {
+    serverComponentsExternalPackages: ['flexsearch']
+  },
   async headers() {
     return [
       // FlexSearch index headers removed - clients now use /api/lookup endpoint

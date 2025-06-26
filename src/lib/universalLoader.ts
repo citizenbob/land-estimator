@@ -91,24 +91,47 @@ export async function loadGzippedData(filename: string): Promise<Uint8Array> {
 
     const projectRoot = process.cwd();
 
-    // Try multiple possible locations for the file
-    const possiblePaths = [
-      path.join(projectRoot, 'public', filename),
-      path.join(projectRoot, '.next', 'server', 'public', filename),
-      path.join(projectRoot, '.next', 'static', filename),
-      // Fallback to root
-      path.join(projectRoot, filename),
-      // AWS Lambda specific path
-      `/var/task/public/${filename}`,
-      // Relative path fallback
-      `./public/${filename}`
-    ];
+    // Vercel-specific paths (production environment)
+    const isVercel = process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME;
+
+    let possiblePaths: string[];
+
+    if (isVercel) {
+      // Vercel moves public files to the root in production
+      possiblePaths = [
+        path.join(projectRoot, filename),
+        path.join('/var/task', filename),
+        path.join('/var/task/public', filename),
+        path.join(projectRoot, 'public', filename)
+      ];
+    } else {
+      // Local development paths
+      possiblePaths = [
+        path.join(projectRoot, 'public', filename),
+        path.join(projectRoot, '.next', 'server', 'public', filename),
+        path.join(projectRoot, '.next', 'static', filename),
+        path.join(projectRoot, filename),
+        `./public/${filename}`
+      ];
+    }
 
     for (const filePath of possiblePaths) {
       if (fs.existsSync(filePath)) {
+        console.log(`📁 Found file at: ${filePath}`);
         return fs.readFileSync(filePath);
       }
     }
+
+    // Debug: Log environment info in production
+    console.log('🔍 Debug info:', {
+      cwd: projectRoot,
+      isVercel,
+      env: {
+        VERCEL: process.env.VERCEL,
+        AWS_LAMBDA: process.env.AWS_LAMBDA_FUNCTION_NAME,
+        NODE_ENV: process.env.NODE_ENV
+      }
+    });
 
     // If no file found, throw error with all attempted paths
     throw new Error(
