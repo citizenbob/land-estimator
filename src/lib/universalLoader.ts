@@ -100,12 +100,18 @@ export async function loadGzippedData(filename: string): Promise<Uint8Array> {
   console.log('🔍 Is Serverless:', isServerless);
 
   if (isBrowser() || isServerless) {
-    // Try multiple URL patterns for Vercel
-    const possibleUrls = [`/${filename}`, `/public/${filename}`];
+    // For serverless environments, we need to use absolute URLs
+    // since relative URLs don't work in serverless functions
+    const possibleUrls = [];
 
-    // Add full URL for serverless
     if (isServerless && process.env.VERCEL_URL) {
+      // Try the deployment URL
       possibleUrls.push(`https://${process.env.VERCEL_URL}/${filename}`);
+      // Try production domain as fallback
+      possibleUrls.push(`https://land-estimator.vercel.app/${filename}`);
+    } else if (isBrowser()) {
+      // For browser, use relative URLs
+      possibleUrls.push(`/${filename}`, `/public/${filename}`);
     }
 
     console.log('🔍 Trying URLs:', possibleUrls);
