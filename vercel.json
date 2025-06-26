@@ -1,14 +1,13 @@
 {
-  "outputDirectory": ".next",
   "buildCommand": "npm run build",
   "functions": {
-    ".next/server/app/api/lookup/route.js": {
+    "src/app/api/lookup/route.ts": {
       "includeFiles": "public/**/*.gz"
     },
-    ".next/server/app/api/parcel-metadata/[id]/route.js": {
+    "src/app/api/parcel-metadata/[id]/route.ts": {
       "includeFiles": "public/**/*.gz"
     },
-    ".next/server/app/api/log/route.js": {
+    "src/app/api/log/route.ts": {
       "includeFiles": "public/**/*.gz"
     }
   }
