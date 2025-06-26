@@ -1,7 +1,9 @@
 {
+  "outputDirectory": ".next",
+  "buildCommand": "npm run build",
   "functions": {
-    "app/api/**/*.ts": {
-      "includeFiles": "public/**"
+    ".next/server/app/api/**/*.js": {
+      "includeFiles": "public/**/*.gz"
     }
   }
 }

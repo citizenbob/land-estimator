@@ -7,6 +7,7 @@ export interface NodeModules {
   fs: {
     readFileSync: (path: string) => Uint8Array;
     existsSync: (path: string) => boolean;
+    readdirSync: (path: string) => string[];
   };
   path: { join: (...paths: string[]) => string };
 }
@@ -63,7 +64,11 @@ export async function importNodeModules(): Promise<NodeModules> {
         // eslint-disable-next-line @typescript-eslint/no-require-imports
         const path = require('path');
         return {
-          fs: { readFileSync: fs.readFileSync, existsSync: fs.existsSync },
+          fs: {
+            readFileSync: fs.readFileSync,
+            existsSync: fs.existsSync,
+            readdirSync: fs.readdirSync
+          },
           path: { join: path.join }
         };
       } catch {
@@ -78,42 +83,73 @@ export async function importNodeModules(): Promise<NodeModules> {
  * Universal data loader that works in both browser and Node.js environments
  */
 export async function loadGzippedData(filename: string): Promise<Uint8Array> {
-  if (isBrowser()) {
-    const response = await fetch(`/${filename}`);
-    if (!response.ok) {
-      throw new Error(
-        `Failed to fetch ${filename}: ${response.status} ${response.statusText}`
-      );
-    }
-    return new Uint8Array(await response.arrayBuffer());
-  } else {
-    const { fs, path } = await importNodeModules();
+  // Add comprehensive debugging
+  console.log('🔍 Environment Debug:', {
+    isBrowser: isBrowser(),
+    VERCEL: process.env.VERCEL,
+    VERCEL_URL: process.env.VERCEL_URL,
+    AWS_LAMBDA: process.env.AWS_LAMBDA_FUNCTION_NAME,
+    NODE_ENV: process.env.NODE_ENV,
+    cwd: typeof process !== 'undefined' ? process.cwd() : 'browser'
+  });
 
+  const isServerless =
+    !isBrowser() &&
+    (process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME);
+
+  console.log('🔍 Is Serverless:', isServerless);
+
+  if (isBrowser() || isServerless) {
+    // Try multiple URL patterns for Vercel
+    const possibleUrls = [`/${filename}`, `/public/${filename}`];
+
+    // Add full URL for serverless
+    if (isServerless && process.env.VERCEL_URL) {
+      possibleUrls.push(`https://${process.env.VERCEL_URL}/${filename}`);
+    }
+
+    console.log('🔍 Trying URLs:', possibleUrls);
+
+    for (const url of possibleUrls) {
+      try {
+        console.log(`📁 Attempting fetch from: ${url}`);
+        const response = await fetch(url);
+
+        console.log(
+          '📊 Response status:',
+          response.status,
+          response.statusText
+        );
+
+        if (response.ok) {
+          console.log('✅ Successfully fetched file');
+          return new Uint8Array(await response.arrayBuffer());
+        }
+
+        console.log(`❌ Failed: ${response.status} ${response.statusText}`);
+      } catch (error) {
+        console.log(
+          `❌ Fetch error for ${url}:`,
+          error instanceof Error ? error.message : error
+        );
+      }
+    }
+
+    throw new Error(
+      `Failed to fetch ${filename} from any URL: ${possibleUrls.join(', ')}`
+    );
+  } else {
+    // Local development - read from filesystem
+    const { fs, path } = await importNodeModules();
     const projectRoot = process.cwd();
 
-    // Vercel-specific paths (production environment)
-    const isVercel = process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME;
-
-    let possiblePaths: string[];
-
-    if (isVercel) {
-      // Vercel moves public files to the root in production
-      possiblePaths = [
-        path.join(projectRoot, filename),
-        path.join('/var/task', filename),
-        path.join('/var/task/public', filename),
-        path.join(projectRoot, 'public', filename)
-      ];
-    } else {
-      // Local development paths
-      possiblePaths = [
-        path.join(projectRoot, 'public', filename),
-        path.join(projectRoot, '.next', 'server', 'public', filename),
-        path.join(projectRoot, '.next', 'static', filename),
-        path.join(projectRoot, filename),
-        `./public/${filename}`
-      ];
-    }
+    const possiblePaths = [
+      path.join(projectRoot, 'public', filename),
+      path.join(projectRoot, '.next', 'server', 'public', filename),
+      path.join(projectRoot, '.next', 'static', filename),
+      path.join(projectRoot, filename),
+      `./public/${filename}`
+    ];
 
     for (const filePath of possiblePaths) {
       if (fs.existsSync(filePath)) {
@@ -121,17 +157,6 @@ export async function loadGzippedData(filename: string): Promise<Uint8Array> {
         return fs.readFileSync(filePath);
       }
     }
-
-    // Debug: Log environment info in production
-    console.log('🔍 Debug info:', {
-      cwd: projectRoot,
-      isVercel,
-      env: {
-        VERCEL: process.env.VERCEL,
-        AWS_LAMBDA: process.env.AWS_LAMBDA_FUNCTION_NAME,
-        NODE_ENV: process.env.NODE_ENV
-      }
-    });
 
     // If no file found, throw error with all attempted paths
     throw new Error(
