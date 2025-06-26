@@ -32,6 +32,7 @@
     "storybook:build": "storybook build"
   },
   "dependencies": {
+    "@vercel/blob": "^1.1.1",
     "dotenv": "^16.5.0",
     "fflate": "^0.8.2",
     "firebase": "^11.5.0",
@@ -98,6 +99,7 @@
     "vite": "^6.0.0",
     "vitest": "^3.0.8",
     "vitest-axe": "^0.1.0",
+    "wrangler": "^4.22.0",
     "yarn-deduplicate": "^6.0.2"
   },
   "resolutions": {

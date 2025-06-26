@@ -1,0 +1,7 @@
+# Cloudflare Wrangler
+.wrangler/
+node_modules/
+
+# Local test files
+*.json.gz
+temp-*.json

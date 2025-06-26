@@ -1,0 +1,7 @@
+name = "land-estimator-kv-experiment"
+main = "worker.ts"
+compatibility_date = "2024-01-01"
+
+[[kv_namespaces]]
+binding = "ADDRESS_INDEX"
+id = "fef2cdcd164cd9880de236699f9156"
