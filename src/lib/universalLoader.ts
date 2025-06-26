@@ -99,9 +99,10 @@ export async function loadGzippedData(filename: string): Promise<Uint8Array> {
 
   console.log('🔍 Is Serverless:', isServerless);
 
-  if (isBrowser()) {
-    // Browser environment - use fetch with relative URLs
-    const possibleUrls = [`/${filename}`, `/public/${filename}`];
+  if (isBrowser() || isServerless) {
+    // Use HTTP fetch for both browser and serverless
+    // Files in public/ should be served as static assets by Vercel
+    const possibleUrls = [`/${filename}`];
 
     console.log('🔍 Trying URLs:', possibleUrls);
 
@@ -133,104 +134,6 @@ export async function loadGzippedData(filename: string): Promise<Uint8Array> {
     throw new Error(
       `Failed to fetch ${filename} from any URL: ${possibleUrls.join(', ')}`
     );
-  } else if (isServerless) {
-    // Serverless environment - try filesystem first (files should be bundled via includeFiles)
-    // then fallback to HTTP if needed
-    try {
-      const { fs, path } = await importNodeModules();
-      const serverlessRoot = process.cwd();
-
-      // Debug: List what files are actually available
-      console.log('🔍 Debugging serverless file system...');
-      try {
-        const rootFiles = fs.readdirSync(serverlessRoot);
-        console.log('📂 Root directory contents:', rootFiles);
-
-        // Check if public directory exists
-        const publicPath = path.join(serverlessRoot, 'public');
-        if (fs.existsSync(publicPath)) {
-          const publicFiles = fs.readdirSync(publicPath);
-          console.log('📂 Public directory contents:', publicFiles);
-        } else {
-          console.log('❌ Public directory does not exist');
-        }
-      } catch (error) {
-        console.log(
-          '❌ Error listing files:',
-          error instanceof Error ? error.message : error
-        );
-      }
-
-      // In Vercel serverless, files should be accessible at the function root
-      const possiblePaths = [
-        path.join(serverlessRoot, filename),
-        path.join(serverlessRoot, 'public', filename),
-        path.join(serverlessRoot, '.next', 'server', 'public', filename),
-        // Try direct paths that Vercel might use
-        `./public/${filename}`,
-        `./${filename}`
-      ];
-
-      console.log('🔍 Trying serverless filesystem paths:', possiblePaths);
-
-      for (const filePath of possiblePaths) {
-        try {
-          if (fs.existsSync(filePath)) {
-            console.log(`📁 Found file in serverless at: ${filePath}`);
-            return fs.readFileSync(filePath);
-          } else {
-            console.log(`❌ File not found at: ${filePath}`);
-          }
-        } catch (error) {
-          console.log(
-            `❌ Error accessing ${filePath}:`,
-            error instanceof Error ? error.message : error
-          );
-        }
-      }
-
-      // If filesystem fails, try HTTP as fallback
-      console.log('� Filesystem failed, trying HTTP fallback...');
-      const possibleUrls = [
-        `https://${process.env.VERCEL_URL}/${filename}`,
-        `https://land-estimator.vercel.app/${filename}`
-      ];
-
-      for (const url of possibleUrls) {
-        try {
-          console.log(`📁 Attempting fetch from: ${url}`);
-          const response = await fetch(url);
-
-          console.log(
-            '📊 Response status:',
-            response.status,
-            response.statusText
-          );
-
-          if (response.ok) {
-            console.log('✅ Successfully fetched file via HTTP');
-            return new Uint8Array(await response.arrayBuffer());
-          }
-        } catch (error) {
-          console.log(
-            `❌ HTTP fetch error for ${url}:`,
-            error instanceof Error ? error.message : error
-          );
-        }
-      }
-
-      throw new Error(
-        `Failed to load ${filename} in serverless environment. Tried filesystem paths: ${possiblePaths.join(
-          ', '
-        )} and URLs: ${possibleUrls.join(', ')}`
-      );
-    } catch (error) {
-      console.log(
-        '❌ Serverless loading failed:',
-        error instanceof Error ? error.message : error
-      );
-      throw error;
-    }
   } else {
     // Local development - read from filesystem
     const { fs, path } = await importNodeModules();

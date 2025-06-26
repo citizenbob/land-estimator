@@ -1,11 +1,3 @@
 {
-  "buildCommand": "npm run build",
-  "functions": {
-    "src/app/api/lookup/route.ts": {
-      "includeFiles": "public/*.gz"
-    },
-    "src/app/api/parcel-metadata/[id]/route.ts": {
-      "includeFiles": "public/*.gz"
-    }
-  }
+  "buildCommand": "npm run build"
 }
