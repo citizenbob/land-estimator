@@ -2,7 +2,13 @@
   "outputDirectory": ".next",
   "buildCommand": "npm run build",
   "functions": {
-    ".next/server/app/api/**/*.js": {
+    ".next/server/app/api/lookup/route.js": {
+      "includeFiles": "public/**/*.gz"
+    },
+    ".next/server/app/api/parcel-metadata/[id]/route.js": {
+      "includeFiles": "public/**/*.gz"
+    },
+    ".next/server/app/api/log/route.js": {
       "includeFiles": "public/**/*.gz"
     }
   }

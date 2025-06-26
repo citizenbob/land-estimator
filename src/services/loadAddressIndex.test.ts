@@ -151,7 +151,8 @@ describe('loadAddressIndex', () => {
       loadModule._setTestMockNodeModules({
         fs: {
           readFileSync: mockReadFileSync,
-          existsSync: mockExistsSync
+          existsSync: mockExistsSync,
+          readdirSync: vi.fn()
         },
         path: {
           join: mockJoin
@@ -192,7 +193,8 @@ describe('loadAddressIndex', () => {
       loadModule._setTestMockNodeModules({
         fs: {
           readFileSync: mockReadFileSync,
-          existsSync: mockExistsSync
+          existsSync: mockExistsSync,
+          readdirSync: vi.fn()
         },
         path: {
           join: mockJoin
@@ -222,7 +224,8 @@ describe('loadAddressIndex', () => {
       loadModule._setTestMockNodeModules({
         fs: {
           readFileSync: mockReadFileSync,
-          existsSync: mockExistsSync
+          existsSync: mockExistsSync,
+          readdirSync: vi.fn()
         },
         path: {
           join: mockJoin
@@ -411,7 +414,8 @@ describe('loadAddressIndex', () => {
       _setTestMockNodeModules({
         fs: {
           readFileSync: () => invalidGzipData,
-          existsSync: () => true
+          existsSync: () => true,
+          readdirSync: () => []
         },
         path: {
           join: (...paths) => paths.join('/')
@@ -462,7 +466,8 @@ describe('loadAddressIndex', () => {
       _setTestMockNodeModules({
         fs: {
           readFileSync: () => validGzipData,
-          existsSync: () => true
+          existsSync: () => true,
+          readdirSync: () => []
         },
         path: {
           join: (...paths) => paths.join('/')
