@@ -104,14 +104,6 @@ export async function loadGzippedData(filename: string): Promise<Uint8Array> {
       `./public/${filename}`
     ];
 
-    // DEBUG: Log which paths exist and what process.cwd() is
-    const existingPaths = possiblePaths.filter(fs.existsSync);
-    console.log(`[DEBUG] loadGzippedData: process.cwd() = ${projectRoot}`);
-    console.log(
-      `[DEBUG] loadGzippedData: existing paths for ${filename}:`,
-      existingPaths
-    );
-
     for (const filePath of possiblePaths) {
       if (fs.existsSync(filePath)) {
         return fs.readFileSync(filePath);

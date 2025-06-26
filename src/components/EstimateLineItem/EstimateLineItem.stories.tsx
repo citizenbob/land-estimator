@@ -44,9 +44,6 @@ export const Default: Story = {
   }
 };
 
-/**
- * Line item with lot size information
- */
 export const LotSize: Story = {
   args: {
     label: 'Lot Size',
@@ -55,9 +52,6 @@ export const LotSize: Story = {
   }
 };
 
-/**
- * Line item showing installation cost
- */
 export const InstallationCost: Story = {
   args: {
     label: 'Installation',
@@ -66,9 +60,6 @@ export const InstallationCost: Story = {
   }
 };
 
-/**
- * Line item showing maintenance cost
- */
 export const MaintenanceCost: Story = {
   args: {
     label: 'Maintenance',
@@ -77,9 +68,6 @@ export const MaintenanceCost: Story = {
   }
 };
 
-/**
- * Line item showing total estimate
- */
 export const TotalEstimate: Story = {
   args: {
     label: 'Total Estimate',

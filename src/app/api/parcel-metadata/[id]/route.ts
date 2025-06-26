@@ -1,6 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getParcelMetadata } from '@services/parcelMetadata';
+import { logError } from '@lib/errorUtils';
 
+/**
+ * Parcel metadata lookup endpoint
+ * @param request NextRequest instance
+ * @param params Route parameters containing parcel ID
+ * @returns JSON response with complete parcel metadata
+ */
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -18,7 +25,10 @@ export async function GET(
       headers: { 'Cache-Control': 'public, max-age=3600' }
     });
   } catch (err) {
-    console.error('Parcel metadata error:', err);
+    logError(err, {
+      operation: 'parcel_metadata_lookup',
+      parcelId: id
+    });
     return NextResponse.json({ error: 'Internal error' }, { status: 500 });
   }
 }

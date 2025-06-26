@@ -194,8 +194,15 @@ describe('addressSearch', () => {
 
       expect(results).toEqual([]);
       expect(consoleSpy).toHaveBeenCalledWith(
-        'Address search error:',
-        expect.any(Error)
+        '[Error]',
+        expect.objectContaining({
+          message: 'Index loading failed',
+          context: expect.objectContaining({
+            operation: 'address_search',
+            query: 'test',
+            limit: 10
+          })
+        })
       );
 
       consoleSpy.mockRestore();

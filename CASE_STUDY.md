@@ -116,13 +116,42 @@ vi.mock('@lib/universalBundleLoader', () => ({
 
 **Professional Recommendation:** Large data files should be treated as build artifacts or hosted on dedicated storage (like S3), not checked into version control. The build pipeline is the correct place to generate them.
 
-### Phase 4: Production-First Testing Strategy
+### Phase 4: Git LFS Production Reality Check
 
-**Lesson Learned:** Our biggest gap was not having tests that validated the actual deployment artifact behavior.
+**The Git LFS Experiment:** After removing large files from the repository, we implemented Git LFS to track the essential compressed `.gz` artifacts. This worked perfectly in development and local testing - our comprehensive test suite (199 tests) all passed, and the application ran flawlessly locally.
 
-**Solution Implemented:**
+**Production Deployment Crisis:** When we deployed to Vercel, the application failed completely. Despite Vercel's advertised Git LFS support, the platform served LFS pointer files instead of actual data files. Our production logs showed "File not found" errors for all index files, causing complete application failure.
 
-1. **Comprehensive Debug Logging:** Added detailed logging with emoji prefixes to trace requests through the production system, making issues immediately visible in deployment logs.
+**Key Learning:** Platform-specific features create hidden deployment dependencies. What works in development doesn't guarantee production success, especially with storage mechanisms that vary between platforms.
+
+**Git LFS Limitations Discovered:**
+
+- Vercel's Git LFS support is incomplete for public asset serving
+- LFS adds complexity and platform dependencies to the deployment pipeline
+- No clear error messaging when LFS files aren't properly resolved
+- Additional costs and storage management overhead
+
+### Phase 5: Firebase Storage Migration & Production-First Architecture
+
+**Lesson Learned:** The Git LFS production failure taught us that deployment environment parity is critical. We needed a platform-agnostic solution that would work reliably across all environments.
+
+**Solution Implemented - Complete Architecture Migration:**
+
+1. **Firebase Storage Migration:** Moved all large GIS data files to Firebase Storage, eliminating Git LFS dependencies and repository bloat. The build process now fetches processed data from cloud storage and generates optimized index files.
+
+```typescript
+// Cloud-first data loading approach
+async function fetchFileFromStorage(fileName: string): Promise<Buffer> {
+  const bucket = storageAdmin.bucket();
+  const file = bucket.file(`integration/${fileName}`);
+  const [data] = await file.download();
+  return data;
+}
+```
+
+2. **DRY Build Pipeline:** Refactored build scripts to use shared utilities (`buildUtils.ts`) that handle Firebase Storage fetching, file writing, and compression consistently across all build targets.
+
+3. **Comprehensive Debug Logging:** Added detailed logging with emoji prefixes to trace requests through the production system, making issues immediately visible in deployment logs.
 
 ```typescript
 // Production debugging approach
@@ -134,57 +163,95 @@ console.log('🚀 Starting searchAddresses for:', query.trim());
 console.log('✅ Search completed:', { resultCount: results.length });
 ```
 
-2. **Git LFS Abandonment:** Discovered Vercel's Git LFS limitations and pivoted to regular Git files. The compressed files (6MB, 36MB) were reasonable for direct Git storage, avoiding platform-specific LFS quirks.
+4. **Ultra-Compressed Production Files:** Implemented dual-output system generating both regular and ultra-compressed index files (73.7% compression ratio) for maximum production performance.
 
-3. **File Integrity Verification:** Added pre-push hooks that verify the actual content of data files, not just their Git status:
+5. **Production Build Integration:** Ensured Vercel's build process generates all required index files in the `public/` directory through the `yarn build` command sequence.
 
-```bash
-# Verify .gz files contain actual data, not LFS pointers
-if file public/*.gz | grep -q "text"; then
-  echo "❌ Found LFS pointer files instead of binary data"
-  exit 1
-fi
-```
+### Phase 6: Production Success & Performance Validation
 
-### Phase 5: Deployment Environment Parity
+**Problem:** After the Firebase Storage migration, we needed to validate that our new architecture actually solved the production deployment issues and performed well under real-world conditions.
 
-**Problem:** Production deployment failures that don't manifest in development or testing.
+**Validation Results:**
 
-**Solutions Implemented:**
+1. **Deployment Success:** Complete end-to-end build process works flawlessly on Vercel, generating all required index files during the build phase rather than relying on static assets.
 
-1. **Environment-Specific Integration Tests:** Created tests that use the actual file loading mechanism, not just mocked data.
-2. **Production Monitoring:** Enhanced error logging to provide actionable debugging information in production.
-3. **Platform-Agnostic Asset Strategy:** Moved away from platform-specific features (Git LFS) to universally supported approaches (regular Git files with compression).
+2. **Performance Metrics:** Build process generates 6MB address index + 32MB parcel metadata + 22MB ultra-compressed files in under 40 seconds with perfect reliability.
 
-## Developer's Retrospective & Production Lessons
+3. **Production Monitoring:** Enhanced error logging provides immediate actionable debugging information in production deployments.
 
-This refactoring was an exercise in discipline, but the production deployment challenges taught us about the limits of local development confidence. My initial bias was not towards prototyping, but towards localized solutions and over-trusting that "it works on my machine" translates to production success.
+4. **Architecture Validation:** Cloud-native approach eliminates all platform-specific dependencies and repository bloat while maintaining development/production parity.
+
+## Developer's Retrospective: From Local Confidence to Production Reality
+
+This refactoring journey was more than an exercise in discipline—it was a masterclass in the difference between "it works on my machine" and production-ready architecture. The progression from Git LFS to Firebase Storage taught us critical lessons about deployment environment dependencies and the limits of local development confidence.
+
+### The Complete Journey: Repository Bloat → Git LFS → Production Failure → Firebase Storage Success
+
+**Phase 1: Repository Bloat Crisis**
+
+- 179MB-815MB data files exceeded GitHub limits
+- CI/CD pipeline slowed to a crawl
+- Clear need for better data management strategy
+
+**Phase 2: Git LFS "Solution"**
+
+- Implemented Git LFS for large file management
+- Perfect development environment experience
+- All 199 tests passed locally
+- False confidence in production readiness
+
+**Phase 3: Production Reality Check**
+
+- Vercel deployment complete failure despite "Git LFS support"
+- LFS pointer files served instead of actual data
+- No clear error messaging or debugging path
+- Complete application failure in production
+
+**Phase 4: Firebase Storage Migration**
+
+- Cloud-native architecture eliminated platform dependencies
+- Build-time data generation replaced static file serving
+- Perfect development/production parity achieved
+- Robust 40-second build process with comprehensive logging
 
 ### Critical Production Insights
 
-1. **Platform-Specific Integrations Are Risky:** Git LFS seemed like the right solution until we discovered Vercel's implementation serves pointer files instead of actual content for public assets. This taught us to be skeptical of platform-specific features and favor universally supported approaches.
+1. **Platform-Specific Features Are Architectural Risks:** Git LFS appeared to be a perfect solution until production deployment revealed platform-specific limitations. Vercel's "Git LFS support" doesn't extend to serving LFS files as public assets.
 
-2. **Mocked Tests Miss Real-World Integration Issues:** Our comprehensive 199-test suite all passed, but none caught the production file loading failure because they used mocked data. We needed more integration tests that exercise actual file system operations.
+2. **Cloud-Native Architecture Delivers on Promises:** Firebase Storage eliminated all platform dependencies and repository bloat. The build process now fetches fresh data and generates optimized index files with perfect reliability across all environments.
 
-3. **Debug Logging Is Production Insurance:** The emoji-prefixed logging we added (`🔍`, `🚀`, `✅`, `❌`) made production debugging immediate and actionable. This should have been part of the initial implementation, not a reactive addition.
+3. **Local Test Success ≠ Production Success:** Our comprehensive 199-test suite all passed with Git LFS, but none caught the production file loading failure because they used mocked data. We needed production-aware integration testing.
 
-4. **Git Hooks Are Prevention, Not Detection:** Our robust pre-commit/pre-push hooks prevent many issues but don't catch deployment environment mismatches. They complement but don't replace production monitoring and integration testing.
+4. **Build-Time Generation > Static Assets:** Moving from pre-built static files to dynamic generation during deployment eliminated storage platform dependencies and ensured fresh data in every build.
 
-### What Would Have Prevented the Production Issues
+5. **Debug Logging Is Production Insurance:** The emoji-prefixed logging we added (`🔍`, `🚀`, `✅`, `❌`) made production debugging immediate and actionable. This should have been part of the initial implementation, not a reactive addition.
 
-1. **Deployment Environment Integration Tests:** Tests that run against the actual build artifacts in a production-like environment
-2. **Platform-Agnostic Architecture Decisions:** Avoiding Git LFS in favor of direct Git storage or CDN-based assets
-3. **Production-First Logging Strategy:** Comprehensive logging implemented from the start, not reactively
-4. **Continuous Deployment Validation:** Automated tests that run against the deployed application, not just the build artifacts
+### What Actually Solved the Production Issues
 
-### Alternative Approaches We Should Have Considered Earlier
+**The Git LFS Approach (Failed):**
 
-Instead of reactive problem-solving, we could have been more proactive:
+- ❌ Platform-specific dependencies created deployment failures
+- ❌ No clear error messaging when LFS files aren't resolved
+- ❌ Additional complexity and storage management overhead
+- ❌ Perfect local experience that didn't translate to production
 
-1. **Infrastructure as Code:** Use tools like Terraform or CDK to ensure development/production parity
-2. **Contract Testing:** Test the actual APIs and file structures that production depends on
-3. **Blue-Green Deployments:** Deploy to a staging environment identical to production before promoting
-4. **Observability-First Development:** Build telemetry and monitoring into the application from day one
+**The Firebase Storage Approach (Success):**
+
+1. **Cloud-Native Data Architecture:** Firebase Storage eliminated all platform-specific file handling issues
+2. **Build-Time Data Generation:** Dynamic index generation during deployment instead of relying on static assets
+3. **Comprehensive Build Integration:** Proper `yarn build` sequence that generates all required files before Next.js compilation
+4. **DRY Build Utilities:** Shared utilities that ensure consistent data handling across all build targets
+5. **Production-First Logging Strategy:** Comprehensive logging implemented throughout the pipeline
+
+### Alternative Approaches That Proved Successful
+
+After trying reactive problem-solving, we found the right proactive approach:
+
+1. **Cloud-First Architecture:** Firebase Storage for data hosting with dynamic build-time generation
+2. **Shared Build Utilities:** DRY, reusable utilities for consistent data handling across all build targets
+3. **Production Build Integration:** Proper build sequence that generates all required files during deployment
+4. **Ultra-Compression Strategy:** Dual-output system (regular + ultra-compressed) for maximum performance
+5. **Observability-First Development:** Comprehensive logging and monitoring built into the application from the start
 
 My key takeaway is that practices like TDD, DRY, and a clear testing strategy are not academic exercises; they are pragmatic tools for maintaining velocity in a professional environment. However, they must be complemented by production-awareness: understanding how your code will actually run in the deployment environment, not just how it runs on your development machine. This case study reflects my journey in applying these principles while learning the critical importance of deployment environment parity.
 

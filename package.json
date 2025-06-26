@@ -8,8 +8,8 @@
     "build": "yarn build:address-index && yarn build:parcel-index && next build",
     "postbuild": "bash -c 'echo \"Verifying data files...\"; ls -la public/*.gz || echo \"Warning: .gz files not found\"'",
     "build:full": "yarn build:address-index && yarn build:parcel-index && NODE_OPTIONS='--max-old-space-size=16384' yarn build",
-    "build:address-index": "tsx src/data/build-address-index.ts",
-    "build:parcel-index": "tsx src/data/build-parcel-index.ts",
+    "build:address-index": "tsx src/config/scripts/build-address-index.ts",
+    "build:parcel-index": "tsx src/config/scripts/build-parcel-index.ts",
     "build:tokens": "npx style-dictionary build --config ./style-dictionary.config.mjs",
     "start": "next start",
     "clean": "yarn format && yarn lint:fix",
@@ -23,7 +23,7 @@
     "test": "vitest --watch",
     "test:run": "vitest run",
     "test:coverage": "vitest run --coverage",
-    "test:python": "pip install -r src/data/requirements.txt && python -m unittest discover src/data 'test_*.py'",
+    "test:python": "pip install -r src/config/scripts/requirements.txt && python -m unittest discover src/data 'test_*.py'",
     "test:e2e": "bash -c 'echo \"Ensuring data files are available...\"; ls -la public/address-index.json.gz public/parcel-metadata.json.gz; echo \"Stopping any existing dev server...\"; pkill -f \"next dev\" || true; sleep 2; echo \"Starting fresh dev server...\"; yarn dev & DEV_PID=$!; sleep 10; echo \"Waiting for server to be ready...\"; until curl -s http://localhost:3000 > /dev/null; do sleep 1; done; echo \"Running E2E tests...\"; (yarn test:performance && cypress run); TEST_RESULT=$?; echo \"Stopping dev server...\"; kill $DEV_PID || true; sleep 2; exit $TEST_RESULT'",
     "test:performance": "node test-address-index-performance.js",
     "test:e2e:open": "cypress open",
@@ -32,6 +32,7 @@
     "storybook:build": "storybook build"
   },
   "dependencies": {
+    "dotenv": "^16.5.0",
     "fflate": "^0.8.2",
     "firebase": "^11.5.0",
     "firebase-admin": "^13.3.0",

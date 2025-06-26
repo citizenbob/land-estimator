@@ -307,3 +307,66 @@ export const MOCK_PARCEL_METADATA = [
     processed_date: '2025-01-02'
   }
 ];
+
+/**
+ * Mock estimate data for BI logging tests
+ */
+export const MOCK_BI_TEST_DATA = {
+  ESTIMATE: {
+    address: {
+      display_name: '1234 Test Street, City, State, 12345',
+      lat: 37.7749,
+      lon: -122.4194
+    },
+    lotSizeSqFt: 10000,
+    baseRatePerSqFt: { min: 4.5, max: 12 },
+    designFee: 900,
+    installationCost: 82500,
+    maintenanceMonthly: 250,
+    subtotal: { min: 45000, max: 120000 },
+    minimumServiceFee: 400,
+    finalEstimate: { min: 45000, max: 120000 }
+  }
+};
+
+/**
+ * Common API response mocks for testing
+ */
+export const MOCK_API_RESPONSES = {
+  ADDRESS_INDEX: {
+    gzipSuccess: {
+      ok: true,
+      arrayBuffer: () => Promise.resolve(new ArrayBuffer(0)),
+      json: () => Promise.resolve(MOCK_ADDRESS_INDEX_INDEX_DATA)
+    },
+    gzipInvalid: {
+      ok: true,
+      arrayBuffer: () => Promise.resolve(new ArrayBuffer(0)),
+      json: () => Promise.reject(new Error('Invalid gzip data'))
+    },
+    notFound: {
+      ok: false,
+      status: 404,
+      statusText: 'Not Found'
+    }
+  },
+  LOOKUP: {
+    success: (
+      query: string,
+      results: Array<{ id: string; display_name: string; region: string }>
+    ) => ({
+      ok: true,
+      json: () =>
+        Promise.resolve({
+          query,
+          results,
+          count: results.length
+        })
+    })
+  }
+} as const;
+
+/**
+ * Mock gzipped data for testing compression/decompression
+ */
+export const MOCK_GZIPPED_DATA = new Uint8Array([0x1f, 0x8b, 0x08, 0x00]);

@@ -1,5 +1,6 @@
 import FlexSearch from 'flexsearch';
 import { createUniversalBundleLoader } from '@lib/universalBundleLoader';
+import { AppError, ErrorType } from '@lib/errorUtils';
 import type { NodeModules } from '@lib/universalLoader';
 
 /**
@@ -49,8 +50,10 @@ function createSearchIndex(
 async function loadRawAddressData(): Promise<
   FlexSearch.PrecomputedIndexData[]
 > {
-  throw new Error(
-    'Address index requires optimized .gz data - no raw fallback available'
+  throw new AppError(
+    'Address index requires optimized .gz data - no raw fallback available',
+    ErrorType.VALIDATION,
+    { isRetryable: false }
   );
 }
 

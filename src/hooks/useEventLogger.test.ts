@@ -73,8 +73,14 @@ describe('useEventLogger', () => {
     });
 
     expect(console.error).toHaveBeenCalledWith(
-      'Error logging event: estimate_button_clicked',
-      testError
+      '[Error]',
+      expect.objectContaining({
+        message: 'Test error',
+        context: expect.objectContaining({
+          operation: 'event_logging',
+          eventName: 'estimate_button_clicked'
+        })
+      })
     );
   });
 });

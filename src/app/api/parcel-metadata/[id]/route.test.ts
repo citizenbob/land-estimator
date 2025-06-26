@@ -104,8 +104,14 @@ describe('/api/parcel-metadata/[id] route', () => {
       expect(response.status).toBe(500);
       expect(data).toEqual({ error: 'Internal error' });
       expect(consoleErrorSpy).toHaveBeenCalledWith(
-        'Parcel metadata error:',
-        expect.any(Error)
+        '[Error]',
+        expect.objectContaining({
+          message: 'Database connection failed',
+          context: expect.objectContaining({
+            operation: 'parcel_metadata_lookup',
+            parcelId: '123'
+          })
+        })
       );
 
       consoleErrorSpy.mockRestore();

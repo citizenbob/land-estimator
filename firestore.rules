@@ -7,6 +7,10 @@ service cloud.firestore {
       allow read: if true;
       allow update, delete: if false;
     }
+    match /data/{document=**} {
+      allow read: if true; // Allow reads for testing
+      allow write: if request.auth != null; // Restrict writes to authenticated users
+    }
     match /{document=**} {
       allow read, write: if false; // Everything else locked down
     }

@@ -1,6 +1,7 @@
 import { useState, useCallback } from 'react';
 import { EnrichedAddressSuggestion } from '@typez/addressMatchTypes';
 import { estimateLandscapingPrice } from '@services/landscapeEstimator';
+import { createInsufficientDataError, getErrorMessage } from '@lib/errorUtils';
 
 /**
  * Options for the landscape estimator hook
@@ -95,7 +96,10 @@ export function useLandscapeEstimator() {
         !addressData.calc?.estimated_landscapable_area ||
         addressData.calc.estimated_landscapable_area === 0
       ) {
-        throw new Error('INSUFFICIENT_DATA');
+        throw createInsufficientDataError({
+          address: addressData.display_name,
+          landscapableArea: addressData.calc?.estimated_landscapable_area
+        });
       }
 
       const landAreaSqFt = addressData.calc.estimated_landscapable_area;
@@ -134,18 +138,17 @@ export function useLandscapeEstimator() {
       setStatus('complete');
       return result;
     } catch (err) {
-      if (err instanceof Error && err.message === 'INSUFFICIENT_DATA') {
+      const errorMessage = getErrorMessage(err);
+
+      // Check if it's an insufficient data error from errorUtils
+      if (
+        err instanceof Error &&
+        err.message.includes('Insufficient data for automatic estimate')
+      ) {
         setError('INSUFFICIENT_DATA');
         setStatus('error');
-        throw new Error(
-          'Insufficient data for automatic estimate. In-person consultation required.'
-        );
+        throw err;
       }
-
-      const errorMessage =
-        err instanceof Error
-          ? err.message
-          : 'An unknown error occurred while calculating the estimate';
 
       setError(errorMessage);
       setStatus('error');

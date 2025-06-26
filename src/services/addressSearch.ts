@@ -1,4 +1,5 @@
 import { loadAddressIndex } from '@services/loadAddressIndex';
+import { createNetworkError, logError } from '@lib/errorUtils';
 import type FlexSearch from 'flexsearch';
 
 export interface AddressLookupRecord {
@@ -90,8 +91,9 @@ export async function searchAddresses(
         `/api/lookup?query=${encodeURIComponent(query.trim())}`
       );
       if (!response.ok) {
-        throw new Error(
-          `Lookup failed: ${response.status} ${response.statusText}`
+        throw createNetworkError(
+          `Lookup failed: ${response.status} ${response.statusText}`,
+          { status: response.status, statusText: response.statusText }
         );
       }
       const { results } = await response.json();
@@ -110,7 +112,11 @@ export async function searchAddresses(
 
     return formatSearchResults(searchResults, addressSearchBundle, limit);
   } catch (error) {
-    console.error('Address search error:', error);
+    logError(error, {
+      operation: 'address_search',
+      query,
+      limit
+    });
     return [];
   }
 }

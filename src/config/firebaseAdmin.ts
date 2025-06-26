@@ -1,51 +1,61 @@
-import * as admin from 'firebase-admin';
+import { initializeApp, cert, getApps, type App } from 'firebase-admin/app';
+import { getFirestore } from 'firebase-admin/firestore';
+import { getStorage } from 'firebase-admin/storage';
+import { validateFirebaseCredentials } from '../lib/envValidation';
+import { logError } from '@lib/errorUtils';
 
-const hasCredentials =
-  process.env.FIREBASE_PROJECT_ID &&
-  process.env.FIREBASE_CLIENT_EMAIL &&
-  process.env.FIREBASE_PRIVATE_KEY;
+let firebaseApp: App | null = null;
 
-const privateKey = process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, '\n');
-
-function initializeFirebase() {
-  if (!hasCredentials) {
-    console.warn(
-      'Firebase credentials missing - Firebase services not initialized'
-    );
-    return false;
+function ensureFirebaseApp(): App {
+  if (firebaseApp) {
+    return firebaseApp;
   }
 
-  if (!admin.apps.length) {
-    try {
-      admin.initializeApp({
-        credential: admin.credential.cert({
-          projectId: process.env.FIREBASE_PROJECT_ID,
-          clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
-          privateKey: privateKey
-        })
-      });
-      return true;
-    } catch (error: unknown) {
-      if (error instanceof Error) {
-        console.error('Firebase Admin SDK initialization error:', error.stack);
-      } else {
-        console.error('Firebase Admin SDK initialization error:', error);
-      }
-      return false;
+  validateFirebaseCredentials();
+
+  const privateKey = process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, '\n');
+
+  try {
+    // Check if an app is already initialized
+    const existingApps = getApps();
+    if (existingApps.length > 0) {
+      firebaseApp = existingApps[0];
+      console.log('✅ Using existing Firebase Admin app');
+      return firebaseApp;
     }
-  }
 
-  return true;
+    firebaseApp = initializeApp({
+      credential: cert({
+        projectId: process.env.FIREBASE_PROJECT_ID!,
+        clientEmail: process.env.FIREBASE_CLIENT_EMAIL!,
+        privateKey: privateKey!
+      }),
+      storageBucket: `${process.env.FIREBASE_PROJECT_ID}.firebasestorage.app`
+    });
+
+    console.log('✅ Firebase Admin SDK initialized successfully');
+    return firebaseApp;
+  } catch (error: unknown) {
+    logError(error, {
+      operation: 'firebase_admin_init'
+    });
+    throw error;
+  }
 }
 
-const isInitialized = initializeFirebase();
+export const firestoreAdmin = {
+  collection(name: string) {
+    return getFirestore(ensureFirebaseApp()).collection(name);
+  }
+};
 
-const firestoreAdmin = isInitialized
-  ? admin.firestore()
-  : ({
-      collection: () => ({
-        /* mock implementation */
-      })
-    } as unknown as admin.firestore.Firestore);
+export const storageAdmin = {
+  bucket() {
+    return getStorage(ensureFirebaseApp()).bucket();
+  }
+};
 
-export { admin, firestoreAdmin };
+// For backwards compatibility
+export const admin = {
+  apps: getApps
+};

@@ -177,8 +177,15 @@ describe('/api/lookup route', () => {
         error: 'Internal server error'
       });
       expect(consoleErrorSpy).toHaveBeenCalledWith(
-        '❌ Address lookup error:',
-        expect.any(Error)
+        '[Error]',
+        expect.objectContaining({
+          message: 'Service unavailable',
+          context: expect.objectContaining({
+            operation: 'api_lookup',
+            endpoint: '/api/lookup',
+            query: 'test query'
+          })
+        })
       );
 
       consoleErrorSpy.mockRestore();

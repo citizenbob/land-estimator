@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { estimateLandscapingPrice } from './landscapeEstimator';
 
 describe('landscapeEstimator', () => {
+  // Mock bounding box representing approximately 1 acre (43,560 sq ft)
   const oneAcreBoundingBox = [
     '37.4215',
     '37.4225',
@@ -9,6 +10,7 @@ describe('landscapeEstimator', () => {
     '-122.0835'
   ] as [string, string, string, string];
 
+  // Mock bounding box for a smaller area
   const smallerBoundingBox = [
     '37.4215',
     '37.4220',
@@ -16,6 +18,7 @@ describe('landscapeEstimator', () => {
     '-122.0840'
   ] as [string, string, string, string];
 
+  // Mock bounding box for a tiny area that should trigger minimum service fee
   const tinyBoundingBox = [
     '37.4215',
     '37.42151',
@@ -27,6 +30,7 @@ describe('landscapeEstimator', () => {
     it('should return a complete price breakdown object', () => {
       const result = estimateLandscapingPrice(oneAcreBoundingBox);
 
+      // Verify the output structure is correct
       expect(result).toHaveProperty('lotSizeSqFt');
       expect(result).toHaveProperty('baseRatePerSqFt');
       expect(result).toHaveProperty('designFee');
@@ -40,6 +44,7 @@ describe('landscapeEstimator', () => {
     it('should calculate base rates correctly for residential projects', () => {
       const result = estimateLandscapingPrice(oneAcreBoundingBox);
 
+      // Base rate for residential should match config values
       expect(result.baseRatePerSqFt.min).toEqual(4.5);
       expect(result.baseRatePerSqFt.max).toEqual(12);
     });
@@ -48,6 +53,7 @@ describe('landscapeEstimator', () => {
       const result1 = estimateLandscapingPrice(oneAcreBoundingBox);
       const result2 = estimateLandscapingPrice(smallerBoundingBox);
 
+      // The larger bounding box should yield a larger area
       expect(result1.lotSizeSqFt).toBeGreaterThan(result2.lotSizeSqFt);
     });
 

@@ -1,6 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { searchAddresses } from '@services/addressSearch';
+import { logError } from '@lib/errorUtils';
 
+/**
+ * Address lookup endpoint with fuzzy search capabilities
+ * @param request NextRequest containing search query parameter
+ * @returns JSON response with matching addresses and metadata
+ */
 export async function GET(request: NextRequest) {
   try {
     const searchParams = request.nextUrl.searchParams;
@@ -37,11 +43,11 @@ export async function GET(request: NextRequest) {
 
     return response;
   } catch (error) {
-    console.error('❌ Address lookup error:', error);
-    console.error(
-      'Stack trace:',
-      error instanceof Error ? error.stack : 'Unknown error'
-    );
+    logError(error, {
+      operation: 'api_lookup',
+      endpoint: '/api/lookup',
+      query: request.nextUrl.searchParams.get('query')
+    });
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }

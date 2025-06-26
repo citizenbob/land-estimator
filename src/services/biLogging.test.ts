@@ -3,6 +3,7 @@ import { logEstimateForBI } from '@services/biLogging';
 import { logEvent } from '@services/logger';
 import type { EstimateResult } from '@typez/landscapeEstimatorTypes';
 import type { EnrichedAddressSuggestion } from '@typez/addressMatchTypes';
+import { MOCK_ENRICHED_ADDRESS_DATA, MOCK_BI_TEST_DATA } from '@lib/testData';
 
 vi.mock('@services/logger', () => ({
   logEvent: vi.fn()
@@ -20,36 +21,8 @@ describe('biLogging', () => {
   });
 
   describe('logEstimateForBI', () => {
-    const mockEstimate: EstimateResult = {
-      address: {
-        display_name: '1234 Test Street, City, State, 12345',
-        lat: 37.7749,
-        lon: -122.4194
-      },
-      lotSizeSqFt: 10000,
-      baseRatePerSqFt: { min: 4.5, max: 12 },
-      designFee: 900,
-      installationCost: 82500,
-      maintenanceMonthly: 250,
-      subtotal: { min: 45000, max: 120000 },
-      minimumServiceFee: 400,
-      finalEstimate: { min: 45000, max: 120000 }
-    };
-
-    const mockAddressData: EnrichedAddressSuggestion = {
-      place_id: 'test_place_123',
-      display_name: '1234 Test Street, City, State, 12345',
-      latitude: 37.7749,
-      longitude: -122.4194,
-      region: 'Missouri',
-      calc: {
-        landarea: 10000,
-        building_sqft: 2000,
-        estimated_landscapable_area: 8000,
-        property_type: 'residential'
-      },
-      affluence_score: 0.75
-    };
+    const mockEstimate: EstimateResult = MOCK_BI_TEST_DATA.ESTIMATE;
+    const mockAddressData = MOCK_ENRICHED_ADDRESS_DATA;
 
     const mockSelectedServices = ['design', 'installation'];
     const mockHasCustomLotSize = false;
@@ -66,7 +39,7 @@ describe('biLogging', () => {
       expect(mockLogEvent).toHaveBeenCalledWith(
         'estimate_generated',
         {
-          address_id: 'test_place_123',
+          address_id: '12345',
           full_address: '1234 Test Street, City, State, 12345',
           region: 'Missouri',
           latitude: 37.7749,
@@ -75,7 +48,7 @@ describe('biLogging', () => {
           building_size_sqft: 2000,
           estimated_landscapable_area: 8000,
           property_type: 'residential',
-          affluence_score: 0.75,
+          affluence_score: 75,
           selected_services: ['design', 'installation'],
           design_fee: 900,
           installation_cost: 82500,
@@ -87,7 +60,7 @@ describe('biLogging', () => {
           price_per_sqft_max: 12,
           is_commercial: true,
           has_custom_lot_size: false,
-          lead_score: Math.round(0.75 * 10 + Math.min(82500 / 1000, 50)),
+          lead_score: Math.round(75 * 10 + Math.min(82500 / 1000, 50)),
           market_segment: 'luxury'
         },
         {

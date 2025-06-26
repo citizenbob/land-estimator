@@ -104,8 +104,14 @@ describe('logEvent', () => {
     ).resolves.not.toThrow();
 
     expect(consoleSpies.errorSpy).toHaveBeenCalledWith(
-      'Error logging event to Mixpanel:',
-      expect.any(Error)
+      '[Error]',
+      expect.objectContaining({
+        message: 'Mixpanel error',
+        context: expect.objectContaining({
+          operation: 'mixpanel_track',
+          eventName: 'address_selected'
+        })
+      })
     );
   });
 
@@ -120,8 +126,22 @@ describe('logEvent', () => {
     ).resolves.not.toThrow();
 
     expect(consoleSpies.errorSpy).toHaveBeenCalledWith(
-      expect.stringContaining('Error logging event to Firestore via API: 500'),
-      expect.any(Object)
+      '[Error]',
+      expect.objectContaining({
+        message: expect.stringContaining(
+          'Error logging event to Firestore via API: 500'
+        ),
+        context: expect.objectContaining({
+          operation: 'firestore_log',
+          eventName: 'address_selected'
+        }),
+        type: 'NETWORK_ERROR',
+        isRetryable: true,
+        errorContext: expect.objectContaining({
+          status: 500,
+          statusText: 'Internal Server Error'
+        })
+      })
     );
   });
 
@@ -136,8 +156,14 @@ describe('logEvent', () => {
     ).resolves.not.toThrow();
 
     expect(consoleSpies.errorSpy).toHaveBeenCalledWith(
-      'Error sending log event to API:',
-      expect.any(Error)
+      '[Error]',
+      expect.objectContaining({
+        message: 'Network failed',
+        context: expect.objectContaining({
+          operation: 'firestore_log',
+          eventName: 'address_selected'
+        })
+      })
     );
   });
 

@@ -27,12 +27,12 @@ describe('parcelMetadata service', () => {
   });
 
   it('getParcelMetadata returns correct metadata or null', async () => {
-    const p1 = await getParcelMetadata('p1');
-    expect(p1).not.toBeNull();
-    expect(p1?.id).toBe('p1');
+    const firstParcel = await getParcelMetadata('p1');
+    expect(firstParcel).not.toBeNull();
+    expect(firstParcel?.id).toBe('p1');
 
-    const missing = await getParcelMetadata('unknown');
-    expect(missing).toBeNull();
+    const missingParcel = await getParcelMetadata('unknown');
+    expect(missingParcel).toBeNull();
   });
 
   it('getBulkParcelMetadata returns only found items', async () => {

@@ -1,5 +1,6 @@
 import mixpanel from 'mixpanel-browser';
 import { EventMap, LogOptions } from '../types/analytics';
+import { logError, createNetworkError } from '@lib/errorUtils';
 
 /**
  * Logs an event to tracking and analytics platforms
@@ -28,7 +29,10 @@ export async function logEvent<T extends keyof EventMap>(
     try {
       mixpanel.track(String(eventName), enrichedData);
     } catch (error: unknown) {
-      console.error('Error logging event to Mixpanel:', error);
+      logError(error, {
+        operation: 'mixpanel_track',
+        eventName: String(eventName)
+      });
     }
   }
 
@@ -44,13 +48,20 @@ export async function logEvent<T extends keyof EventMap>(
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
-        console.error(
+        throw createNetworkError(
           `Error logging event to Firestore via API: ${response.status} ${response.statusText}`,
-          errorData
+          {
+            status: response.status,
+            statusText: response.statusText,
+            errorData
+          }
         );
       }
     } catch (error: unknown) {
-      console.error('Error sending log event to API:', error);
+      logError(error, {
+        operation: 'firestore_log',
+        eventName: String(eventName)
+      });
     }
   }
 }

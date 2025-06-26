@@ -69,18 +69,9 @@ next-env.d.ts
 /public/address-index.backup.json
 /public/parcel-metadata.backup.json
 
-# Keep essential GIS source files for processing
-# Note: Shapefiles and CSV files are kept for processing
+# Symlinked data directory: ignore its contents, allow the symlink
+/src/data/*
+!/src/data
+# (actual data files live in ../land-estimator-data LFS repo)
 
-# Exclude large intermediate processed files (keep essential source JSON files)
-src/data/saint_louis_city/saint_louis_city-processed.json
-src/data/saint_louis_county/saint_louis_county-processed.json
-src/data/saint_louis_county/saint_louis_county-optimized.json
-src/data/parcel_geometry_index.json
-src/data/*-processed.json
-src/data/*-optimized.json
-src/data/*.geojson
-
-# Keep essential build source files:
-# - src/data/address_index.json (when regenerated)
-# - src/data/parcel_metadata.json (when regenerated)
+## (Large data files are symlinked into /data; no deeper ignores required)

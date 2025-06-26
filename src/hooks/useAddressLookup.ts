@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { AddressLookupRecord } from '@services/addressSearch';
 import { LocalAddressRecord } from '@typez/localAddressTypes';
+import { createNetworkError, getErrorMessage, logError } from '@lib/errorUtils';
 
 export function useAddressLookup() {
   const [query, setQuery] = useState<string>('');
@@ -34,8 +35,9 @@ export function useAddressLookup() {
           `/api/lookup?query=${encodeURIComponent(value)}`
         );
         if (!response.ok) {
-          throw new Error(
-            `Failed to fetch address suggestions: ${response.status} ${response.statusText}`
+          throw createNetworkError(
+            `Failed to fetch address suggestions: ${response.status} ${response.statusText}`,
+            { status: response.status, statusText: response.statusText }
           );
         }
         const responseData = await response.json();
@@ -55,12 +57,12 @@ export function useAddressLookup() {
         setSuggestions(simplified);
         setHasFetched(true);
       } catch (err: unknown) {
-        console.error('Failed to fetch or process address suggestions:', err);
-        if (err instanceof Error) {
-          setError(err.message);
-        } else {
-          setError('An unknown error occurred');
-        }
+        logError(err, {
+          operation: 'address_lookup',
+          query: value
+        });
+        const errorMessage = getErrorMessage(err);
+        setError(errorMessage);
         setSuggestions([]);
         setHasFetched(true);
       } finally {
@@ -106,7 +108,10 @@ export function useAddressLookup() {
         }
       }
     } catch (error) {
-      console.error('Failed to fetch parcel metadata for ID:', id, error);
+      logError(error, {
+        operation: 'parcel_metadata_fetch',
+        id
+      });
     }
 
     return {

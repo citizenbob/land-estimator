@@ -3,26 +3,49 @@ import tokens from '@tokens/tokens.json';
 import { getToken } from '@tokens/tokenUtils';
 
 export const CalculatorContainer = styled.div.attrs(() => ({
-  className: 'estimate-calculator space-y-4'
-}))``;
-
-export const Title = styled.h2.attrs(() => ({
-  className: 'text-xl font-semibold'
+  className: 'estimate-calculator rounded-md shadow-sm'
 }))`
-  color: ${({ theme }) =>
+  padding: ${({ theme }) =>
+    getToken(theme, 'spacing.base.value', tokens.spacing.base.value)};
+  border: 1px solid
+    ${({ theme }) =>
+      getToken(
+        theme,
+        'colors.light.gray200.value',
+        tokens.colors.light.gray200.value
+      )};
+  background: ${({ theme }) =>
     getToken(
       theme,
-      'colors.light.gray900.value',
-      tokens.colors.light.gray900.value
+      'colors.light.background.value',
+      tokens.colors.light.background.value
     )};
 
   @media (prefers-color-scheme: dark) {
-    color: ${({ theme }) =>
+    border-color: ${({ theme }) =>
       getToken(
         theme,
-        'colors.dark.gray900.value',
-        tokens.colors.dark.gray900.value
+        'colors.dark.gray300.value',
+        tokens.colors.dark.gray300.value
       )};
+    background: ${({ theme }) =>
+      getToken(
+        theme,
+        'colors.dark.background.value',
+        tokens.colors.dark.background.value
+      )};
+  }
+`;
+
+export const Title = styled.h2.attrs(() => ({
+  className: 'text-xl font-semibold mb-4'
+}))`
+  color: ${({ theme }) =>
+    getToken(theme, 'colors.light.text.value', tokens.colors.light.text.value)};
+
+  @media (prefers-color-scheme: dark) {
+    color: ${({ theme }) =>
+      getToken(theme, 'colors.dark.text.value', tokens.colors.dark.text.value)};
   }
 `;
 
@@ -37,19 +60,11 @@ export const ServiceLabel = styled.label.attrs(() => ({
   className: 'flex items-center gap-2 cursor-pointer'
 }))`
   color: ${({ theme }) =>
-    getToken(
-      theme,
-      'colors.light.gray800.value',
-      tokens.colors.light.gray800.value
-    )};
+    getToken(theme, 'colors.light.text.value', tokens.colors.light.text.value)};
 
   @media (prefers-color-scheme: dark) {
     color: ${({ theme }) =>
-      getToken(
-        theme,
-        'colors.dark.gray800.value',
-        tokens.colors.dark.gray800.value
-      )};
+      getToken(theme, 'colors.dark.text.value', tokens.colors.dark.text.value)};
   }
 `;
 
@@ -86,26 +101,64 @@ export const EstimateBreakdown = styled.div.attrs(() => ({
 }))``;
 
 export const LineItem = styled.div.attrs(() => ({
-  className: 'line-item flex justify-between'
+  className: 'line-item flex justify-between p-2 rounded'
 }))`
   color: ${({ theme }) =>
     getToken(theme, 'colors.light.text.value', tokens.colors.light.text.value)};
+  background: ${({ theme }) =>
+    getToken(
+      theme,
+      'colors.light.background.value',
+      tokens.colors.light.background.value
+    )};
 
   @media (prefers-color-scheme: dark) {
     color: ${({ theme }) =>
       getToken(theme, 'colors.dark.text.value', tokens.colors.dark.text.value)};
+    background: ${({ theme }) =>
+      getToken(
+        theme,
+        'colors.dark.gray100.value',
+        tokens.colors.dark.gray100.value
+      )};
   }
 `;
 
 export const Total = styled.div.attrs(() => ({
-  className: 'total mt-4 flex justify-between font-bold'
+  className: 'total mt-4 flex justify-between font-bold p-2 rounded'
 }))`
   color: ${({ theme }) =>
     getToken(theme, 'colors.light.text.value', tokens.colors.light.text.value)};
+  background: ${({ theme }) =>
+    getToken(
+      theme,
+      'colors.light.gray100.value',
+      tokens.colors.light.gray100.value
+    )};
+  border-top: 1px solid
+    ${({ theme }) =>
+      getToken(
+        theme,
+        'colors.light.gray200.value',
+        tokens.colors.light.gray200.value
+      )};
 
   @media (prefers-color-scheme: dark) {
     color: ${({ theme }) =>
       getToken(theme, 'colors.dark.text.value', tokens.colors.dark.text.value)};
+    background: ${({ theme }) =>
+      getToken(
+        theme,
+        'colors.dark.gray200.value',
+        tokens.colors.dark.gray200.value
+      )};
+    border-top: 1px solid
+      ${({ theme }) =>
+        getToken(
+          theme,
+          'colors.dark.gray300.value',
+          tokens.colors.dark.gray300.value
+        )};
   }
 `;
 

@@ -1,4 +1,5 @@
 import mixpanel from 'mixpanel-browser';
+import { logError } from '@lib/errorUtils';
 
 try {
   if (process.env.NEXT_PUBLIC_MIXPANEL) {
@@ -14,7 +15,9 @@ try {
     );
   }
 } catch (error) {
-  console.error('Mixpanel initialization failed:', error);
+  logError(error, {
+    operation: 'mixpanel_init'
+  });
 }
 
 export default mixpanel;

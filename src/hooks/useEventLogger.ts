@@ -1,5 +1,6 @@
 import { logEvent as actualLogEvent } from '@services/logger';
 import { EventMap, LogOptions } from '../types/analytics';
+import { logError } from '@lib/errorUtils';
 
 /**
  * Hook for consistent event logging across components
@@ -29,7 +30,10 @@ export const useEventLogger = () => {
         await testLogger(eventName, data, mergedOptions);
       }
     } catch (error) {
-      console.error(`Error logging event: ${eventName}`, error);
+      logError(error, {
+        operation: 'event_logging',
+        eventName: String(eventName)
+      });
     }
   };
 

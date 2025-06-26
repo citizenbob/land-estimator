@@ -10,32 +10,15 @@ import {
  */
 type BoundingBox = [string, string, string, string];
 
-/**
- * Detailed breakdown of landscaping price estimate components
- */
+/** Contains all components of a landscape project cost estimate */
 interface PriceBreakdown {
-  /** Size of the property lot in square feet */
   lotSizeSqFt: number;
-
-  /** Base rate per square foot for landscaping work */
   baseRatePerSqFt: { min: number; max: number };
-
-  /** Design fee estimate */
   designFee: number;
-
-  /** Installation cost estimate */
   installationCost: number;
-
-  /** Monthly maintenance cost estimate */
   maintenanceMonthly: number;
-
-  /** Subtotal before minimum service fee application */
   subtotal: { min: number; max: number };
-
-  /** Minimum service fee for any project */
   minimumServiceFee: number;
-
-  /** Final price range estimate */
   finalEstimate: { min: number; max: number };
 }
 
@@ -60,12 +43,7 @@ const PRICING = {
   }
 };
 
-/**
- * Calculates pricing multiplier based on affluence score
- *
- * @param affluenceScore - Score from 0-100 indicating area affluence
- * @returns Multiplier between 0.85 and 1.25 based on affluence
- */
+/** Returns price multiplier (0.85-1.25) based on area affluence score (0-100) */
 export function calculateAffluenceMultiplier(affluenceScore: number): number {
   const { minMultiplier, maxMultiplier, baselineScore } = PRICING.affluence;
 
@@ -80,20 +58,10 @@ export function calculateAffluenceMultiplier(affluenceScore: number): number {
   }
 }
 
-/**
- * Earth's radius in feet for geographical calculations
- */
+/** Earth's radius in feet (Haversine formula constant) */
 const earthRadiusFt = 20925524.9;
 
-/**
- * Calculates the area in square feet from a geographical bounding box
- *
- * Uses the Haversine formula to approximate rectangular area on Earth's surface
- * based on latitude and longitude coordinates.
- *
- * @param box - Bounding box coordinates [latMin, latMax, lonMin, lonMax]
- * @returns Area in square feet
- */
+/** Approximates rectangular area on Earth's surface from lat/lon coordinates */
 function calculateAreaFromBoundingBox(box: BoundingBox): number {
   const [latMin, latMax, lonMin, lonMax] = box.map(Number);
 
@@ -107,14 +75,7 @@ function calculateAreaFromBoundingBox(box: BoundingBox): number {
   return Math.abs(widthFt * heightFt);
 }
 
-/**
- * Creates a default price breakdown object with zeroed values
- *
- * @param lotSizeSqFt - Size of the lot in square feet
- * @param baseRate - Base rate per square foot
- * @param minimumServiceFee - Minimum service fee
- * @returns A baseline price breakdown object
- */
+/** Creates an empty price breakdown with zeroed values and base configuration */
 function createBasePriceBreakdown(
   lotSizeSqFt: number,
   baseRate: { min: number; max: number },
@@ -132,13 +93,7 @@ function createBasePriceBreakdown(
   };
 }
 
-/**
- * Calculates installation costs based on lot size and base rates
- *
- * @param lotSizeSqFt - Size of the lot in square feet
- * @param baseRate - Base rate per square foot
- * @returns Installation cost range (min/max)
- */
+/** Computes min/max installation costs for a given lot size */
 function calculateInstallationCost(
   lotSizeSqFt: number,
   baseRate: { min: number; max: number }
@@ -149,13 +104,7 @@ function calculateInstallationCost(
   };
 }
 
-/**
- * Applies minimum service fee to ensure estimates don't go below the threshold
- *
- * @param estimate - Current estimate values
- * @param minimumServiceFee - Minimum service fee to enforce
- * @returns Adjusted estimate with minimum fee applied
- */
+/** Ensures estimates don't fall below minimum service fee threshold */
 function applyMinimumServiceFee(
   estimate: { min: number; max: number },
   minimumServiceFee: number
@@ -166,12 +115,7 @@ function applyMinimumServiceFee(
   };
 }
 
-/**
- * Calculates the average of a min/max range
- *
- * @param range - Object with min and max values
- * @returns Average of the min and max values
- */
+/** Returns the average of a min/max range */
 function calculateAverage(range: { min: number; max: number }): number {
   return (range.min + range.max) / 2;
 }
@@ -213,9 +157,7 @@ function mergeBreakdowns(breakdowns: PriceBreakdown[]): PriceBreakdown {
   };
 }
 
-/**
- * Internal helper to compute a single service breakdown
- */
+/** Calculates price breakdown for a single service type */
 function computeSingleService(
   boundingBox: BoundingBox,
   type: 'design' | 'installation' | 'maintenance',
@@ -298,17 +240,7 @@ const DEFAULT_SERVICES: Array<'design' | 'installation'> = [
   'installation'
 ];
 
-/**
- * Estimates landscaping prices based on property size and service requirements
- *
- * Calculates pricing for different landscaping services including design, installation,
- * and maintenance. Takes into account property size, service type, and whether
- * the project is commercial or residential.
- *
- * @param boundingBox - Geographic coordinates defining the property boundaries
- * @param options - Configuration options for the price estimate
- * @returns Detailed price breakdown showing min/max estimates for each service component
- */
+/** Calculates service pricing from property boundaries using min/max lat/lon coords */
 export function estimateLandscapingPrice(
   boundingBox: BoundingBox,
   options?: {
@@ -328,13 +260,7 @@ export function estimateLandscapingPrice(
   return mergeBreakdowns(breakdowns);
 }
 
-/**
- * Estimates landscaping prices using parcel metadata for accurate lot sizing
- *
- * @param parcelData - Detailed parcel metadata with land area calculations
- * @param options - Configuration options for the price estimate
- * @returns Detailed price breakdown using actual parcel land area
- */
+/** Calculates service pricing using pre-loaded parcel metadata */
 export function estimateLandscapingPriceFromParcel(
   parcelData: ParcelMetadata,
   options?: {

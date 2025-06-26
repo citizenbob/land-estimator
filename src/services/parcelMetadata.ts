@@ -1,4 +1,5 @@
 import { createUniversalBundleLoader } from '@lib/universalBundleLoader';
+import { AppError, ErrorType } from '@lib/errorUtils';
 import type { NodeModules } from '@lib/universalLoader';
 
 export interface ParcelMetadata {
@@ -55,8 +56,10 @@ function createParcelLookupMap(
  * @throws Always throws as raw fallback is not supported
  */
 async function loadRawParcelData(): Promise<ParcelMetadata[]> {
-  throw new Error(
-    'Parcel metadata requires optimized .gz data - no raw fallback available'
+  throw new AppError(
+    'Parcel metadata requires optimized .gz data - no raw fallback available',
+    ErrorType.VALIDATION,
+    { isRetryable: false }
   );
 }
 
