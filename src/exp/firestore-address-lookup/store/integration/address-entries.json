@@ -1,0 +1,502 @@
+[
+  {
+    "id": 0,
+    "searchable": "626 S 1st St., St. Louis, MO 63102 10001000005",
+    "parcelId": "10001000005"
+  },
+  {
+    "id": 1,
+    "searchable": "616 S 1st St., St. Louis, MO 63102 10001000010",
+    "parcelId": "10001000010"
+  },
+  {
+    "id": 2,
+    "searchable": "608 S 1st St., St. Louis, MO 63102 10001000020",
+    "parcelId": "10001000020"
+  },
+  {
+    "id": 3,
+    "searchable": "619 S Wharf St., St. Louis, MO 63102 10001000032",
+    "parcelId": "10001000032"
+  },
+  {
+    "id": 4,
+    "searchable": "620 N Commercial St., St. Louis, MO 63102 10001000034",
+    "parcelId": "10001000034"
+  },
+  {
+    "id": 5,
+    "searchable": "601 S Wharf St., St. Louis, MO 63102 10001000040",
+    "parcelId": "10001000040"
+  },
+  {
+    "id": 6,
+    "searchable": "606 N 1st St., St. Louis, MO 63102 10014000005",
+    "parcelId": "10014000005"
+  },
+  {
+    "id": 7,
+    "searchable": "610 N 1st St., St. Louis, MO 63102 10014000010",
+    "parcelId": "10014000010"
+  },
+  {
+    "id": 8,
+    "searchable": "612 N 1st St., St. Louis, MO 63102 10014000020",
+    "parcelId": "10014000020"
+  },
+  {
+    "id": 9,
+    "searchable": "10 Lucas Ave., St. Louis, MO 63102 10014000035",
+    "parcelId": "10014000035"
+  },
+  {
+    "id": 10,
+    "searchable": "621 N Wharf St., St. Louis, MO 63102 10014000040",
+    "parcelId": "10014000040"
+  },
+  {
+    "id": 11,
+    "searchable": "619 N Wharf St., St. Louis, MO 63102 10014000050",
+    "parcelId": "10014000050"
+  },
+  {
+    "id": 12,
+    "searchable": "617 N Wharf St., St. Louis, MO 63102 10014000060",
+    "parcelId": "10014000060"
+  },
+  {
+    "id": 13,
+    "searchable": "613 N Wharf St., St. Louis, MO 63102 10014000070",
+    "parcelId": "10014000070"
+  },
+  {
+    "id": 14,
+    "searchable": "609 N Wharf St., St. Louis, MO 63102 10014000080",
+    "parcelId": "10014000080"
+  },
+  {
+    "id": 15,
+    "searchable": "601 N Wharf St., St. Louis, MO 63102 10014000090",
+    "parcelId": "10014000090"
+  },
+  {
+    "id": 16,
+    "searchable": "700 N 1st St., St. Louis, MO 63102 10015000010",
+    "parcelId": "10015000010"
+  },
+  {
+    "id": 17,
+    "searchable": "716 N 1st St., St. Louis, MO 63102 10015000050",
+    "parcelId": "10015000050"
+  },
+  {
+    "id": 18,
+    "searchable": "720 N 1st St., St. Louis, MO 63102 10015000060",
+    "parcelId": "10015000060"
+  },
+  {
+    "id": 19,
+    "searchable": "728 N 1st St., St. Louis, MO 63102 10015000080",
+    "parcelId": "10015000080"
+  },
+  {
+    "id": 20,
+    "searchable": "701 N Wharf St., St. Louis, MO 63102 10015000090",
+    "parcelId": "10015000090"
+  },
+  {
+    "id": 21,
+    "searchable": "710 N Wharf St., St. Louis, MO 63102 10015000095",
+    "parcelId": "10015000095"
+  },
+  {
+    "id": 22,
+    "searchable": "800 N 1st St., St. Louis, MO 63102 10016000011",
+    "parcelId": "10016000011"
+  },
+  {
+    "id": 23,
+    "searchable": "806 N 1st St., St. Louis, MO 63102 10016000020",
+    "parcelId": "10016000020"
+  },
+  {
+    "id": 24,
+    "searchable": "810 N 1st St., St. Louis, MO 63102 10016000025",
+    "parcelId": "10016000025"
+  },
+  {
+    "id": 25,
+    "searchable": "814 N 1st St., St. Louis, MO 63102 10016000040",
+    "parcelId": "10016000040"
+  },
+  {
+    "id": 26,
+    "searchable": "810 H N 1st St., St. Louis, MO 63102 10016000045",
+    "parcelId": "10016000045"
+  },
+  {
+    "id": 27,
+    "searchable": "817 N Wharf St., St. Louis, MO 63102 10016000050",
+    "parcelId": "10016000050"
+  },
+  {
+    "id": 28,
+    "searchable": "811 N Wharf St., St. Louis, MO 63102 10016000055",
+    "parcelId": "10016000055"
+  },
+  {
+    "id": 29,
+    "searchable": "811 N Wharf St., St. Louis, MO 63102 10016000060",
+    "parcelId": "10016000060"
+  },
+  {
+    "id": 30,
+    "searchable": "801 N Leonor K Sullivan Blvd., St. Louis, MO 63102 10016000101",
+    "parcelId": "10016000101"
+  },
+  {
+    "id": 31,
+    "searchable": "812 N 1st St., St. Louis, MO 63102 10016000110",
+    "parcelId": "10016000110"
+  },
+  {
+    "id": 32,
+    "searchable": "900 N 1st St., St. Louis, MO 63102 10017000010",
+    "parcelId": "10017000010"
+  },
+  {
+    "id": 33,
+    "searchable": "902 N 1st St., St. Louis, MO 63102 10017000045",
+    "parcelId": "10017000045"
+  },
+  {
+    "id": 34,
+    "searchable": "901 N Wharf St., St. Louis, MO 63102 10017000080",
+    "parcelId": "10017000080"
+  },
+  {
+    "id": 35,
+    "searchable": "17 S Wharf St., St. Louis, MO 63102 10017000100",
+    "parcelId": "10017000100"
+  },
+  {
+    "id": 36,
+    "searchable": "1000 N 1st St., St. Louis, MO 63102 10018000010",
+    "parcelId": "10018000010"
+  },
+  {
+    "id": 37,
+    "searchable": "1004 N 1st St., St. Louis, MO 63102 10018000020",
+    "parcelId": "10018000020"
+  },
+  {
+    "id": 38,
+    "searchable": "1012 N 1st St., St. Louis, MO 63102 10018000030",
+    "parcelId": "10018000030"
+  },
+  {
+    "id": 39,
+    "searchable": "1016 N 1st St., St. Louis, MO 63102 10018000040",
+    "parcelId": "10018000040"
+  },
+  {
+    "id": 40,
+    "searchable": "1020 N 1st St., St. Louis, MO 63102 10018000050",
+    "parcelId": "10018000050"
+  },
+  {
+    "id": 41,
+    "searchable": "1024 N 1st St., St. Louis, MO 63102 10018000065",
+    "parcelId": "10018000065"
+  },
+  {
+    "id": 42,
+    "searchable": "1028 N 1st St., St. Louis, MO 63102 10018000075",
+    "parcelId": "10018000075"
+  },
+  {
+    "id": 43,
+    "searchable": "1014 R N 1st St., St. Louis, MO 63102 10018000080",
+    "parcelId": "10018000080"
+  },
+  {
+    "id": 44,
+    "searchable": "1003 N Wharf St., St. Louis, MO 63102 10018000086",
+    "parcelId": "10018000086"
+  },
+  {
+    "id": 45,
+    "searchable": "1009 N Wharf St., St. Louis, MO 63102 10018000087",
+    "parcelId": "10018000087"
+  },
+  {
+    "id": 46,
+    "searchable": "1005 N Wharf St., St. Louis, MO 63102 10018000088",
+    "parcelId": "10018000088"
+  },
+  {
+    "id": 47,
+    "searchable": "1007 N Wharf St., St. Louis, MO 63102 10018000089",
+    "parcelId": "10018000089"
+  },
+  {
+    "id": 48,
+    "searchable": "8 R Carr St., St. Louis, MO 63102 10018000091",
+    "parcelId": "10018000091"
+  },
+  {
+    "id": 49,
+    "searchable": "8 Carr St., St. Louis, MO 63102 10018000092",
+    "parcelId": "10018000092"
+  },
+  {
+    "id": 50,
+    "searchable": "1030 R N Commercial St., St. Louis, MO 63102 10018000100",
+    "parcelId": "10018000100"
+  },
+  {
+    "id": 51,
+    "searchable": "1100 N Wharf St., St. Louis, MO 63102 10019000015",
+    "parcelId": "10019000015"
+  },
+  {
+    "id": 52,
+    "searchable": "1120 N 1st St., St. Louis, MO 63102 10019000035",
+    "parcelId": "10019000035"
+  },
+  {
+    "id": 53,
+    "searchable": "1114 R N 1st St., St. Louis, MO 63102 10019000045",
+    "parcelId": "10019000045"
+  },
+  {
+    "id": 54,
+    "searchable": "1110 N 1st St., St. Louis, MO 63102 10019000055",
+    "parcelId": "10019000055"
+  },
+  {
+    "id": 55,
+    "searchable": "1100 N 1st St., St. Louis, MO 63102 10019000065",
+    "parcelId": "10019000065"
+  },
+  {
+    "id": 56,
+    "searchable": "1200 N 1st St., St. Louis, MO 63102 10020000015",
+    "parcelId": "10020000015"
+  },
+  {
+    "id": 57,
+    "searchable": "1206 N 1st St., St. Louis, MO 63102 10020000020",
+    "parcelId": "10020000020"
+  },
+  {
+    "id": 58,
+    "searchable": "10 Ashley St., St. Louis, MO 63102 10020000030",
+    "parcelId": "10020000030"
+  },
+  {
+    "id": 59,
+    "searchable": "1205 Lewis St., St. Louis, MO 63102 10020000040",
+    "parcelId": "10020000040"
+  },
+  {
+    "id": 60,
+    "searchable": "1201 Lewis St., St. Louis, MO 63102 10020000055",
+    "parcelId": "10020000055"
+  },
+  {
+    "id": 61,
+    "searchable": "122 Ashley St., St. Louis, MO 63102 10021000020",
+    "parcelId": "10021000020"
+  },
+  {
+    "id": 62,
+    "searchable": "121 Biddle St., St. Louis, MO 63102 10021000030",
+    "parcelId": "10021000030"
+  },
+  {
+    "id": 63,
+    "searchable": "158 Biddle St., St. Louis, MO 63102 10022000015",
+    "parcelId": "10022000015"
+  },
+  {
+    "id": 64,
+    "searchable": "122 Biddle St., St. Louis, MO 63102 10022000017",
+    "parcelId": "10022000017"
+  },
+  {
+    "id": 65,
+    "searchable": "1100 N 2nd St., St. Louis, MO 63102 10022000025",
+    "parcelId": "10022000025"
+  },
+  {
+    "id": 66,
+    "searchable": "901 N 1st St., St. Louis, MO 63102 10023000015",
+    "parcelId": "10023000015"
+  },
+  {
+    "id": 67,
+    "searchable": "925 N 1st St., St. Louis, MO 63102 10023000020",
+    "parcelId": "10023000020"
+  },
+  {
+    "id": 68,
+    "searchable": "1030 N 2nd St., St. Louis, MO 63102 10023000025",
+    "parcelId": "10023000025"
+  },
+  {
+    "id": 69,
+    "searchable": "1000 N 2nd St., St. Louis, MO 63102 10024000015",
+    "parcelId": "10024000015"
+  },
+  {
+    "id": 70,
+    "searchable": "801 N 1st St., St. Louis, MO 63102 10025000005",
+    "parcelId": "10025000005"
+  },
+  {
+    "id": 71,
+    "searchable": "820 N 2nd St., St. Louis, MO 63102 10025000015",
+    "parcelId": "10025000015"
+  },
+  {
+    "id": 72,
+    "searchable": "124 Dr. Martin Luther King Dr., St. Louis, MO 63102 10025000020",
+    "parcelId": "10025000020"
+  },
+  {
+    "id": 73,
+    "searchable": "120 Dr. Martin Luther King Dr., St. Louis, MO 63102 10025000030",
+    "parcelId": "10025000030"
+  },
+  {
+    "id": 74,
+    "searchable": "112 Dr. Martin Luther King Dr., St. Louis, MO 63102 10025000040",
+    "parcelId": "10025000040"
+  },
+  {
+    "id": 75,
+    "searchable": "819 N 1st St., St. Louis, MO 63102 10025000045",
+    "parcelId": "10025000045"
+  },
+  {
+    "id": 76,
+    "searchable": "118 Morgan St., St. Louis, MO 63102 10026000010",
+    "parcelId": "10026000010"
+  },
+  {
+    "id": 77,
+    "searchable": "719 N 1st St., St. Louis, MO 63102 10026000020",
+    "parcelId": "10026000020"
+  },
+  {
+    "id": 78,
+    "searchable": "701 N 1st St., St. Louis, MO 63102 10026000030",
+    "parcelId": "10026000030"
+  },
+  {
+    "id": 79,
+    "searchable": "700 N 2nd St., St. Louis, MO 63102 10026000040",
+    "parcelId": "10026000040"
+  },
+  {
+    "id": 80,
+    "searchable": "704 N 2nd St., St. Louis, MO 63102 10026000050",
+    "parcelId": "10026000050"
+  },
+  {
+    "id": 81,
+    "searchable": "712 N 2nd St., St. Louis, MO 63102 10026000055",
+    "parcelId": "10026000055"
+  },
+  {
+    "id": 82,
+    "searchable": "718 N 2nd St., St. Louis, MO 63102 10026000090",
+    "parcelId": "10026000090"
+  },
+  {
+    "id": 83,
+    "searchable": "720 N 2nd St., St. Louis, MO 63102 10026000100",
+    "parcelId": "10026000100"
+  },
+  {
+    "id": 84,
+    "searchable": "613 N 1st St., St. Louis, MO 63102 10027000010",
+    "parcelId": "10027000010"
+  },
+  {
+    "id": 85,
+    "searchable": "609 N 1st St., St. Louis, MO 63102 10027000030",
+    "parcelId": "10027000030"
+  },
+  {
+    "id": 86,
+    "searchable": "604 N 2nd St., St. Louis, MO 63102 10027000040",
+    "parcelId": "10027000040"
+  },
+  {
+    "id": 87,
+    "searchable": "606 N 2nd St., St. Louis, MO 63102 10027000050",
+    "parcelId": "10027000050"
+  },
+  {
+    "id": 88,
+    "searchable": "610 N 2nd St., St. Louis, MO 63102 10027000060",
+    "parcelId": "10027000060"
+  },
+  {
+    "id": 89,
+    "searchable": "612 N 2nd St., St. Louis, MO 63102 10027000070",
+    "parcelId": "10027000070"
+  },
+  {
+    "id": 90,
+    "searchable": "618 N 2nd St., St. Louis, MO 63102 10027000080",
+    "parcelId": "10027000080"
+  },
+  {
+    "id": 91,
+    "searchable": "100 Poplar St., St. Louis, MO 63102 10040000010",
+    "parcelId": "10040000010"
+  },
+  {
+    "id": 92,
+    "searchable": "181 Plum St., St. Louis, MO 63102 10040000030",
+    "parcelId": "10040000030"
+  },
+  {
+    "id": 93,
+    "searchable": "193 Plum St., St. Louis, MO 63102 10040000040",
+    "parcelId": "10040000040"
+  },
+  {
+    "id": 94,
+    "searchable": "119 Cedar St., St. Louis, MO 63102 10041000010",
+    "parcelId": "10041000010"
+  },
+  {
+    "id": 95,
+    "searchable": "722 S 2nd St., St. Louis, MO 63102 10041000020",
+    "parcelId": "10041000020"
+  },
+  {
+    "id": 96,
+    "searchable": "720 S 2nd St., St. Louis, MO 63102 10041000030",
+    "parcelId": "10041000030"
+  },
+  {
+    "id": 97,
+    "searchable": "716 S 2nd St., St. Louis, MO 63102 10041000040",
+    "parcelId": "10041000040"
+  },
+  {
+    "id": 98,
+    "searchable": "710 S 2nd St., St. Louis, MO 63102 10041000060",
+    "parcelId": "10041000060"
+  },
+  {
+    "id": 99,
+    "searchable": "704 S 2nd St., St. Louis, MO 63102 10041000070",
+    "parcelId": "10041000070"
+  }
+]

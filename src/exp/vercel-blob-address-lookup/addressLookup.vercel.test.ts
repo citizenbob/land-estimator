@@ -8,7 +8,15 @@ function createMockFetch(data: unknown) {
 
   return vi.fn().mockResolvedValue({
     ok: true,
-    arrayBuffer: async () => gzippedBuffer.buffer
+    arrayBuffer: async () => {
+      // Convert Node.js Buffer to ArrayBuffer properly
+      const arrayBuffer = new ArrayBuffer(gzippedBuffer.length);
+      const view = new Uint8Array(arrayBuffer);
+      for (let i = 0; i < gzippedBuffer.length; i++) {
+        view[i] = gzippedBuffer[i];
+      }
+      return arrayBuffer;
+    }
   } as Response);
 }
 
