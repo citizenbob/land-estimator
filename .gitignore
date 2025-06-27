@@ -75,6 +75,11 @@ env/
 /public/address-index.backup.json
 /public/parcel-metadata.backup.json
 
+# FlexSearch indexes - only track compressed versions
+**/flexsearch-index.json
+**/store/flexsearch/*.json
+!**/store/flexsearch/*.json.gz
+
 # Symlinked data directory: ignore its contents, allow the symlink
 /src/data/*
 !/src/data
