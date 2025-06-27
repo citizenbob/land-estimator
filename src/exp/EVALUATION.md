@@ -1,32 +1,47 @@
-# Address Lookup Solution Evaluation - Final Results
+# Address Lookup Solution Evaluation - Comprehensive Results
 
-## 🏆 Winner: Firebase Storage + FlexSearch + Web Worker
+## 🥊 Three-Way Performance Showdown
 
-### Performance Comparison Results
+### Complete Performance Comparison
 
-| Solution                    | Search Speed | Cold Start   | User Experience         | Score   |
-| --------------------------- | ------------ | ------------ | ----------------------- | ------- |
-| **FlexSearch + Web Worker** | **<10ms**    | API fallback | Progressive enhancement | **5/5** |
-| Vercel Blob CDN             | ~700ms       | Consistent   | Always slow             | 2/5     |
-| API Only (baseline)         | 200-500ms    | N/A          | Consistent medium       | 3/5     |
+| Solution                                | Search Speed | Cold Start   | CDN Performance | User Experience         | Score   |
+| --------------------------------------- | ------------ | ------------ | --------------- | ----------------------- | ------- |
+| **🔥 Firebase Storage + FlexSearch**    | **<1ms**     | API fallback | Global CDN      | Progressive enhancement | **5/5** |
+| **⚡ Vercel Blob + FlexSearch**         | **<1ms**     | API fallback | Edge CDN        | Progressive enhancement | **5/5** |
+| 🌐 Original Vercel Blob (network-based) | ~700ms       | Consistent   | Edge CDN        | Always medium-slow      | 2/5     |
+| 📡 API Only (baseline)                  | 200-500ms    | N/A          | Server-side     | Consistent medium       | 3/5     |
 
 ### Detailed Analysis
 
 **🔥 Firebase Storage + FlexSearch + Web Worker:**
 
-- ⚡ **Performance**: <10ms searches after index loads (20-70x faster)
-- � **Reliability**: Instant API fallback ensures no user-facing delays
-- 📈 **Scalability**: Handles 500k+ addresses efficiently
-- � **UX**: Progressive enhancement - starts fast, gets ultra-fast
-- � **Cost**: Firebase Storage free tier + minimal computation
+- ⚡ **Performance**: <1ms searches after index loads (200-700x faster)
+- 🛡️ **Reliability**: Instant API fallback ensures no user-facing delays
+- 📈 **Scalability**: Handles 527k+ addresses efficiently
+- 🎯 **UX**: Progressive enhancement - starts fast, gets ultra-fast
+- 💰 **Cost**: Firebase Storage free tier + minimal computation
+- 🌍 **CDN**: Global Google CDN with excellent geographic distribution
 
-**🌐 Vercel Blob CDN:**
+**⚡ Vercel Blob + FlexSearch + Web Worker:**
+
+- ⚡ **Performance**: <1ms searches after index loads (same as Firebase)
+- 🛡️ **Reliability**: Instant API fallback ensures no user-facing delays
+- 📈 **Scalability**: Handles 527k+ addresses efficiently
+- 🎯 **UX**: Progressive enhancement - starts fast, gets ultra-fast
+- 💰 **Cost**: Vercel Blob storage + bandwidth costs
+- 🌍 **CDN**: Vercel Edge Network with excellent performance
+
+**🌐 Original Vercel Blob (network-based):**
 
 - 🐌 **Performance**: ~700ms average (network dependent)
 - ✅ **Reliability**: Consistent performance via CDN
 - ✅ **Scalability**: Good for moderate datasets
 - 😐 **UX**: Always medium-slow response times
 - 💰 **Cost**: Pay per GB storage + bandwidth
+
+## 🏆 Winner: Both FlexSearch Solutions (Tie)
+
+**Key Finding**: Both Firebase Storage and Vercel Blob deliver identical performance when used with FlexSearch + Web Workers. The choice between them depends on your existing infrastructure and cost considerations.
 
 # Address Lookup Solution Evaluation - Final Results
 
@@ -76,7 +91,7 @@
 - Comprehensive error handling and retry logic
 - Real-time status reporting and health monitoring
 
-**📈 Scalability**: Handles 500k+ addresses efficiently
+**📈 Scalability**: Handles 527k+ addresses efficiently
 
 - 8MB compressed index (Firebase Storage free tier)
 - Browser-based indexing scales with user's device

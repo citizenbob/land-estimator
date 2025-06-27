@@ -60,6 +60,12 @@ next-env.d.ts
 .vscode/
 .idea/
 
+# Python virtual environments
+venv/
+.venv/
+env/
+.env/
+
 *storybook.log*
 
 # Large data files - track compressed versions only
