@@ -1,6 +1,5 @@
-import { createUniversalBundleLoader } from '@lib/universalBundleLoader';
+import { createVersionedBundleLoader } from '@lib/versionedBundleLoader';
 import { AppError, ErrorType } from '@lib/errorUtils';
-import type { NodeModules } from '@lib/universalLoader';
 
 export interface ParcelMetadata {
   id: string;
@@ -81,16 +80,13 @@ async function loadRawParcelData(): Promise<ParcelMetadata[]> {
   );
 }
 
-const parcelBundleLoader = createUniversalBundleLoader<
+const parcelBundleLoader = createVersionedBundleLoader<
   ParcelMetadata,
   OptimizedParcelIndex,
   ParcelBundle
 >({
-  gzippedFilename: 'parcel-metadata.json.gz',
   baseFilename: 'parcel-metadata',
-  useVersioning: process.env.NODE_ENV === 'production',
   createLookupMap: createParcelLookupMap,
-  loadRawData: loadRawParcelData,
   extractDataFromIndex: (index: OptimizedParcelIndex) => index.parcels,
   createBundle: (
     data: ParcelMetadata[],
@@ -99,21 +95,70 @@ const parcelBundleLoader = createUniversalBundleLoader<
 });
 
 /**
- * Sets mock Node.js modules for testing
- */
-export function _setTestMockParcelNodeModules(
-  mockModules: NodeModules | null
-): void {
-  parcelBundleLoader.setTestMockModules(mockModules);
-}
-
-/**
  * Universal parcel metadata loader that works in both browser and Node.js environments
+ * Enhanced with Service Worker integration for better caching
  * @returns Complete parcel bundle with data array and lookup map
  * @throws When parcel files cannot be loaded, decompressed, or parsed
  */
 export async function loadParcelMetadata(): Promise<ParcelBundle> {
-  return parcelBundleLoader.loadBundle();
+  // In production, use versioned loader with comprehensive CDN fallback chain
+  if (process.env.NODE_ENV === 'production') {
+    // Check if Service Worker has the data cached
+    if (typeof window !== 'undefined') {
+      try {
+        const { default: serviceWorkerClient } = await import(
+          '@lib/serviceWorkerClient'
+        );
+
+        const { getVersionManifest } = await import(
+          '@services/versionManifest'
+        );
+        const manifest = await getVersionManifest();
+        const url = manifest.current.files.parcel_metadata;
+
+        if (url && (await serviceWorkerClient.isCached(url))) {
+          console.log(
+            '🎯 [SW] Parcel metadata available in Service Worker cache'
+          );
+        }
+
+        // Warm up cache if needed
+        await serviceWorkerClient.warmupCache();
+      } catch (error) {
+        console.warn(
+          '[Parcel Metadata] Service Worker integration failed:',
+          error
+        );
+        // Continue with normal loading
+      }
+    }
+
+    return parcelBundleLoader.loadBundle();
+  }
+
+  // Test environment - use mocked loader
+  if (process.env.NODE_ENV === 'test') {
+    // During tests, the loader should be mocked, so this should work
+    return parcelBundleLoader.loadBundle();
+  }
+
+  // Development mode - graceful fallback to raw data
+  console.warn(
+    '⚠️ [DEV] Loading raw parcel data (versioned loader disabled in development)'
+  );
+  try {
+    const rawData = await loadRawParcelData();
+    const lookup = createParcelLookupMap(rawData);
+
+    return { data: rawData, lookup };
+  } catch (error) {
+    console.error('[DEV] Failed to load raw parcel data:', error);
+    throw new AppError(
+      'Parcel data not available in development mode. Ensure data files are present.',
+      ErrorType.VALIDATION,
+      { isRetryable: false }
+    );
+  }
 }
 
 /**

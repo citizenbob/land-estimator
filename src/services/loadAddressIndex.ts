@@ -1,5 +1,5 @@
 import FlexSearch from 'flexsearch';
-import { createUniversalBundleLoader } from '@lib/universalBundleLoader';
+import { createVersionedBundleLoader } from '@lib/versionedBundleLoader';
 import { AppError, ErrorType } from '@lib/errorUtils';
 import { decompressJsonData } from '@lib/universalLoader';
 
@@ -75,17 +75,14 @@ async function loadRawAddressData(): Promise<
   );
 }
 
-// Universal address index loader with versioning support
-const addressIndexLoader = createUniversalBundleLoader<
+// Versioned address index loader with comprehensive CDN fallback chain
+const addressIndexLoader = createVersionedBundleLoader<
   FlexSearch.PrecomputedIndexData,
   FlexSearch.PrecomputedIndexData,
   FlexSearch.FlexSearchIndexBundle
 >({
-  gzippedFilename: 'address-index.json.gz',
   baseFilename: 'address-index',
-  useVersioning: process.env.NODE_ENV === 'production',
   createLookupMap: () => ({}),
-  loadRawData: loadRawAddressData,
   extractDataFromIndex: (index: FlexSearch.PrecomputedIndexData) => [index],
   createBundle: async (data: FlexSearch.PrecomputedIndexData[]) => {
     const indexData = data[0];
@@ -102,11 +99,76 @@ const addressIndexLoader = createUniversalBundleLoader<
 
 /**
  * Universal address index loader that works in both browser and Node.js environments
+ * Enhanced with Service Worker integration for better caching
  * @returns FlexSearch index bundle with search index, parcel IDs, and address data
  * @throws When index file cannot be loaded or processed
  */
 export async function loadAddressIndex(): Promise<FlexSearch.FlexSearchIndexBundle> {
-  return addressIndexLoader.loadBundle();
+  // In production, use versioned loader with comprehensive CDN fallback chain
+  if (process.env.NODE_ENV === 'production') {
+    // Check if Service Worker has the data cached
+    if (typeof window !== 'undefined') {
+      try {
+        const { default: serviceWorkerClient } = await import(
+          '@lib/serviceWorkerClient'
+        );
+
+        const { getVersionManifest } = await import(
+          '@services/versionManifest'
+        );
+        const manifest = await getVersionManifest();
+        const url = manifest.current.files.address_index;
+
+        if (url && (await serviceWorkerClient.isCached(url))) {
+          console.log(
+            '🎯 [SW] Address index available in Service Worker cache'
+          );
+        }
+
+        // Warm up cache if needed
+        await serviceWorkerClient.warmupCache();
+      } catch (error) {
+        console.warn(
+          '[Address Index] Service Worker integration failed:',
+          error
+        );
+        // Continue with normal loading
+      }
+    }
+
+    return addressIndexLoader.loadBundle();
+  }
+
+  // Test environment - use mocked loader
+  if (process.env.NODE_ENV === 'test') {
+    // During tests, the loader should be mocked, so this should work
+    return addressIndexLoader.loadBundle();
+  }
+
+  // Development mode - graceful fallback to raw data
+  console.warn(
+    '⚠️ [DEV] Loading raw address data (versioned loader disabled in development)'
+  );
+  try {
+    const rawDataArray = await loadRawAddressData();
+    // Extract the single PrecomputedIndexData object
+    const rawData = rawDataArray[0];
+    const searchIndex = createSearchIndex(rawData);
+    const addressData = await createAddressLookupMap(rawData);
+
+    return {
+      index: searchIndex,
+      parcelIds: rawData.parcelIds,
+      addressData
+    };
+  } catch (error) {
+    console.error('[DEV] Failed to load raw address data:', error);
+    throw new AppError(
+      'Address data not available in development mode. Ensure data files are present.',
+      ErrorType.VALIDATION,
+      { isRetryable: false }
+    );
+  }
 }
 
 /**

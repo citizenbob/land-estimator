@@ -66,17 +66,15 @@ interface ParcelData {
       name?: string;
     };
     affluence_score?: number;
-    source_file?: string;
-    processed_date?: string;
   }>;
   metadata?: Record<string, unknown>;
 }
 
 interface GeometryData {
-  [parcel_id: string]: {
-    type?: string;
-    coordinates?: unknown[][];
-    bbox?: number[];
+  [parcelId: string]: {
+    type: 'Polygon' | 'MultiPolygon';
+    coordinates: number[][][] | number[][][][];
+    bbox: [number, number, number, number];
   };
 }
 
@@ -245,8 +243,8 @@ class FlexSearchBuilder {
               name: parcel.owner?.name || 'Unknown'
             },
             affluence_score: parcel.affluence_score || 0,
-            source_file: parcel.source_file || 'unknown',
-            processed_date: parcel.processed_date || new Date().toISOString()
+            source_file: 'ingest_pipeline',
+            processed_date: new Date().toISOString()
           };
         }
       });
@@ -299,38 +297,19 @@ class FlexSearchBuilder {
       if (fs.existsSync(geometryIndexPath)) {
         geometryData = JSON.parse(fs.readFileSync(geometryIndexPath, 'utf8'));
         console.log(
-          `📋 Processing ${Object.keys(geometryData).length || 0} geometries`
+          `📋 Processing ${Object.keys(geometryData).length} geometries`
         );
       } else {
         console.log('⚠️  Geometry index not found, creating empty index');
       }
 
-      // Create geometry lookup (already in the correct format from Python)
-      const geometryLookup: Record<
-        string,
-        {
-          type?: string;
-          coordinates?: unknown[][];
-          bbox?: number[];
-        }
-      > = {};
-
-      // Copy over all geometry data
-      Object.keys(geometryData).forEach((parcelId) => {
-        const geom = geometryData[parcelId];
-        if (geom) {
-          geometryLookup[parcelId] = {
-            type: geom.type,
-            coordinates: geom.coordinates,
-            bbox: geom.bbox
-          };
-        }
-      });
-
+      // The geometry data is already in the correct format for the app
+      // It's a flat object where keys are parcel IDs and values are GeoJSON geometry objects
+      // We just need to compress it for CDN distribution
       const geometryIndex = {
-        geometries: geometryLookup,
+        geometries: geometryData,
         metadata: {
-          totalGeometries: Object.keys(geometryLookup).length,
+          totalGeometries: Object.keys(geometryData).length,
           buildTime: new Date().toISOString(),
           sourceUrl: 'integration/parcel_geometry_index.json',
           version: '1.0-claude-pipeline'
@@ -344,7 +323,7 @@ class FlexSearchBuilder {
       fs.writeFileSync(compressedPath, compressed);
 
       console.log(
-        `✅ Geometry index built: ${Object.keys(geometryLookup).length} geometries`
+        `✅ Geometry index built: ${Object.keys(geometryData).length} geometries`
       );
       console.log(
         `📊 Compressed size: ${Math.round(compressed.length / 1024)}KB`

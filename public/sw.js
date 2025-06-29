@@ -4,8 +4,12 @@
  */
 
 const CACHE_NAME = 'versioned-index-cache-v1';
-const VERSION_MANIFEST_URL =
-  'https://lchevt1wkhcax7cz.public.blob.vercel-storage.com/cdn/version-manifest.json';
+
+// Try CDN first, fallback to development mode if needed
+const VERSION_MANIFEST_URLS = [
+  'https://lchevt1wkhcax7cz.public.blob.vercel-storage.com/cdn/version-manifest.json',
+  '/version-manifest-dev.json'
+];
 
 self.addEventListener('install', () => {
   console.log('[SW] Installing service worker...');
@@ -81,6 +85,53 @@ self.addEventListener('message', async (event) => {
       });
     }
   }
+
+  if (event.data?.type === 'PREFETCH_URL') {
+    try {
+      const url = event.data.url;
+      if (!url) {
+        throw new Error('No URL provided for prefetch');
+      }
+
+      console.log('[SW] Prefetching URL:', url);
+      const cache = await caches.open(CACHE_NAME);
+
+      // Check if already cached
+      const cachedResponse = await cache.match(url);
+      if (cachedResponse) {
+        console.log('[SW] URL already cached:', url);
+        event.ports[0]?.postMessage({
+          type: 'PREFETCH_COMPLETE',
+          success: true,
+          cached: true
+        });
+        return;
+      }
+
+      // Fetch and cache
+      const response = await fetch(url);
+      if (response.ok) {
+        await cache.put(url, response);
+        console.log('[SW] Successfully prefetched and cached:', url);
+        event.ports[0]?.postMessage({
+          type: 'PREFETCH_COMPLETE',
+          success: true,
+          cached: false
+        });
+      } else {
+        throw new Error(
+          `Fetch failed: ${response.status} ${response.statusText}`
+        );
+      }
+    } catch (error) {
+      console.error('[SW] Prefetch failed:', error);
+      event.ports[0]?.postMessage({
+        type: 'PREFETCH_COMPLETE',
+        success: false,
+        error: error.message
+      });
+    }
+  }
 });
 
 /**
@@ -89,12 +140,30 @@ self.addEventListener('message', async (event) => {
 async function preloadVersionedIndexes() {
   try {
     console.log('[SW] Fetching version manifest...');
-    const manifestResponse = await fetch(VERSION_MANIFEST_URL);
 
-    if (!manifestResponse.ok) {
-      throw new Error(
-        `Version manifest fetch failed: ${manifestResponse.status} ${manifestResponse.statusText}`
-      );
+    let manifestResponse;
+    let lastError;
+
+    // Try each manifest URL until one works
+    for (const url of VERSION_MANIFEST_URLS) {
+      try {
+        console.log('[SW] Trying manifest URL:', url);
+        manifestResponse = await fetch(url);
+        if (manifestResponse.ok) {
+          console.log('[SW] Successfully fetched manifest from:', url);
+          break;
+        }
+        lastError = new Error(
+          `HTTP ${manifestResponse.status}: ${manifestResponse.statusText}`
+        );
+      } catch (error) {
+        lastError = error;
+        console.warn('[SW] Failed to fetch from:', url, error.message);
+      }
+    }
+
+    if (!manifestResponse || !manifestResponse.ok) {
+      throw lastError || new Error('All manifest URLs failed');
     }
 
     const manifest = await manifestResponse.json();

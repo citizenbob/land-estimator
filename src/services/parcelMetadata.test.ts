@@ -7,8 +7,8 @@ import {
   ParcelMetadata
 } from './parcelMetadata';
 
-vi.mock('@lib/universalBundleLoader', () => ({
-  createUniversalBundleLoader: () => ({
+vi.mock('@lib/versionedBundleLoader', () => ({
+  createVersionedBundleLoader: () => ({
     loadBundle: vi.fn().mockResolvedValue({
       data: MOCK_PARCEL_METADATA,
       lookup: {
@@ -16,8 +16,7 @@ vi.mock('@lib/universalBundleLoader', () => ({
         p2: MOCK_PARCEL_METADATA[1]
       }
     }),
-    clearCache: vi.fn(),
-    setTestMockModules: vi.fn()
+    clearCache: vi.fn()
   })
 }));
 

@@ -8,6 +8,16 @@ import json
 from pathlib import Path
 from typing import Optional, Dict, Any
 
+try:
+    from dotenv import load_dotenv
+    # Load environment variables
+    project_root = Path(__file__).parent.parent.parent.parent
+    env_path = project_root / '.env.local'
+    if env_path.exists():
+        load_dotenv(env_path)
+except ImportError:
+    pass
+
 
 class BlobClient:
     """Python client for Vercel Blob Storage using Node.js subprocess"""
@@ -148,26 +158,18 @@ class BlobClient:
             # Use requests to download the file directly
             import requests
             
-            # Get the blob URL first - use parent directory as prefix to find the blob
-            prefix_path = "/".join(blob_path.split("/")[:-1]) + "/"  # Get parent directory
-            print(f"🔍 Searching for blob with prefix: {prefix_path}")
-            
-            blob_list = self.list_blobs(prefix=prefix_path)
+            # Get the blob URL first
+            blob_list = self.list_blobs(prefix=blob_path)
             if not blob_list or 'blobs' not in blob_list:
-                print(f"❌ No blobs found with prefix: {prefix_path}")
-                # Try without prefix as fallback
-                print("🔍 Trying to list all blobs...")
-                blob_list = self.list_blobs()
-                if not blob_list or 'blobs' not in blob_list:
-                    print(f"❌ Blob not found: {blob_path}")
-                    return False
+                print(f"❌ Blob not found: {blob_path}")
+                return False
             
             # Find the exact blob
             blob_url = None
             for blob in blob_list['blobs']:
                 print(f"🔍 Checking blob: {blob['pathname']} vs {blob_path}")
                 if blob['pathname'] == blob_path:
-                    blob_url = blob.get('downloadUrl') or blob.get('url')
+                    blob_url = blob['downloadUrl']  # Use downloadUrl instead of url
                     print(f"✅ Found blob URL: {blob_url}")
                     break
             
@@ -196,27 +198,15 @@ class BlobClient:
     
     def list_files(self, prefix: Optional[str] = None) -> list:
         """
-        List files in blob storage (alias for list_blobs that returns just the files)
+        List files with optional prefix filter - returns list of file info dicts
         
         Args:
             prefix: Optional prefix to filter files
             
         Returns:
-            List of file info dicts
+            List of file info dicts or empty list on failure
         """
-        blob_list = self.list_blobs(prefix)
-        if blob_list and 'blobs' in blob_list:
-            return blob_list['blobs']
+        blob_response = self.list_blobs(prefix)
+        if blob_response and 'blobs' in blob_response:
+            return blob_response['blobs']
         return []
-    
-    def delete_file(self, blob_path: str) -> bool:
-        """
-        Delete a file from blob storage (alias for delete_blob)
-        
-        Args:
-            blob_path: Path of the blob to delete
-            
-        Returns:
-            True if successful, False otherwise
-        """
-        return self.delete_blob(blob_path)

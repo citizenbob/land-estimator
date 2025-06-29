@@ -43,6 +43,24 @@ export function clearVersionManifestCache(): void {
  * @throws Error when manifest cannot be loaded or is invalid
  */
 export async function getVersionManifest(): Promise<VersionManifest> {
+  // In development mode, return a mock manifest for local files
+  if (process.env.NODE_ENV === 'development') {
+    console.log('🔧 Using development version manifest (local files)');
+    return {
+      generated_at: new Date().toISOString(),
+      current: {
+        version: 'dev-local',
+        files: {
+          address_index: '/address-index.json.gz',
+          parcel_metadata: '/parcel-metadata.json.gz',
+          parcel_geometry: '/parcel-geometry.json.gz'
+        }
+      },
+      previous: null,
+      available_versions: ['dev-local']
+    };
+  }
+
   // Check cache first
   if (manifestCache && Date.now() - manifestCache.timestamp < CACHE_DURATION) {
     console.log('📦 Using cached version manifest');

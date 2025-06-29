@@ -1,0 +1,13 @@
+{
+  "generated_at": "2025-06-29T19:00:00.000Z",
+  "current": {
+    "version": "dev-local",
+    "files": {
+      "address_index": "/address-index.json.gz",
+      "parcel_metadata": "/parcel-metadata.json.gz",
+      "parcel_geometry": "/parcel-geometry.json.gz"
+    }
+  },
+  "previous": null,
+  "available_versions": ["dev-local"]
+}

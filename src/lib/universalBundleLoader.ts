@@ -10,6 +10,25 @@ import {
 } from '@services/versionManifest';
 import { logError } from '@lib/errorUtils';
 
+// Lazy import to avoid circular dependencies and SSR issues
+let serviceWorkerClient: {
+  isCached: (url: string) => Promise<boolean>;
+} | null = null;
+async function getServiceWorkerClient() {
+  if (typeof window !== 'undefined' && !serviceWorkerClient) {
+    try {
+      const { default: swClient } = await import('@lib/serviceWorkerClient');
+      serviceWorkerClient = swClient;
+    } catch (error) {
+      console.warn(
+        '[Universal Loader] Service Worker Client not available:',
+        error
+      );
+    }
+  }
+  return serviceWorkerClient;
+}
+
 /**
  * Universal bundle interface for optimized and cached data loading
  */
@@ -174,6 +193,23 @@ export function createUniversalBundleLoader<TData, TOptimizedIndex, TBundle>(
             `📦 Using cached ${config.baseFilename} for version ${currentVersion}`
           );
           return cachedBundle;
+        }
+
+        // Check Service Worker cache for version URLs
+        const swClient = await getServiceWorkerClient();
+        if (swClient && manifest.current.files) {
+          const fileKey = config.baseFilename.replace(
+            '-',
+            '_'
+          ) as keyof typeof manifest.current.files;
+          const url = manifest.current.files[fileKey];
+
+          if (url && (await swClient.isCached(url))) {
+            console.log(
+              `🎯 [SW] Found ${config.baseFilename} in Service Worker cache`
+            );
+            // Let the normal loading process handle it, but it'll be fast from cache
+          }
         }
 
         // Try to load from current version

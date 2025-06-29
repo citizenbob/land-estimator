@@ -116,6 +116,67 @@ class ServiceWorkerClient {
   }
 
   /**
+   * Get cache status for versioned indexes
+   */
+  async getCacheStatus(): Promise<{
+    cacheExists: boolean;
+    cachedFiles: string[];
+    cacheSize?: number;
+  }> {
+    if (!this.isSupported) {
+      return { cacheExists: false, cachedFiles: [] };
+    }
+
+    try {
+      const cache = await caches.open('versioned-index-cache-v1');
+      const requests = await cache.keys();
+      const cachedFiles = requests.map((req) => req.url);
+
+      return {
+        cacheExists: cachedFiles.length > 0,
+        cachedFiles,
+        cacheSize: cachedFiles.length
+      };
+    } catch (error) {
+      console.error('[SW Client] Error getting cache status:', error);
+      return { cacheExists: false, cachedFiles: [] };
+    }
+  }
+
+  /**
+   * Warm up the cache by preloading if needed
+   */
+  async warmupCache(): Promise<boolean> {
+    const status = await this.getCacheStatus();
+
+    if (!status.cacheExists || status.cachedFiles.length === 0) {
+      console.log('[SW Client] Cache is empty, triggering preload...');
+      return await this.preloadVersionedIndexes();
+    }
+
+    console.log(
+      '[SW Client] Cache already warm with',
+      status.cachedFiles.length,
+      'files'
+    );
+    return true;
+  }
+
+  /**
+   * Force refresh the cache (clear + preload)
+   */
+  async refreshCache(): Promise<boolean> {
+    console.log('[SW Client] Refreshing cache...');
+
+    const cleared = await this.clearCache();
+    if (!cleared) {
+      return false;
+    }
+
+    return await this.preloadVersionedIndexes();
+  }
+
+  /**
    * Send a message to the service worker and wait for response
    */
   private async sendMessage(
@@ -173,6 +234,52 @@ class ServiceWorkerClient {
       scope: this.registration?.scope
     };
   }
+
+  /**
+   * Check if a specific URL is cached
+   */
+  async isCached(url: string): Promise<boolean> {
+    if (!this.isSupported) {
+      return false;
+    }
+
+    try {
+      const cache = await caches.open('versioned-index-cache-v1');
+      const response = await cache.match(url);
+      return !!response;
+    } catch (error) {
+      console.error('[SW Client] Error checking cache for URL:', url, error);
+      return false;
+    }
+  }
+
+  /**
+   * Prefetch a specific URL if not already cached
+   */
+  async prefetchUrl(url: string): Promise<boolean> {
+    if (!this.isSupported) {
+      return false;
+    }
+
+    try {
+      // Check if already cached
+      if (await this.isCached(url)) {
+        console.log('[SW Client] URL already cached:', url);
+        return true;
+      }
+
+      // Send prefetch request to service worker
+      const success = await this.sendMessage(
+        { type: 'PREFETCH_URL', url },
+        10000
+      );
+
+      return success;
+    } catch (error) {
+      console.error('[SW Client] Prefetch failed for URL:', url, error);
+      return false;
+    }
+  }
 }
 
 // Create singleton instance
@@ -185,12 +292,23 @@ if (typeof window !== 'undefined') {
     const registered = await serviceWorkerClient.register();
 
     if (registered) {
-      // Start preloading indexes in the background
+      // Start intelligent cache warming in the background
       setTimeout(async () => {
-        await serviceWorkerClient.preloadVersionedIndexes();
+        try {
+          await serviceWorkerClient.warmupCache();
+        } catch (error) {
+          console.warn('[SW Client] Cache warmup failed:', error);
+          // Don't block the app if cache warmup fails
+        }
       }, 1000);
       // Delay to avoid interfering with initial page load
     }
+  });
+
+  // Handle online/offline events for better cache management
+  window.addEventListener('online', async () => {
+    console.log('[SW Client] Back online, checking cache freshness...');
+    // Could trigger a background refresh if needed
   });
 }
 

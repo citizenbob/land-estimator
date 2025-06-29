@@ -86,3 +86,60 @@ env/
 # (actual data files live in ../land-estimator-data LFS repo)
 
 ## (Large data files are symlinked into /data; no deeper ignores required)
+# Experiment data files (large datasets, generated files)
+src/exp/**/store/
+src/exp/**/store/**
+src/exp/**/*-entries.json
+src/exp/**/address-entries.json
+
+# Python cache and temporary files
+__pycache__/
+*/__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.so
+
+# Ingest pipeline temporary files
+src/config/scripts/temp/
+src/config/scripts/raw/
+src/config/scripts/*.json
+src/config/scripts/*.gz
+src/config/scripts/*.csv
+src/config/scripts/*.shp
+src/config/scripts/*.shx
+src/config/scripts/*.dbf
+src/config/scripts/*.prj
+src/config/scripts/*.cpg
+
+# Shapefile data (all formats)
+*.shp
+*.shx
+*.dbf
+*.prj
+*.cpg
+*.xml
+*.fbn
+*.fbx
+*.ain
+*.aih
+*.ixs
+*.mxs
+*.atx
+*.shp.xml
+
+# Compressed data archives  
+*.tar.gz
+*.tar.gz.enc
+shapefiles.tar.gz*
+
+# Data processing outputs
+*-processed.json
+*-metadata-*.json
+parcel-geometry*.json
+backup-manifest*.json
+
+# Emergency backup files
+/public/*-backup.json
+/public/emergency-backup/

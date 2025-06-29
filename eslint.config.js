@@ -20,6 +20,7 @@ const config = [
       '**/cypress/screenshots/**',
       '**/cypress/videos/**',
       '**/storybook-static/**',
+
       '**/*.json',
       '**/*.csv',
       '**/*.geojson',
