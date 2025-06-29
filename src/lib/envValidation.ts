@@ -23,7 +23,6 @@ export function validateFirebaseCredentials() {
     );
   }
 
-  // Log validation success
   console.log('🐛 Firebase Admin: Checking credentials...');
   required.forEach((key) => {
     console.log(`${key}: ${process.env[key] ? 'SET' : 'NOT SET'}`);

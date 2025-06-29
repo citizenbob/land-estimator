@@ -40,18 +40,15 @@ vi.mock('@data/address_index.json', () => ({
 /**
  * Mock versioned bundle loader with configurable behavior
  */
-const mockLoadBundle = vi.fn();
-const mockClearCache = vi.fn();
+const mockLoadVersionedBundle = vi.fn();
+const mockClearMemoryCache = vi.fn();
 
-vi.mock('@lib/versionedBundleLoader', () => ({
-  createVersionedBundleLoader: () => ({
-    loadBundle: mockLoadBundle,
-    clearCache: mockClearCache
-  })
+vi.mock('@workers/versionedBundleLoader', () => ({
+  loadVersionedBundle: mockLoadVersionedBundle,
+  clearMemoryCache: mockClearMemoryCache
 }));
 
-// Default successful mock behavior
-mockLoadBundle.mockResolvedValue({
+mockLoadVersionedBundle.mockResolvedValue({
   index: mockSearchIndex,
   parcelIds: mockIndexData.parcelIds,
   addressData: MOCK_ADDRESS_INDEX_ADDRESS_DATA
@@ -67,7 +64,7 @@ describe('loadAddressIndex', () => {
     /**
      * Reset mock behavior to default success
      */
-    mockLoadBundle.mockResolvedValue({
+    mockLoadVersionedBundle.mockResolvedValue({
       index: mockSearchIndex,
       parcelIds: mockIndexData.parcelIds,
       addressData: MOCK_ADDRESS_INDEX_ADDRESS_DATA
@@ -91,7 +88,6 @@ describe('loadAddressIndex', () => {
      * Clear any cached data and reset the mock call count
      */
     clearAddressIndexCache();
-    // Clear mocks again after clearing cache
     vi.clearAllMocks();
   });
 
@@ -121,23 +117,23 @@ describe('loadAddressIndex', () => {
       expect(result).toHaveProperty('addressData');
       expect(result.parcelIds).toEqual(mockIndexData.parcelIds);
       expect(result.addressData).toEqual(MOCK_ADDRESS_INDEX_ADDRESS_DATA);
-      expect(mockLoadBundle).toHaveBeenCalledTimes(1);
+      expect(mockLoadVersionedBundle).toHaveBeenCalledTimes(1);
     });
 
     it('should handle loader errors gracefully', async () => {
       const errorMessage =
         'Unable to load address-index data. This may be due to network connectivity issues or temporary service unavailability. Please try refreshing the page or check your internet connection.';
-      mockLoadBundle.mockRejectedValue(new Error(errorMessage));
+      mockLoadVersionedBundle.mockRejectedValue(new Error(errorMessage));
 
       await expect(loadAddressIndex()).rejects.toThrow(errorMessage);
-      expect(mockLoadBundle).toHaveBeenCalledTimes(1);
+      expect(mockLoadVersionedBundle).toHaveBeenCalledTimes(1);
     });
 
     it('should handle unexpected loader failures', async () => {
-      mockLoadBundle.mockRejectedValue(new Error('Network error'));
+      mockLoadVersionedBundle.mockRejectedValue(new Error('Network error'));
 
       await expect(loadAddressIndex()).rejects.toThrow('Network error');
-      expect(mockLoadBundle).toHaveBeenCalledTimes(1);
+      expect(mockLoadVersionedBundle).toHaveBeenCalledTimes(1);
     });
   });
 
@@ -147,7 +143,6 @@ describe('loadAddressIndex', () => {
     });
 
     it('should load index using versioned loader in production', async () => {
-      // Test that the versioned loader is called correctly
       const result = await loadAddressIndex();
 
       expect(result).toHaveProperty('index');
@@ -155,7 +150,7 @@ describe('loadAddressIndex', () => {
       expect(result).toHaveProperty('addressData');
       expect(result.parcelIds).toEqual(mockIndexData.parcelIds);
       expect(result.addressData).toEqual(MOCK_ADDRESS_INDEX_ADDRESS_DATA);
-      expect(mockLoadBundle).toHaveBeenCalledTimes(1);
+      expect(mockLoadVersionedBundle).toHaveBeenCalledTimes(1);
     });
   });
 
@@ -165,7 +160,7 @@ describe('loadAddressIndex', () => {
     });
 
     it('should handle versioned loader errors gracefully', async () => {
-      mockLoadBundle.mockRejectedValue(
+      mockLoadVersionedBundle.mockRejectedValue(
         new Error(
           'Unable to load address-index data. This may be due to network connectivity issues or temporary service unavailability. Please try refreshing the page or check your internet connection.'
         )
@@ -174,24 +169,25 @@ describe('loadAddressIndex', () => {
       await expect(loadAddressIndex()).rejects.toThrow(
         'Unable to load address-index data'
       );
-      expect(mockLoadBundle).toHaveBeenCalledTimes(1);
+      expect(mockLoadVersionedBundle).toHaveBeenCalledTimes(1);
     });
 
     it('should handle data corruption errors gracefully', async () => {
-      mockLoadBundle.mockRejectedValue(new Error('Failed to decompress data'));
+      mockLoadVersionedBundle.mockRejectedValue(
+        new Error('Failed to decompress data')
+      );
 
       await expect(loadAddressIndex()).rejects.toThrow(
         'Failed to decompress data'
       );
-      expect(mockLoadBundle).toHaveBeenCalledTimes(1);
+      expect(mockLoadVersionedBundle).toHaveBeenCalledTimes(1);
     });
 
     it('should use the versioned bundle loader for all data processing', async () => {
       const result = await loadAddressIndex();
 
-      // The versioned loader handles all data processing internally
       expect(result.addressData).toEqual(MOCK_ADDRESS_INDEX_ADDRESS_DATA);
-      expect(mockLoadBundle).toHaveBeenCalledTimes(1);
+      expect(mockLoadVersionedBundle).toHaveBeenCalledTimes(1);
     });
   });
 
@@ -201,26 +197,24 @@ describe('loadAddressIndex', () => {
     });
 
     it('should call the versioned loader for each request', async () => {
-      // Note: Caching is now handled internally by the versioned loader
       const result1 = await loadAddressIndex();
-      expect(mockLoadBundle).toHaveBeenCalledTimes(1);
+      expect(mockLoadVersionedBundle).toHaveBeenCalledTimes(1);
 
       const result2 = await loadAddressIndex();
-      expect(mockLoadBundle).toHaveBeenCalledTimes(2);
+      expect(mockLoadVersionedBundle).toHaveBeenCalledTimes(2);
 
-      // Both calls should return the same mock data
       expect(result1).toEqual(result2);
     });
 
     it('should call clearCache on the versioned loader when clearAddressIndexCache is called', async () => {
       await loadAddressIndex();
-      expect(mockLoadBundle).toHaveBeenCalledTimes(1);
+      expect(mockLoadVersionedBundle).toHaveBeenCalledTimes(1);
 
       clearAddressIndexCache();
-      expect(mockClearCache).toHaveBeenCalledTimes(1);
+      expect(mockClearMemoryCache).toHaveBeenCalledTimes(1);
 
       await loadAddressIndex();
-      expect(mockLoadBundle).toHaveBeenCalledTimes(2);
+      expect(mockLoadVersionedBundle).toHaveBeenCalledTimes(2);
     });
   });
 
@@ -230,24 +224,15 @@ describe('loadAddressIndex', () => {
     });
 
     it('should create FlexSearch index with correct configuration', async () => {
-      // In test environment, we can't test the actual FlexSearch constructor call
-      // because the versioned loader is mocked to return a pre-built index.
-      // Instead, we test that the mocked index is returned correctly.
       const result = await loadAddressIndex();
 
-      // Verify the result structure
       expect(result).toHaveProperty('index');
       expect(result).toHaveProperty('parcelIds');
       expect(result).toHaveProperty('addressData');
 
-      // Verify the index is the mocked one
       expect(result.index).toBe(mockSearchIndex);
 
-      // Verify the versioned loader was called
-      expect(mockLoadBundle).toHaveBeenCalledTimes(1);
-
-      // The actual FlexSearch constructor would be called in the createSearchIndex function,
-      // but since we're mocking the loader, we don't test this implementation detail
+      expect(mockLoadVersionedBundle).toHaveBeenCalledTimes(1);
     });
   });
 });

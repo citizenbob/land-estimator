@@ -2,8 +2,8 @@ import { GET } from './route';
 import { getParcelMetadata } from '@services/parcelMetadata';
 import { NextRequest } from 'next/server';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { MOCK_PARCEL_METADATA } from '@lib/testData';
 
-// Mock the parcelMetadata service
 vi.mock('@services/parcelMetadata', () => ({
   getParcelMetadata: vi.fn()
 }));
@@ -21,41 +21,22 @@ describe('/api/parcel-metadata/[id] route', () => {
     return new NextRequest(url);
   };
 
-  const mockParcelData = {
-    id: '123',
-    full_address: '123 Main St, St. Louis, MO 63101',
-    latitude: 38.627,
-    longitude: -90.1994,
-    region: 'St. Louis City',
-    calc: {
-      landarea: 5000,
-      building_sqft: 1200,
-      estimated_landscapable_area: 3800,
-      property_type: 'residential'
-    },
-    owner: {
-      name: 'John Doe'
-    },
-    affluence_score: 0.75,
-    source_file: 'test',
-    processed_date: '2024-01-01T00:00:00.000Z'
-  };
+  const mockParcelData = MOCK_PARCEL_METADATA[0];
 
   describe('GET', () => {
     it('should return parcel data when parcel exists', async () => {
       mockGetParcelMetadata.mockResolvedValue(mockParcelData);
 
       const request = createMockRequest();
-      const params = { params: Promise.resolve({ id: '123' }) };
+      const params = { params: Promise.resolve({ id: mockParcelData.id }) };
 
       const response = await GET(request, params);
       const data = await response.json();
 
       expect(response.status).toBe(200);
       expect(data).toEqual(mockParcelData);
-      expect(mockGetParcelMetadata).toHaveBeenCalledWith('123');
+      expect(mockGetParcelMetadata).toHaveBeenCalledWith(mockParcelData.id);
 
-      // Check cache headers
       expect(response.headers.get('Cache-Control')).toBe(
         'public, max-age=3600'
       );

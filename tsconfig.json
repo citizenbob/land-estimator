@@ -31,7 +31,8 @@
       "@store/*": ["store/*"],
       "@tokens/*": ["tokens/*"],
       "@types/*": ["types/*"],
-      "@typez/*": ["types/*"]
+      "@typez/*": ["types/*"],
+      "@workers/*": ["workers/*"]
     },
     "types": [
       "cypress",

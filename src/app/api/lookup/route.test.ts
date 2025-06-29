@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { NextRequest } from 'next/server';
 import { GET } from './route';
 import * as addressSearch from '@services/addressSearch';
+import { MOCK_ADDRESS_LOOKUP_DATA } from '@lib/testData';
 
 vi.mock('@services/addressSearch');
 const mockSearchAddresses = vi.mocked(addressSearch.searchAddresses);
@@ -21,14 +22,7 @@ describe('/api/lookup route', () => {
 
   describe('Valid requests', () => {
     it('should return successful response with results', async () => {
-      const mockResults = [
-        {
-          id: '123',
-          display_name: 'Test Address, Test City',
-          region: 'Test Region',
-          normalized: 'test address test city'
-        }
-      ];
+      const mockResults = MOCK_ADDRESS_LOOKUP_DATA.slice(0, 1);
 
       mockSearchAddresses.mockResolvedValue(mockResults);
 
@@ -74,20 +68,7 @@ describe('/api/lookup route', () => {
     });
 
     it('should handle multiple results', async () => {
-      const mockResults = [
-        {
-          id: '123',
-          display_name: 'Main St, City A',
-          region: 'Region A',
-          normalized: 'main st city a'
-        },
-        {
-          id: '456',
-          display_name: 'Main St, City B',
-          region: 'Region B',
-          normalized: 'main st city b'
-        }
-      ];
+      const mockResults = MOCK_ADDRESS_LOOKUP_DATA.slice(0, 2);
 
       mockSearchAddresses.mockResolvedValue(mockResults);
 
@@ -251,14 +232,7 @@ describe('/api/lookup route', () => {
 
   describe('Response format validation', () => {
     it('should always include required response fields', async () => {
-      const mockResults = [
-        {
-          id: '123',
-          display_name: 'Test Address',
-          region: 'Test Region',
-          normalized: 'test address'
-        }
-      ];
+      const mockResults = [MOCK_ADDRESS_LOOKUP_DATA[0]];
 
       mockSearchAddresses.mockResolvedValue(mockResults);
 

@@ -120,7 +120,6 @@ const AddressInput = ({
 
     logAddressEvent(matched, 'estimate_button_clicked');
 
-    // Use API route instead of client-side parcel metadata loading
     try {
       const response = await fetch(`/api/parcel-metadata/${matched.place_id}`);
       if (!response.ok) {
@@ -137,11 +136,11 @@ const AddressInput = ({
           longitude: rawData.longitude,
           region: rawData.region || 'Unknown',
           calc: {
-            landarea: rawData.calc.landarea,
-            building_sqft: rawData.calc.building_sqft,
+            landarea: rawData.calc?.landarea || 0,
+            building_sqft: rawData.calc?.building_sqft || 0,
             estimated_landscapable_area:
-              rawData.calc.estimated_landscapable_area,
-            property_type: rawData.calc.property_type
+              rawData.calc?.estimated_landscapable_area || 0,
+            property_type: rawData.calc?.property_type || 'residential'
           },
           affluence_score: rawData.affluence_score
         };
@@ -158,11 +157,11 @@ const AddressInput = ({
           longitude: rawData.longitude,
           region: rawData.region || 'Unknown',
           calc: {
-            landarea: rawData.calc.landarea,
-            building_sqft: rawData.calc.building_sqft,
+            landarea: rawData.calc?.landarea || 0,
+            building_sqft: rawData.calc?.building_sqft || 0,
             estimated_landscapable_area:
-              rawData.calc.estimated_landscapable_area,
-            property_type: rawData.calc.property_type
+              rawData.calc?.estimated_landscapable_area || 0,
+            property_type: rawData.calc?.property_type || 'residential'
           },
           affluence_score: rawData.affluence_score
         };

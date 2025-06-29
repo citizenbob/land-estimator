@@ -233,7 +233,6 @@ describe('useAddressLookup', () => {
     );
 
     mockSuccessResponse(mockFetch, lookupResponse);
-    // Mock the parcel metadata API response
     mockSuccessResponse(mockFetch, MOCK_LOCAL_ADDRESSES[0]);
 
     const { result } = renderHook(() => useAddressLookup());
@@ -266,7 +265,6 @@ describe('useAddressLookup', () => {
       mockApiRecord
     ]);
 
-    // Mock the lookup API response first
     mockSuccessResponse(mockFetch, lookupResponse);
 
     const { result } = renderHook(() => useAddressLookup());
@@ -296,9 +294,7 @@ describe('useAddressLookup', () => {
       mockApiRecord
     ]);
 
-    // Mock the lookup API response first
     mockSuccessResponse(mockFetch, lookupResponse);
-    // Mock the parcel metadata API response
     mockSuccessResponse(mockFetch, MOCK_LOCAL_ADDRESSES[1]);
 
     const { result } = renderHook(() => useAddressLookup());

@@ -1,37 +1,50 @@
 /// <reference types="cypress" />
-// ***********************************************
-// This example commands.ts shows you how to
-// create various custom commands and overwrite
-// existing commands.
-//
-// For more comprehensive examples of custom
-// commands please read more here:
-// https://on.cypress.io/custom-commands
-// ***********************************************
-//
-//
-// -- This is a parent command --
-// Cypress.Commands.add('login', (email, password) => { ... })
-//
-//
-// -- This is a child command --
-// Cypress.Commands.add('drag', { prevSubject: 'element'}, (subject, options) => { ... })
-//
-//
-// -- This is a dual command --
-// Cypress.Commands.add('dismiss', { prevSubject: 'optional'}, (subject, options) => { ... })
-//
-//
-// -- This will overwrite an existing command --
-// Cypress.Commands.overwrite('visit', (originalFn, url, options) => { ... })
-//
-// declare global {
-//   namespace Cypress {
-//     interface Chainable {
-//       login(email: string, password: string): Chainable<void>
-//       drag(subject: string, options?: Partial<TypeOptions>): Chainable<Element>
-//       dismiss(subject: string, options?: Partial<TypeOptions>): Chainable<Element>
-//       visit(originalFn: CommandOriginalFn, url: string, options: Partial<VisitOptions>): Chainable<Element>
-//     }
-//   }
-// }
+
+// Export empty object to make this a module
+export {};
+
+// TypeScript declarations for custom commands
+declare global {
+  // eslint-disable-next-line @typescript-eslint/no-namespace
+  namespace Cypress {
+    interface Chainable {
+      /**
+       * Custom command to log API intercepts for debugging
+       */
+      logIntercepts(): Chainable<void>;
+
+      /**
+       * Custom command to wait for all common API calls to complete
+       */
+      waitForApiCalls(): Chainable<void>;
+    }
+  }
+}
+
+// Custom command to log API intercepts for debugging
+Cypress.Commands.add('logIntercepts', () => {
+  cy.window().then((win) => {
+    // Log all active intercepts to console for debugging
+    console.log('Active Cypress intercepts:', {
+      timestamp: new Date().toISOString(),
+      userAgent: win.navigator.userAgent,
+      url: win.location.href
+    });
+  });
+});
+
+// Custom command to wait for all common API calls to complete
+Cypress.Commands.add('waitForApiCalls', () => {
+  // Wait for the most common API calls with reasonable timeouts
+  cy.wait('@lookup', { timeout: 5000 }).then(() => {
+    cy.log('✅ Lookup API call completed');
+  });
+
+  cy.wait('@parcelMetadata', { timeout: 5000 }).then(() => {
+    cy.log('✅ Parcel metadata API call completed');
+  });
+
+  cy.wait('@logApiCall', { timeout: 5000 }).then(() => {
+    cy.log('✅ Log API call completed');
+  });
+});

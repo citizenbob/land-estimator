@@ -11,7 +11,6 @@ describe('EstimateLineItem', () => {
 
     expect(labelElement).toBeInTheDocument();
     expect(valueElement).toBeInTheDocument();
-    // Check the elements are in the same parent
     expect(labelElement.parentElement).toBe(valueElement.parentElement);
   });
 
@@ -32,12 +31,9 @@ describe('EstimateLineItem', () => {
   });
 
   it('increments animation props on motion component', () => {
-    // We can't test framer-motion internals easily, but we can check that the component renders the correct tag
     render(<EstimateLineItem label="Test" value="123" />);
     const container = screen.getByText('Test:').parentElement;
-    // The styled component uses a MotionLineItem which resolves to a div with motion props
     expect(container).toHaveAttribute('style');
-    // At least it should be a DOM element
     const tagName = container?.tagName.toLowerCase();
     expect(tagName).toBe('div');
   });

@@ -1,7 +1,23 @@
 import FlexSearch from 'flexsearch';
-import { createVersionedBundleLoader } from '@lib/versionedBundleLoader';
-import { AppError, ErrorType } from '@lib/errorUtils';
-import { decompressJsonData } from '@lib/universalLoader';
+import {
+  loadVersionedBundle,
+  clearMemoryCache
+} from '@workers/versionedBundleLoader';
+
+type PrecomputedIndexData = {
+  parcelIds: string[];
+  searchStrings: string[];
+  timestamp: string;
+  recordCount: number;
+  version: string;
+  exportMethod: string;
+};
+
+type FlexSearchIndexBundle = {
+  index: FlexSearch.Index;
+  parcelIds: string[];
+  addressData: Record<string, string>;
+};
 
 /**
  * Creates address lookup map for search result mapping
@@ -9,11 +25,11 @@ import { decompressJsonData } from '@lib/universalLoader';
  * @returns Map of parcel IDs to address strings
  */
 async function createAddressLookupMap(
-  indexData: FlexSearch.PrecomputedIndexData
+  indexData: PrecomputedIndexData
 ): Promise<Record<string, string>> {
   const addressData: Record<string, string> = {};
 
-  indexData.parcelIds.forEach((parcelId, idx) => {
+  indexData.parcelIds.forEach((parcelId: string, idx: number) => {
     const searchString = indexData.searchStrings[idx];
     const address = searchString.replace(` ${parcelId}`, '');
     addressData[parcelId] = address;
@@ -23,13 +39,14 @@ async function createAddressLookupMap(
 }
 
 /**
- * Creates a search index from precomputed search strings
+ * Creates a search index from search strings using fast rebuild approach
+ * Based on performance testing: rebuild is faster and more reliable than export/import
  * @param indexData Precomputed index data
  * @returns FlexSearch index
  */
-function createSearchIndex(
-  indexData: FlexSearch.PrecomputedIndexData
-): FlexSearch.Index {
+function createSearchIndex(indexData: PrecomputedIndexData): FlexSearch.Index {
+  console.log('⚡ Building FlexSearch index from search strings');
+
   const searchIndex = new FlexSearch.Index({
     tokenize: 'forward',
     cache: 100,
@@ -43,48 +60,11 @@ function createSearchIndex(
   return searchIndex;
 }
 
-/**
- * Address index fallback - attempts to load from local backup if available
- * @throws When no fallback data is available
- */
-async function loadRawAddressData(): Promise<
-  FlexSearch.PrecomputedIndexData[]
-> {
-  // Try to load from emergency backup file if available
-  if (typeof window !== 'undefined') {
-    try {
-      const response = await fetch('/address-index-backup.json.gz');
-      if (response.ok) {
-        const arrayBuffer = await response.arrayBuffer();
-        const decompressed =
-          decompressJsonData<FlexSearch.PrecomputedIndexData>(
-            new Uint8Array(arrayBuffer)
-          );
-        console.log('🚨 Using emergency backup address index');
-        return [decompressed];
-      }
-    } catch (error) {
-      console.warn('Emergency backup not available:', error);
-    }
-  }
-
-  throw new AppError(
-    'Address index requires optimized .gz data - no fallback available. CDN may be temporarily unavailable.',
-    ErrorType.VALIDATION,
-    { isRetryable: true }
-  );
-}
-
-// Versioned address index loader with comprehensive CDN fallback chain
-const addressIndexLoader = createVersionedBundleLoader<
-  FlexSearch.PrecomputedIndexData,
-  FlexSearch.PrecomputedIndexData,
-  FlexSearch.FlexSearchIndexBundle
->({
+const addressIndexConfig = {
   baseFilename: 'address-index',
   createLookupMap: () => ({}),
-  extractDataFromIndex: (index: FlexSearch.PrecomputedIndexData) => [index],
-  createBundle: async (data: FlexSearch.PrecomputedIndexData[]) => {
+  extractDataFromIndex: (index: PrecomputedIndexData) => [index],
+  createBundle: async (data: PrecomputedIndexData[]) => {
     const indexData = data[0];
     const searchIndex = createSearchIndex(indexData);
     const addressData = await createAddressLookupMap(indexData);
@@ -95,7 +75,7 @@ const addressIndexLoader = createVersionedBundleLoader<
       addressData
     };
   }
-});
+};
 
 /**
  * Universal address index loader that works in both browser and Node.js environments
@@ -103,14 +83,12 @@ const addressIndexLoader = createVersionedBundleLoader<
  * @returns FlexSearch index bundle with search index, parcel IDs, and address data
  * @throws When index file cannot be loaded or processed
  */
-export async function loadAddressIndex(): Promise<FlexSearch.FlexSearchIndexBundle> {
-  // In production, use versioned loader with comprehensive CDN fallback chain
+export async function loadAddressIndex(): Promise<FlexSearchIndexBundle> {
   if (process.env.NODE_ENV === 'production') {
-    // Check if Service Worker has the data cached
     if (typeof window !== 'undefined') {
       try {
         const { default: serviceWorkerClient } = await import(
-          '@lib/serviceWorkerClient'
+          '@workers/serviceWorkerClient'
         );
 
         const { getVersionManifest } = await import(
@@ -125,55 +103,26 @@ export async function loadAddressIndex(): Promise<FlexSearch.FlexSearchIndexBund
           );
         }
 
-        // Warm up cache if needed
         await serviceWorkerClient.warmupCache();
       } catch (error) {
         console.warn(
           '[Address Index] Service Worker integration failed:',
           error
         );
-        // Continue with normal loading
       }
     }
 
-    return addressIndexLoader.loadBundle();
+    return loadVersionedBundle(addressIndexConfig);
   }
 
-  // Test environment - use mocked loader
   if (process.env.NODE_ENV === 'test') {
-    // During tests, the loader should be mocked, so this should work
-    return addressIndexLoader.loadBundle();
+    return loadVersionedBundle(addressIndexConfig);
   }
 
-  // Development mode - graceful fallback to raw data
-  console.warn(
-    '⚠️ [DEV] Loading raw address data (versioned loader disabled in development)'
-  );
-  try {
-    const rawDataArray = await loadRawAddressData();
-    // Extract the single PrecomputedIndexData object
-    const rawData = rawDataArray[0];
-    const searchIndex = createSearchIndex(rawData);
-    const addressData = await createAddressLookupMap(rawData);
-
-    return {
-      index: searchIndex,
-      parcelIds: rawData.parcelIds,
-      addressData
-    };
-  } catch (error) {
-    console.error('[DEV] Failed to load raw address data:', error);
-    throw new AppError(
-      'Address data not available in development mode. Ensure data files are present.',
-      ErrorType.VALIDATION,
-      { isRetryable: false }
-    );
-  }
+  console.log('🔧 [DEV] Using versioned loader with Firebase CDN');
+  return loadVersionedBundle(addressIndexConfig);
 }
 
-/**
- * Clears the cached address index bundle
- */
 export function clearAddressIndexCache(): void {
-  addressIndexLoader.clearCache();
+  clearMemoryCache();
 }

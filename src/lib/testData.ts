@@ -1,7 +1,10 @@
+import { vi } from 'vitest';
 import type {
   LocalAddressRecord,
   AddressSuggestion
 } from '@typez/localAddressTypes';
+import type { VersionManifest } from '@services/versionManifest';
+import FlexSearch from 'flexsearch';
 
 export const MOCK_LOCAL_ADDRESSES: LocalAddressRecord[] = [
   {
@@ -370,3 +373,72 @@ export const MOCK_API_RESPONSES = {
  * Mock gzipped data for testing compression/decompression
  */
 export const MOCK_GZIPPED_DATA = new Uint8Array([0x1f, 0x8b, 0x08, 0x00]);
+
+/**
+ * Worker-specific test types and data
+ */
+export interface TestItem {
+  id: string;
+  name: string;
+}
+
+export interface TestBundle {
+  data: TestItem[];
+  lookup: Record<string, TestItem>;
+  count: number;
+}
+
+export const MOCK_VERSION_MANIFEST: VersionManifest = {
+  generated_at: '2024-01-15T10:30:00.000Z',
+  current: {
+    version: '1.2.3',
+    files: {
+      address_index: 'cdn/address-index-v1.2.3.json.gz',
+      parcel_metadata: 'cdn/parcel-metadata-v1.2.3.json.gz',
+      parcel_geometry: 'cdn/parcel-geometry-v1.2.3.json.gz'
+    }
+  },
+  previous: {
+    version: '1.2.2',
+    files: {
+      address_index: 'cdn/address-index-v1.2.2.json.gz',
+      parcel_metadata: 'cdn/parcel-metadata-v1.2.2.json.gz',
+      parcel_geometry: 'cdn/parcel-geometry-v1.2.2.json.gz'
+    }
+  },
+  available_versions: ['1.2.3', '1.2.2']
+};
+
+export const MOCK_TEST_ITEMS: TestItem[] = [
+  { id: '1', name: 'Item 1' },
+  { id: '2', name: 'Item 2' }
+];
+
+export const MOCK_OPTIMIZED_INDEX = {
+  data: MOCK_TEST_ITEMS
+};
+
+export const EXPECTED_TEST_BUNDLE: TestBundle = {
+  data: MOCK_TEST_ITEMS,
+  lookup: {
+    '1': { id: '1', name: 'Item 1' },
+    '2': { id: '2', name: 'Item 2' }
+  },
+  count: 2
+};
+
+/**
+ * Mock FlexSearch index bundle for testing
+ */
+export const MOCK_FLEXSEARCH_BUNDLE: FlexSearch.FlexSearchIndexBundle = {
+  index: {
+    add: vi.fn(),
+    search: vi.fn().mockReturnValue([0, 1, 2]),
+    remove: vi.fn(),
+    update: vi.fn(),
+    clear: vi.fn(),
+    length: 3
+  } as unknown as FlexSearch.Index,
+  parcelIds: MOCK_ADDRESS_INDEX_INDEX_DATA.parcelIds,
+  addressData: MOCK_ADDRESS_INDEX_ADDRESS_DATA
+};

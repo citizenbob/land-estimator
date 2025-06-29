@@ -118,13 +118,11 @@ export function useLandscapeEstimator() {
         overrideLotSizeSqFt: landAreaSqFt
       };
 
-      // Calculate the price estimate using the service
       const priceBreakdown = estimateLandscapingPrice(
         boundingBox,
         estimatorOptions
       );
 
-      // Create the result with address information
       const result: EstimateResult = {
         address: {
           display_name: addressData.display_name,
@@ -140,7 +138,6 @@ export function useLandscapeEstimator() {
     } catch (err) {
       const errorMessage = getErrorMessage(err);
 
-      // Check if it's an insufficient data error from errorUtils
       if (
         err instanceof Error &&
         err.message.includes('Insufficient data for automatic estimate')

@@ -1,6 +1,6 @@
 import { fireEvent, screen, waitFor } from '@testing-library/react';
 import { expect, vi } from 'vitest';
-import { MOCK_LOCAL_ADDRESSES } from './testData';
+import { MOCK_LOCAL_ADDRESSES, TestItem, TestBundle } from './testData';
 import { useAddressLookup } from '@hooks/useAddressLookup';
 import { EventMap, LogOptions } from '@typez/analytics';
 
@@ -210,8 +210,20 @@ export function setupBrowserEnvironment() {
     (globalThis as Record<string, unknown>).window = {
       document: globalThis.document || {},
       navigator: globalThis.navigator || { userAgent: 'Vitest' },
-      location: { origin: 'http://localhost:3000' }
+      location: { origin: 'http://localhost:3000' },
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn()
     };
+  }
+
+  /**
+   * Ensure window has event listener methods
+   */
+  if (typeof globalThis.window?.addEventListener === 'undefined') {
+    globalThis.window.addEventListener = vi.fn();
+  }
+  if (typeof globalThis.window?.removeEventListener === 'undefined') {
+    globalThis.window.removeEventListener = vi.fn();
   }
 
   /**
@@ -445,3 +457,73 @@ export function createConsoleCapture() {
     restore: () => spy.mockRestore()
   };
 }
+
+/**
+ * Worker-specific test utilities
+ */
+
+/**
+ * Creates a mock fetch response with consistent structure
+ */
+export const createMockFetchResponse = (
+  data: unknown,
+  ok = true,
+  status = 200
+) => ({
+  ok,
+  status,
+  arrayBuffer: () => Promise.resolve(new ArrayBuffer(100)),
+  json: () => Promise.resolve(data)
+});
+
+/**
+ * Creates standardized cache mocks for service worker testing
+ */
+export const createCacheMocks = () => {
+  const mockCache = {
+    match: vi.fn(),
+    keys: vi.fn()
+  };
+  const mockCaches = {
+    open: vi.fn().mockResolvedValue(mockCache),
+    keys: vi.fn().mockResolvedValue(['versioned-index-cache-v1'])
+  };
+  return { mockCache, mockCaches };
+};
+
+/**
+ * Standard test configuration for versioned bundle loader
+ */
+export const createTestConfig = () => ({
+  baseFilename: 'address-index',
+  createLookupMap: vi.fn(
+    (data: TestItem[]): Record<string, TestItem> =>
+      data.reduce((acc, item) => ({ ...acc, [item.id]: item }), {})
+  ),
+  extractDataFromIndex: vi.fn(
+    (index: { data?: TestItem[] }): TestItem[] => index.data || []
+  ),
+  createBundle: vi.fn(
+    (data: TestItem[], lookup: Record<string, TestItem>): TestBundle => ({
+      data,
+      lookup,
+      count: data.length
+    })
+  )
+});
+
+/**
+ * Sets up consistent mock environment for worker tests
+ */
+export const setupWorkerMocks = (mockFetch: ReturnType<typeof vi.fn>) => {
+  const { mockCache, mockCaches } = createCacheMocks();
+
+  Object.defineProperty(global, 'caches', {
+    value: mockCaches,
+    writable: true
+  });
+
+  mockFetch.mockResolvedValue(createMockFetchResponse({}));
+
+  return { mockCache, mockCaches };
+};

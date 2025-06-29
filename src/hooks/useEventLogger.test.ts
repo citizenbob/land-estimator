@@ -3,22 +3,24 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { useEventLogger } from './useEventLogger';
 import * as loggerModule from '@services/logger';
 import { EstimateButtonClickedEvent } from '../types/analytics';
+import { setupConsoleMocks } from '@lib/testUtils';
+import { MOCK_ANALYTICS_EVENTS } from '@lib/testData';
 
 describe('useEventLogger', () => {
   const mockLogEvent = vi.fn().mockResolvedValue(undefined);
+  let consoleSpies: ReturnType<typeof setupConsoleMocks>;
 
   beforeEach(() => {
     vi.resetAllMocks();
-    vi.spyOn(console, 'error').mockImplementation(() => {});
+    consoleSpies = setupConsoleMocks();
     vi.spyOn(loggerModule, 'logEvent').mockImplementation(mockLogEvent);
   });
 
   it('uses the logger service with default options', async () => {
     const { result } = renderHook(() => useEventLogger());
 
-    const testEvent: EstimateButtonClickedEvent = {
-      address_id: '123-abc'
-    };
+    const testEvent: EstimateButtonClickedEvent =
+      MOCK_ANALYTICS_EVENTS.ESTIMATE_BUTTON_CLICKED;
 
     await act(async () => {
       await result.current.logEvent('estimate_button_clicked', testEvent);
@@ -72,7 +74,7 @@ describe('useEventLogger', () => {
       await result.current.logEvent('estimate_button_clicked', errorEvent);
     });
 
-    expect(console.error).toHaveBeenCalledWith(
+    expect(consoleSpies.errorSpy).toHaveBeenCalledWith(
       '[Error]',
       expect.objectContaining({
         message: 'Test error',

@@ -16,7 +16,6 @@ function ensureFirebaseApp(): App {
   const privateKey = process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, '\n');
 
   try {
-    // Check if an app is already initialized
     const existingApps = getApps();
     if (existingApps.length > 0) {
       firebaseApp = existingApps[0];
@@ -55,7 +54,6 @@ export const storageAdmin = {
   }
 };
 
-// For backwards compatibility
 export const admin = {
   apps: getApps
 };

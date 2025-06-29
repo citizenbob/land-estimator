@@ -249,9 +249,6 @@ describe('biLogging', () => {
       });
 
       const call = mockLogEvent.mock.calls[0];
-      // affluenceScore = 0.9 * 10 = 9
-      // estimateScore = min(50000 / 1000, 50) = 50
-      // leadScore = round(9 + 50) = 59
       expect(call[1].lead_score).toBe(59);
     });
 

@@ -2,6 +2,7 @@ import { renderHook } from '@testing-library/react';
 import { describe, it, expect } from 'vitest';
 import { useInputState } from './useInputState';
 import { AddressSuggestion } from '@typez/addressMatchTypes';
+import { MOCK_SUGGESTIONS } from '@lib/testData';
 
 describe('useInputState', () => {
   it('should return correct state for loading state', () => {
@@ -44,9 +45,7 @@ describe('useInputState', () => {
 
   it('should return correct state when showing suggestions', () => {
     const query = 'test';
-    const suggestions: AddressSuggestion[] = [
-      { place_id: '1', display_name: 'test location' }
-    ];
+    const suggestions: AddressSuggestion[] = [MOCK_SUGGESTIONS[0]];
     const isFetching = false;
     const hasFetched = true;
     const locked = false;
@@ -65,9 +64,7 @@ describe('useInputState', () => {
 
   it('should return correct state for locked state', () => {
     const query = 'test location';
-    const suggestions: AddressSuggestion[] = [
-      { place_id: '1', display_name: 'test location' }
-    ];
+    const suggestions: AddressSuggestion[] = [MOCK_SUGGESTIONS[0]];
     const isFetching = false;
     const hasFetched = true;
     const locked = true;
@@ -87,9 +84,9 @@ describe('useInputState', () => {
   it('should deduplicate suggestions by display_name', () => {
     const query = 'test';
     const suggestions: AddressSuggestion[] = [
-      { place_id: '1', display_name: 'test location' },
-      { place_id: '2', display_name: 'test location' },
-      { place_id: '3', display_name: 'another location' }
+      MOCK_SUGGESTIONS[0],
+      { ...MOCK_SUGGESTIONS[0], place_id: '2' },
+      MOCK_SUGGESTIONS[1]
     ];
     const isFetching = false;
     const hasFetched = true;
@@ -103,10 +100,8 @@ describe('useInputState', () => {
   });
 
   it('should not show suggestions if query matches a suggestion display_name', () => {
-    const query = 'test location';
-    const suggestions: AddressSuggestion[] = [
-      { place_id: '1', display_name: 'test location' }
-    ];
+    const query = MOCK_SUGGESTIONS[0].display_name;
+    const suggestions: AddressSuggestion[] = [MOCK_SUGGESTIONS[0]];
     const isFetching = false;
     const hasFetched = true;
     const locked = false;

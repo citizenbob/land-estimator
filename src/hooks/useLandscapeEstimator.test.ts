@@ -40,7 +40,6 @@ describe('useLandscapeEstimator', () => {
     });
 
     expect(estimatorModule.estimateLandscapingPrice).toHaveBeenCalledWith(
-      // Expect a generated bounding box around the lat/lon
       expect.arrayContaining([
         expect.any(String),
         expect.any(String),

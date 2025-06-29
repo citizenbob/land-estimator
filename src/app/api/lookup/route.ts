@@ -8,26 +8,38 @@ import { logError } from '@lib/errorUtils';
  * @returns JSON response with matching addresses and metadata
  */
 export async function GET(request: NextRequest) {
-  try {
-    const searchParams = request.nextUrl.searchParams;
-    const query = searchParams.get('query');
+  const searchParams = request.nextUrl.searchParams;
+  const query = searchParams.get('query');
 
+  // Reduce logging noise in test environment
+  const isTestEnv =
+    process.env.NODE_ENV === 'test' || process.env.CYPRESS === 'true';
+
+  if (!isTestEnv) {
     console.log('🔍 Lookup API called:', {
       query,
       timestamp: new Date().toISOString()
     });
+  }
 
-    if (!query || query.trim().length < 2) {
+  if (!query || query.trim().length < 2) {
+    if (!isTestEnv) {
       console.log('❌ Query too short:', query);
-      return NextResponse.json(
-        { error: 'Query parameter must be at least 2 characters' },
-        { status: 400 }
-      );
     }
+    return NextResponse.json(
+      { error: 'Query parameter must be at least 2 characters' },
+      { status: 400 }
+    );
+  }
 
-    console.log('🚀 Starting searchAddresses for:', query.trim());
+  try {
+    if (!isTestEnv) {
+      console.log('🚀 Starting searchAddresses for:', query.trim());
+    }
     const results = await searchAddresses(query.trim(), 10);
-    console.log('✅ Search completed:', { resultCount: results.length });
+    if (!isTestEnv) {
+      console.log('✅ Search completed:', { resultCount: results.length });
+    }
 
     const response = NextResponse.json({
       query: query.trim(),
@@ -35,7 +47,6 @@ export async function GET(request: NextRequest) {
       count: results.length
     });
 
-    // Add cache headers for fast responses
     response.headers.set(
       'Cache-Control',
       'public, s-maxage=300, stale-while-revalidate=86400'

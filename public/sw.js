@@ -1,14 +1,7 @@
-/**
- * Land Estimator Service Worker
- * Handles background preloading of versioned index files for better performance
- */
-
 const CACHE_NAME = 'versioned-index-cache-v1';
 
-// Try CDN first, fallback to development mode if needed
 const VERSION_MANIFEST_URLS = [
-  'https://lchevt1wkhcax7cz.public.blob.vercel-storage.com/cdn/version-manifest.json',
-  '/version-manifest-dev.json'
+  'https://storage.googleapis.com/land-estimator-29ee9.firebasestorage.app/cdn/version-manifest.json'
 ];
 
 self.addEventListener('install', () => {
@@ -19,7 +12,6 @@ self.addEventListener('install', () => {
 self.addEventListener('activate', (event) => {
   console.log('[SW] Activating service worker...');
   event.waitUntil(
-    // Clean up old caches
     caches
       .keys()
       .then((cacheNames) => {
@@ -51,7 +43,6 @@ self.addEventListener('message', async (event) => {
       console.log('[SW] Starting versioned index preload...');
       await preloadVersionedIndexes();
 
-      // Notify the client that preloading is complete
       event.ports[0]?.postMessage({
         type: 'PRELOAD_COMPLETE',
         success: true
@@ -96,7 +87,6 @@ self.addEventListener('message', async (event) => {
       console.log('[SW] Prefetching URL:', url);
       const cache = await caches.open(CACHE_NAME);
 
-      // Check if already cached
       const cachedResponse = await cache.match(url);
       if (cachedResponse) {
         console.log('[SW] URL already cached:', url);
@@ -108,7 +98,6 @@ self.addEventListener('message', async (event) => {
         return;
       }
 
-      // Fetch and cache
       const response = await fetch(url);
       if (response.ok) {
         await cache.put(url, response);
@@ -134,9 +123,6 @@ self.addEventListener('message', async (event) => {
   }
 });
 
-/**
- * Preload versioned index files based on the current version manifest
- */
 async function preloadVersionedIndexes() {
   try {
     console.log('[SW] Fetching version manifest...');
@@ -144,7 +130,6 @@ async function preloadVersionedIndexes() {
     let manifestResponse;
     let lastError;
 
-    // Try each manifest URL until one works
     for (const url of VERSION_MANIFEST_URLS) {
       try {
         console.log('[SW] Trying manifest URL:', url);
@@ -172,32 +157,40 @@ async function preloadVersionedIndexes() {
       previous: manifest.previous?.version
     });
 
-    // Validate manifest structure
     if (!manifest.current?.files) {
       throw new Error('Invalid version manifest: missing current files');
     }
 
-    // Get URLs to preload (current version)
+    // Convert relative paths to full CDN URLs
+    const baseCdnUrl =
+      'https://storage.googleapis.com/land-estimator-29ee9.firebasestorage.app/';
+
     const urlsToPreload = [
       manifest.current.files.address_index,
       manifest.current.files.parcel_metadata
-    ].filter(Boolean);
-    // Remove any undefined URLs
+    ]
+      .filter(Boolean)
+      .map((url) => {
+        // Handle both relative and absolute URLs
+        return url.startsWith('http') ? url : `${baseCdnUrl}${url}`;
+      });
 
-    // Also include previous version for fallback if available
     if (manifest.previous?.files) {
-      urlsToPreload.push(
+      const previousUrls = [
         manifest.previous.files.address_index,
         manifest.previous.files.parcel_metadata
-      );
+      ]
+        .filter(Boolean)
+        .map((url) => {
+          return url.startsWith('http') ? url : `${baseCdnUrl}${url}`;
+        });
+      urlsToPreload.push(...previousUrls);
     }
 
     console.log('[SW] URLs to preload:', urlsToPreload);
 
-    // Open cache
     const cache = await caches.open(CACHE_NAME);
 
-    // Preload files with error handling for individual files
     const preloadPromises = urlsToPreload.map(async (url) => {
       try {
         console.log('[SW] Preloading:', url);
@@ -223,23 +216,15 @@ async function preloadVersionedIndexes() {
   }
 }
 
-/**
- * Handle fetch events - serve from cache if available, otherwise fetch from network
- */
 self.addEventListener('fetch', (event) => {
-  // Only handle requests for versioned index files
   const url = event.request.url;
   if (url.includes('address-index-v') || url.includes('parcel-metadata-v')) {
     event.respondWith(handleVersionedIndexFetch(event.request));
   }
 });
 
-/**
- * Handle fetches for versioned index files with cache-first strategy
- */
 async function handleVersionedIndexFetch(request) {
   try {
-    // Try cache first
     const cache = await caches.open(CACHE_NAME);
     const cachedResponse = await cache.match(request);
 
@@ -248,12 +233,10 @@ async function handleVersionedIndexFetch(request) {
       return cachedResponse;
     }
 
-    // If not in cache, fetch from network and cache it
     console.log('[SW] Fetching from network:', request.url);
     const networkResponse = await fetch(request);
 
     if (networkResponse.ok) {
-      // Clone the response before caching (response can only be consumed once)
       const responseToCache = networkResponse.clone();
       await cache.put(request, responseToCache);
       console.log('[SW] Cached network response:', request.url);
@@ -262,7 +245,6 @@ async function handleVersionedIndexFetch(request) {
     return networkResponse;
   } catch (error) {
     console.error('[SW] Fetch failed:', request.url, error);
-    // Return a basic error response
     return new Response('Service worker fetch failed', {
       status: 500,
       statusText: 'Service Worker Error'

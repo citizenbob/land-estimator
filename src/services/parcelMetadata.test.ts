@@ -7,17 +7,15 @@ import {
   ParcelMetadata
 } from './parcelMetadata';
 
-vi.mock('@lib/versionedBundleLoader', () => ({
-  createVersionedBundleLoader: () => ({
-    loadBundle: vi.fn().mockResolvedValue({
-      data: MOCK_PARCEL_METADATA,
-      lookup: {
-        p1: MOCK_PARCEL_METADATA[0],
-        p2: MOCK_PARCEL_METADATA[1]
-      }
-    }),
-    clearCache: vi.fn()
-  })
+vi.mock('@workers/versionedBundleLoader', () => ({
+  loadVersionedBundle: vi.fn().mockResolvedValue({
+    data: MOCK_PARCEL_METADATA,
+    lookup: {
+      p1: MOCK_PARCEL_METADATA[0],
+      p2: MOCK_PARCEL_METADATA[1]
+    }
+  }),
+  clearMemoryCache: vi.fn()
 }));
 
 describe('parcelMetadata service', () => {

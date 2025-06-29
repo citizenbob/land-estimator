@@ -19,7 +19,8 @@ export default defineConfig({
       '@store': path.resolve(dirname, 'src/store'),
       '@tokens': path.resolve(dirname, 'src/tokens'),
       '@types': path.resolve(dirname, 'src/types'),
-      '@typez': path.resolve(dirname, 'src/types')
+      '@typez': path.resolve(dirname, 'src/types'),
+      '@workers': path.resolve(dirname, 'src/workers')
     }
   },
 

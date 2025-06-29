@@ -68,7 +68,7 @@ export function useAddressLookup() {
       } finally {
         setIsFetching(false);
       }
-    }, 600);
+    }, 300);
   };
 
   const handleSelect = (selected: string) => {

@@ -26,7 +26,6 @@ interface VersionManifestCache {
   timestamp: number;
 }
 
-// Cache manifest for 5 minutes to avoid excessive CDN requests
 const CACHE_DURATION = 5 * 60 * 1000;
 let manifestCache: VersionManifestCache | null = null;
 
@@ -43,25 +42,10 @@ export function clearVersionManifestCache(): void {
  * @throws Error when manifest cannot be loaded or is invalid
  */
 export async function getVersionManifest(): Promise<VersionManifest> {
-  // In development mode, return a mock manifest for local files
   if (process.env.NODE_ENV === 'development') {
-    console.log('🔧 Using development version manifest (local files)');
-    return {
-      generated_at: new Date().toISOString(),
-      current: {
-        version: 'dev-local',
-        files: {
-          address_index: '/address-index.json.gz',
-          parcel_metadata: '/parcel-metadata.json.gz',
-          parcel_geometry: '/parcel-geometry.json.gz'
-        }
-      },
-      previous: null,
-      available_versions: ['dev-local']
-    };
+    console.log('🔧 Development mode: fetching production manifest from CDN');
   }
 
-  // Check cache first
   if (manifestCache && Date.now() - manifestCache.timestamp < CACHE_DURATION) {
     console.log('📦 Using cached version manifest');
     return manifestCache.data;
@@ -70,9 +54,8 @@ export async function getVersionManifest(): Promise<VersionManifest> {
   try {
     console.log('🔍 Fetching version manifest from CDN...');
     const response = await fetch(
-      'https://lchevt1wkhcax7cz.public.blob.vercel-storage.com/cdn/version-manifest.json',
+      'https://storage.googleapis.com/land-estimator-29ee9.firebasestorage.app/cdn/version-manifest.json',
       {
-        // Add cache control to ensure we get fresh data when needed
         cache: 'no-cache',
         headers: {
           'Cache-Control': 'no-cache, must-revalidate'
@@ -88,14 +71,12 @@ export async function getVersionManifest(): Promise<VersionManifest> {
 
     const manifest: VersionManifest = await response.json();
 
-    // Validate manifest structure
     if (!manifest.current?.version || !manifest.current?.files) {
       throw new Error(
         'Invalid version manifest structure: missing current version or files'
       );
     }
 
-    // Cache the manifest
     manifestCache = {
       data: manifest,
       timestamp: Date.now()

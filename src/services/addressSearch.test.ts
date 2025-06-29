@@ -5,6 +5,13 @@ import {
   resetAddressSearchCache
 } from './addressSearch';
 import { MOCK_ADDRESS_LOOKUP_DATA } from '@lib/testData';
+import {
+  setupBrowserEnvironment,
+  setupNodeEnvironment,
+  createMockFetch,
+  mockSuccessResponse,
+  setupConsoleMocks
+} from '@lib/testUtils';
 
 const mockAddressData: AddressLookupRecord[] = MOCK_ADDRESS_LOOKUP_DATA;
 
@@ -13,11 +20,14 @@ vi.mock('./loadAddressIndex', () => ({
 }));
 
 describe('addressSearch', () => {
+  const mockFetch = createMockFetch();
+
   beforeEach(() => {
     vi.clearAllMocks();
     resetAddressSearchCache();
-    delete (globalThis as Record<string, unknown>).window;
-    delete (globalThis as Record<string, unknown>).fetch;
+    mockFetch.mockReset();
+    setupConsoleMocks();
+    setupNodeEnvironment();
   });
 
   afterEach(() => {
@@ -26,26 +36,17 @@ describe('addressSearch', () => {
 
   describe('Browser Environment (Client-side)', () => {
     beforeEach(() => {
-      (globalThis as Record<string, unknown>).window = {};
-      (globalThis as Record<string, unknown>).fetch = vi.fn();
+      setupBrowserEnvironment();
     });
 
     it('should call /api/lookup endpoint in browser', async () => {
-      const mockResponse = {
-        ok: true,
-        json: vi.fn().mockResolvedValue({
-          results: [mockAddressData[0]]
-        })
-      };
-      const mockFetch = (globalThis as Record<string, unknown>)
-        .fetch as ReturnType<typeof vi.fn>;
-      mockFetch.mockResolvedValue(mockResponse);
+      mockSuccessResponse(mockFetch, {
+        results: [mockAddressData[0]]
+      });
 
       const results = await searchAddresses('riverview');
 
-      expect(globalThis.fetch).toHaveBeenCalledWith(
-        '/api/lookup?query=riverview'
-      );
+      expect(mockFetch).toHaveBeenCalledWith('/api/lookup?query=riverview');
       expect(results).toEqual([mockAddressData[0]]);
     });
 
@@ -55,8 +56,6 @@ describe('addressSearch', () => {
         status: 500,
         statusText: 'Internal Server Error'
       };
-      const mockFetch = (globalThis as Record<string, unknown>)
-        .fetch as ReturnType<typeof vi.fn>;
       mockFetch.mockResolvedValue(mockResponse);
 
       const results = await searchAddresses('test');
@@ -65,8 +64,6 @@ describe('addressSearch', () => {
     });
 
     it('should handle network errors gracefully', async () => {
-      const mockFetch = (globalThis as Record<string, unknown>)
-        .fetch as ReturnType<typeof vi.fn>;
       mockFetch.mockRejectedValue(new Error('Network error'));
 
       const results = await searchAddresses('test');

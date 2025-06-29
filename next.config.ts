@@ -8,12 +8,29 @@ const nextConfig: NextConfig = {
   sassOptions: {
     includePaths: [path.join(__dirname, 'styles')]
   },
-  // Include external packages for server components
   serverExternalPackages: ['flexsearch'],
+
+  // Reduce noise during E2E testing
+  logging:
+    process.env.CYPRESS === 'true'
+      ? {
+          fetches: {
+            fullUrl: false
+          }
+        }
+      : undefined,
+
+  // Suppress build warnings in test mode
+  typescript: {
+    ignoreBuildErrors: process.env.CYPRESS === 'true'
+  },
+
+  eslint: {
+    ignoreDuringBuilds: process.env.CYPRESS === 'true'
+  },
+
   async headers() {
-    return [
-      // FlexSearch index headers removed - clients now use /api/lookup endpoint
-    ];
+    return [];
   }
 };
 

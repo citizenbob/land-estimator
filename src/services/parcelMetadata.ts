@@ -1,4 +1,7 @@
-import { createVersionedBundleLoader } from '@lib/versionedBundleLoader';
+import {
+  loadVersionedBundle,
+  clearMemoryCache
+} from '@workers/versionedBundleLoader';
 import { AppError, ErrorType } from '@lib/errorUtils';
 
 export interface ParcelMetadata {
@@ -55,16 +58,16 @@ function createParcelLookupMap(
  * @throws When no fallback data is available
  */
 async function loadRawParcelData(): Promise<ParcelMetadata[]> {
-  // Try to load from emergency backup file if available
   if (typeof window !== 'undefined') {
     try {
       const response = await fetch('/parcel-metadata-backup.json.gz');
       if (response.ok) {
         const arrayBuffer = await response.arrayBuffer();
-        const { decompressJsonData } = await import('@lib/universalLoader');
-        const decompressed = decompressJsonData<OptimizedParcelIndex>(
-          new Uint8Array(arrayBuffer)
+        const { decompressVersionedJsonData } = await import(
+          '@workers/versionedBundleLoader'
         );
+        const decompressed =
+          decompressVersionedJsonData<OptimizedParcelIndex>(arrayBuffer);
         console.log('🚨 Using emergency backup parcel metadata');
         return decompressed.parcels;
       }
@@ -80,11 +83,10 @@ async function loadRawParcelData(): Promise<ParcelMetadata[]> {
   );
 }
 
-const parcelBundleLoader = createVersionedBundleLoader<
-  ParcelMetadata,
-  OptimizedParcelIndex,
-  ParcelBundle
->({
+/**
+ * Configuration for parcel metadata bundle loading
+ */
+const parcelBundleConfig = {
   baseFilename: 'parcel-metadata',
   createLookupMap: createParcelLookupMap,
   extractDataFromIndex: (index: OptimizedParcelIndex) => index.parcels,
@@ -92,7 +94,7 @@ const parcelBundleLoader = createVersionedBundleLoader<
     data: ParcelMetadata[],
     lookup: Record<string, ParcelMetadata>
   ) => ({ data, lookup })
-});
+};
 
 /**
  * Universal parcel metadata loader that works in both browser and Node.js environments
@@ -101,13 +103,11 @@ const parcelBundleLoader = createVersionedBundleLoader<
  * @throws When parcel files cannot be loaded, decompressed, or parsed
  */
 export async function loadParcelMetadata(): Promise<ParcelBundle> {
-  // In production, use versioned loader with comprehensive CDN fallback chain
   if (process.env.NODE_ENV === 'production') {
-    // Check if Service Worker has the data cached
     if (typeof window !== 'undefined') {
       try {
         const { default: serviceWorkerClient } = await import(
-          '@lib/serviceWorkerClient'
+          '@workers/serviceWorkerClient'
         );
 
         const { getVersionManifest } = await import(
@@ -122,27 +122,22 @@ export async function loadParcelMetadata(): Promise<ParcelBundle> {
           );
         }
 
-        // Warm up cache if needed
         await serviceWorkerClient.warmupCache();
       } catch (error) {
         console.warn(
           '[Parcel Metadata] Service Worker integration failed:',
           error
         );
-        // Continue with normal loading
       }
     }
 
-    return parcelBundleLoader.loadBundle();
+    return loadVersionedBundle(parcelBundleConfig);
   }
 
-  // Test environment - use mocked loader
   if (process.env.NODE_ENV === 'test') {
-    // During tests, the loader should be mocked, so this should work
-    return parcelBundleLoader.loadBundle();
+    return loadVersionedBundle(parcelBundleConfig);
   }
 
-  // Development mode - graceful fallback to raw data
   console.warn(
     '⚠️ [DEV] Loading raw parcel data (versioned loader disabled in development)'
   );
@@ -165,7 +160,7 @@ export async function loadParcelMetadata(): Promise<ParcelBundle> {
  * Clears the cached parcel bundle
  */
 export function clearParcelMetadataCache(): void {
-  parcelBundleLoader.clearCache();
+  clearMemoryCache();
 }
 
 /**

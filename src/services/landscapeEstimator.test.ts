@@ -1,36 +1,36 @@
 import { describe, it, expect } from 'vitest';
 import { estimateLandscapingPrice } from './landscapeEstimator';
+import { MOCK_BOUNDING_BOXES } from '@lib/testData';
 
 describe('landscapeEstimator', () => {
-  // Mock bounding box representing approximately 1 acre (43,560 sq ft)
+  /**
+   * Convert bounding box objects to string arrays as expected by the function
+   */
   const oneAcreBoundingBox = [
-    '37.4215',
-    '37.4225',
-    '-122.0845',
-    '-122.0835'
+    MOCK_BOUNDING_BOXES.ONE_ACRE.lat_min.toString(),
+    MOCK_BOUNDING_BOXES.ONE_ACRE.lat_max.toString(),
+    MOCK_BOUNDING_BOXES.ONE_ACRE.lon_min.toString(),
+    MOCK_BOUNDING_BOXES.ONE_ACRE.lon_max.toString()
   ] as [string, string, string, string];
 
-  // Mock bounding box for a smaller area
   const smallerBoundingBox = [
-    '37.4215',
-    '37.4220',
-    '-122.0845',
-    '-122.0840'
+    MOCK_BOUNDING_BOXES.SMALL_AREA.lat_min.toString(),
+    MOCK_BOUNDING_BOXES.SMALL_AREA.lat_max.toString(),
+    MOCK_BOUNDING_BOXES.SMALL_AREA.lon_min.toString(),
+    MOCK_BOUNDING_BOXES.SMALL_AREA.lon_max.toString()
   ] as [string, string, string, string];
 
-  // Mock bounding box for a tiny area that should trigger minimum service fee
   const tinyBoundingBox = [
-    '37.4215',
-    '37.42151',
-    '-122.0845',
-    '-122.08451'
+    MOCK_BOUNDING_BOXES.TINY_AREA.lat_min.toString(),
+    MOCK_BOUNDING_BOXES.TINY_AREA.lat_max.toString(),
+    MOCK_BOUNDING_BOXES.TINY_AREA.lon_min.toString(),
+    MOCK_BOUNDING_BOXES.TINY_AREA.lon_max.toString()
   ] as [string, string, string, string];
 
   describe('estimateLandscapingPrice', () => {
     it('should return a complete price breakdown object', () => {
       const result = estimateLandscapingPrice(oneAcreBoundingBox);
 
-      // Verify the output structure is correct
       expect(result).toHaveProperty('lotSizeSqFt');
       expect(result).toHaveProperty('baseRatePerSqFt');
       expect(result).toHaveProperty('designFee');
@@ -44,7 +44,6 @@ describe('landscapeEstimator', () => {
     it('should calculate base rates correctly for residential projects', () => {
       const result = estimateLandscapingPrice(oneAcreBoundingBox);
 
-      // Base rate for residential should match config values
       expect(result.baseRatePerSqFt.min).toEqual(4.5);
       expect(result.baseRatePerSqFt.max).toEqual(12);
     });
@@ -53,7 +52,6 @@ describe('landscapeEstimator', () => {
       const result1 = estimateLandscapingPrice(oneAcreBoundingBox);
       const result2 = estimateLandscapingPrice(smallerBoundingBox);
 
-      // The larger bounding box should yield a larger area
       expect(result1.lotSizeSqFt).toBeGreaterThan(result2.lotSizeSqFt);
     });
 
@@ -63,7 +61,6 @@ describe('landscapeEstimator', () => {
         isCommercial: true
       });
 
-      // Commercial rates should be 85% of residential rates
       expect(commercial.baseRatePerSqFt.min).toBeCloseTo(
         residential.baseRatePerSqFt.min * 0.85
       );
@@ -71,7 +68,6 @@ describe('landscapeEstimator', () => {
         residential.baseRatePerSqFt.max * 0.85
       );
 
-      // Installation costs should also reflect the commercial discount
       expect(commercial.installationCost).toBeLessThan(
         residential.installationCost
       );
@@ -102,7 +98,6 @@ describe('landscapeEstimator', () => {
           serviceTypes: ['design']
         });
 
-        // Design fee should be at least the minimum service fee
         expect(result.finalEstimate.min).toBeGreaterThanOrEqual(400);
         expect(result.finalEstimate.max).toBeGreaterThanOrEqual(400);
       });
@@ -118,7 +113,6 @@ describe('landscapeEstimator', () => {
         expect(result.installationCost).toBeGreaterThan(0);
         expect(result.maintenanceMonthly).toEqual(0);
 
-        // Installation cost should be proportional to lot size
         const smallerLot = estimateLandscapingPrice(smallerBoundingBox, {
           serviceTypes: ['installation']
         });
@@ -133,7 +127,6 @@ describe('landscapeEstimator', () => {
           serviceTypes: ['installation']
         });
 
-        // Final estimate should be at least the minimum service fee
         expect(result.finalEstimate.min).toBeGreaterThanOrEqual(400);
       });
     });
@@ -148,7 +141,6 @@ describe('landscapeEstimator', () => {
         expect(result.installationCost).toEqual(0);
         expect(result.maintenanceMonthly).toBeGreaterThan(0);
 
-        // Maintenance costs should be between min and max range in config
         expect(result.maintenanceMonthly).toBeGreaterThanOrEqual(100);
         expect(result.maintenanceMonthly).toBeLessThanOrEqual(400);
       });
@@ -162,7 +154,6 @@ describe('landscapeEstimator', () => {
           serviceTypes: ['maintenance']
         });
 
-        // Maintenance costs should be the same regardless of lot size
         expect(largeLot.maintenanceMonthly).toEqual(
           smallLot.maintenanceMonthly
         );
@@ -171,7 +162,6 @@ describe('landscapeEstimator', () => {
 
     describe('design_installation bundling', () => {
       it('should apply bundled discount for design+installation services', () => {
-        // First get separate costs
         const designOnly = estimateLandscapingPrice(oneAcreBoundingBox, {
           serviceTypes: ['design']
         });
@@ -179,12 +169,9 @@ describe('landscapeEstimator', () => {
           serviceTypes: ['installation']
         });
 
-        // Then get bundled cost by default (no options)
         const bundled = estimateLandscapingPrice(oneAcreBoundingBox);
 
-        // Design fee should equal standalone design
         expect(bundled.designFee).toBeCloseTo(designOnly.designFee);
-        // Total estimate min should equal sum of individual service minimums
         expect(bundled.finalEstimate.min).toEqual(
           designOnly.finalEstimate.min + installOnly.finalEstimate.min
         );
@@ -192,7 +179,6 @@ describe('landscapeEstimator', () => {
 
       it('should apply minimum service fee when calculated cost is lower', () => {
         const result = estimateLandscapingPrice(tinyBoundingBox);
-        // Combined services should apply two minimum service fees => 800
         expect(result.finalEstimate.min).toEqual(result.minimumServiceFee * 2);
       });
     });

@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect } from 'react';
-import serviceWorkerClient from '@lib/serviceWorkerClient';
+import serviceWorkerClient from '@workers/serviceWorkerClient';
 
 /**
  * Service Worker Registration Component
@@ -9,7 +9,6 @@ import serviceWorkerClient from '@lib/serviceWorkerClient';
  */
 export default function ServiceWorkerRegistration() {
   useEffect(() => {
-    // Only run on the client side
     if (typeof window === 'undefined') {
       return;
     }
@@ -25,8 +24,6 @@ export default function ServiceWorkerRegistration() {
             '[SW Registration] Service worker registered successfully'
           );
 
-          // Start preloading indexes in the background after a short delay
-          // to avoid interfering with initial page load
           setTimeout(async () => {
             try {
               console.log('[SW Registration] Starting background preload...');
@@ -52,7 +49,6 @@ export default function ServiceWorkerRegistration() {
       }
     };
 
-    // Register service worker when the page loads
     if (document.readyState === 'complete') {
       initServiceWorker();
     } else {
@@ -61,6 +57,5 @@ export default function ServiceWorkerRegistration() {
     }
   }, []);
 
-  // This component doesn't render anything
   return null;
 }

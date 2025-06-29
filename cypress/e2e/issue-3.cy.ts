@@ -4,24 +4,39 @@ export {};
 
 describe('Estimate Calculation Flow for Residential and Commercial Parcels', () => {
   beforeEach(() => {
-    cy.intercept('POST', '**/api/log', {
+    // Override global intercepts with test-specific ones
+    // Using more robust patterns to catch all API variations
+
+    cy.intercept('POST', '**/api/log**', {
       statusCode: 201,
       body: { success: true, message: 'Log event stored', id: 'mock-doc-id' }
     }).as('logApiCall');
 
-    cy.intercept('GET', '/api/parcel-metadata/*', {
+    cy.intercept('GET', '**/api/parcel-metadata/**', {
       fixture: 'parcels/residential_baseline.json'
     }).as('parcelMetadata');
 
     cy.intercept('GET', '**/api/lookup**', (req) => {
       let fixture: string | null = null;
-      if (req.url.includes('123')) fixture = 'lookups/query_test.json';
-      else if (req.url.includes('456')) fixture = 'lookups/query_business.json';
-      else if (req.url.includes('789')) fixture = 'lookups/query_missing.json';
-      else if (req.url.includes('999')) fixture = 'lookups/query_broken.json';
+      const url = req.url.toLowerCase();
+
+      if (url.includes('123')) fixture = 'lookups/query_test.json';
+      else if (url.includes('456')) fixture = 'lookups/query_business.json';
+      else if (url.includes('789')) fixture = 'lookups/query_missing.json';
+      else if (url.includes('999')) fixture = 'lookups/query_broken.json';
 
       if (fixture) {
         req.reply({ fixture });
+      } else {
+        // Fallback to empty results for unmatched queries
+        req.reply({
+          statusCode: 200,
+          body: {
+            query: req.url.split('query=')[1] || '',
+            results: [],
+            count: 0
+          }
+        });
       }
     }).as('lookup');
 
@@ -74,7 +89,8 @@ describe('Estimate Calculation Flow for Residential and Commercial Parcels', () 
   });
 
   it('Shopper requests estimate for Commercial parcel in affluent area', () => {
-    cy.intercept('GET', '/api/parcel-metadata/*', {
+    // Override the default parcel metadata intercept for this specific test
+    cy.intercept('GET', '**/api/parcel-metadata/**', {
       fixture: 'parcels/commercial_affluent.json'
     }).as('commercialMetadata');
 
@@ -117,7 +133,7 @@ describe('Estimate Calculation Flow for Residential and Commercial Parcels', () 
 
   // GIVEN I am requesting an instant estimate for a parcel with missing area
   it('Handles missing landscapable area gracefully', () => {
-    cy.intercept('GET', '/api/parcel-metadata/*', {
+    cy.intercept('GET', '**/api/parcel-metadata/**', {
       fixture: 'parcels/missing_area.json'
     }).as('nullAreaMetadata');
 
@@ -157,7 +173,7 @@ describe('Estimate Calculation Flow for Residential and Commercial Parcels', () 
 
   // GIVEN I am requesting an instant estimate for a parcel with malformed bounding box data
   it('Handles malformed bounding box data without crashing', () => {
-    cy.intercept('GET', '/api/parcel-metadata/*', {
+    cy.intercept('GET', '**/api/parcel-metadata/**', {
       fixture: 'parcels/malformed_bounds.json'
     }).as('malformedMetadata');
 

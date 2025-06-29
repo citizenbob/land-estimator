@@ -16,6 +16,7 @@ export async function GET(
   if (!id) {
     return NextResponse.json({ error: 'Missing parcel id' }, { status: 400 });
   }
+
   try {
     const data = await getParcelMetadata(id);
     if (!data) {

@@ -16,7 +16,6 @@ async function createEmergencyBackups(): Promise<void> {
   console.log('🚨 Creating emergency backup files...');
 
   try {
-    // Check if we have temp files from latest build
     const tempDir = path.join(process.cwd(), 'temp');
     const publicDir = path.join(process.cwd(), 'public');
 
@@ -32,7 +31,6 @@ async function createEmergencyBackups(): Promise<void> {
       'parcel-metadata-backup.json.gz'
     );
 
-    // Copy address index backup if available
     if (fs.existsSync(addressIndexPath)) {
       fs.copyFileSync(addressIndexPath, addressBackupPath);
       const stats = fs.statSync(addressBackupPath);
@@ -43,7 +41,6 @@ async function createEmergencyBackups(): Promise<void> {
       console.log('⚠️ No address index file found in temp directory');
     }
 
-    // Copy parcel metadata backup if available
     if (fs.existsSync(parcelMetadataPath)) {
       fs.copyFileSync(parcelMetadataPath, parcelBackupPath);
       const stats = fs.statSync(parcelBackupPath);
@@ -54,7 +51,6 @@ async function createEmergencyBackups(): Promise<void> {
       console.log('⚠️ No parcel metadata file found in temp directory');
     }
 
-    // Update .gitignore to include these backups
     const gitignorePath = path.join(process.cwd(), '.gitignore');
     const gitignoreContent = fs.readFileSync(gitignorePath, 'utf8');
 

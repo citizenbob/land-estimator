@@ -15,16 +15,13 @@ import path from 'path';
 import zlib from 'zlib';
 import { fileURLToPath } from 'url';
 
-// Get __dirname equivalent in ES modules
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// Configuration
 const TEMP_DIR = path.join(__dirname, 'temp');
 const TEMP_RAW_DIR = path.join(TEMP_DIR, 'raw');
 const OUTPUT_DIR = TEMP_DIR;
 
-// FlexSearch configuration (matches experimental implementations)
 const FLEXSEARCH_CONFIG = {
   tokenize: 'forward',
   cache: 100,
@@ -78,7 +75,6 @@ interface GeometryData {
   };
 }
 
-// FlexSearch precomputed index data structure
 interface PrecomputedIndexData {
   parcelIds: string[];
   searchStrings: string[];
@@ -109,7 +105,6 @@ class FlexSearchBuilder {
     console.log('\n🏠 Building Address FlexSearch Index...');
 
     try {
-      // Load address data from integration
       const addressIndexPath = path.join(TEMP_RAW_DIR, 'address_index.json');
 
       if (!fs.existsSync(addressIndexPath)) {
@@ -123,36 +118,34 @@ class FlexSearchBuilder {
 
       console.log(`📋 Processing ${addresses.length} addresses`);
 
-      // Create FlexSearch index
       const flexIndex = new FlexSearch.Index(FLEXSEARCH_CONFIG);
 
-      // Build precomputed index data structure (matches loadAddressIndex.ts contract)
       const searchStrings: string[] = [];
       const parcelIds: string[] = [];
 
       addresses.forEach((addr, i) => {
-        // Create searchable string: "display_name parcel_id"
         const searchable =
           `${addr.display_name || ''} ${addr.parcel_id || ''}`.trim();
 
         searchStrings.push(searchable);
         parcelIds.push(addr.parcel_id || '');
 
-        // Add to FlexSearch index for testing
         flexIndex.add(i, searchable);
       });
 
-      // Create precomputed index data (matches FlexSearch.PrecomputedIndexData)
+      console.log(
+        '📦 Creating simple index data (no export/import complexity)'
+      );
+
       const indexData: PrecomputedIndexData = {
         parcelIds: parcelIds,
         searchStrings: searchStrings,
         timestamp: new Date().toISOString(),
         recordCount: addresses.length,
-        version: '1.0-claude-pipeline',
-        exportMethod: 'claude_flexsearch_builder'
+        version: '1.0-fast-rebuild',
+        exportMethod: 'simple_rebuild_approach'
       };
 
-      // Save compressed for CDN upload (this is what universalBundleLoader expects)
       const jsonString = JSON.stringify(indexData);
       const compressed = zlib.gzipSync(Buffer.from(jsonString));
       const compressedPath = path.join(OUTPUT_DIR, 'address-index.json.gz');
@@ -168,7 +161,6 @@ class FlexSearchBuilder {
       this.stats.totalAddresses = addresses.length;
       this.stats.indexesBuilt.push('address-index.json.gz');
 
-      // Test the index
       await this.testIndex(flexIndex, searchStrings);
 
       return true;
@@ -182,7 +174,6 @@ class FlexSearchBuilder {
     console.log('\n🏢 Building Parcel Metadata Index...');
 
     try {
-      // Load parcel metadata from integration
       const parcelIndexPath = path.join(
         TEMP_RAW_DIR,
         'parcel_metadata_index.json'
@@ -199,7 +190,6 @@ class FlexSearchBuilder {
         );
       }
 
-      // Create parcel metadata structure (optimized for lookup by parcel_id)
       const parcelLookup: Record<
         string,
         {
@@ -259,7 +249,6 @@ class FlexSearchBuilder {
         }
       };
 
-      // Save compressed
       const jsonString = JSON.stringify(metadataIndex);
       const compressed = zlib.gzipSync(Buffer.from(jsonString));
       const compressedPath = path.join(OUTPUT_DIR, 'parcel-metadata.json.gz');
@@ -286,7 +275,6 @@ class FlexSearchBuilder {
     console.log('\n🗺️  Building Parcel Geometry Index...');
 
     try {
-      // Load geometry data from integration
       const geometryIndexPath = path.join(
         TEMP_RAW_DIR,
         'parcel_geometry_index.json'
@@ -303,9 +291,6 @@ class FlexSearchBuilder {
         console.log('⚠️  Geometry index not found, creating empty index');
       }
 
-      // The geometry data is already in the correct format for the app
-      // It's a flat object where keys are parcel IDs and values are GeoJSON geometry objects
-      // We just need to compress it for CDN distribution
       const geometryIndex = {
         geometries: geometryData,
         metadata: {
@@ -316,7 +301,6 @@ class FlexSearchBuilder {
         }
       };
 
-      // Save compressed
       const jsonString = JSON.stringify(geometryIndex);
       const compressed = zlib.gzipSync(Buffer.from(jsonString));
       const compressedPath = path.join(OUTPUT_DIR, 'parcel-geometry.json.gz');
@@ -345,7 +329,6 @@ class FlexSearchBuilder {
     console.log('\n🧪 Testing FlexSearch index...');
 
     try {
-      // Test searches
       const testQueries = ['626', '1st St', 'Main', 'Louis'];
 
       for (const query of testQueries) {
@@ -393,12 +376,10 @@ class FlexSearchBuilder {
     this.stats.buildTime = new Date().toISOString();
 
     try {
-      // Ensure temp directories exist
       if (!fs.existsSync(TEMP_DIR)) {
         throw new Error(`Temp directory not found: ${TEMP_DIR}`);
       }
 
-      // Build all indexes
       const addressSuccess = await this.buildAddressIndex();
       const parcelSuccess = await this.buildParcelMetadataIndex();
       const geometrySuccess = await this.buildParcelGeometryIndex();
@@ -407,7 +388,6 @@ class FlexSearchBuilder {
         throw new Error('Address index build failed');
       }
 
-      // Optional indexes - don't fail if they don't exist
       if (!parcelSuccess) {
         console.warn('⚠️  Parcel metadata index build failed - continuing');
       }
@@ -415,7 +395,6 @@ class FlexSearchBuilder {
         console.warn('⚠️  Geometry index build failed - continuing');
       }
 
-      // Show summary
       this.printSummary();
 
       console.log('\n✅ FlexSearch build completed successfully!');
@@ -427,14 +406,12 @@ class FlexSearchBuilder {
   }
 }
 
-// Main execution
 async function main(): Promise<void> {
   const builder = new FlexSearchBuilder();
   const success = await builder.build();
   process.exit(success ? 0 : 1);
 }
 
-// Run if called directly
 if (import.meta.url === `file://${process.argv[1]}`) {
   main().catch(console.error);
 }

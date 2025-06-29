@@ -1,7 +1,4 @@
 #!/usr/bin/env node
-/*
-Vercel Blob uploader using the official SDK with proper directory structure support
-*/
 
 import { put, list } from '@vercel/blob';
 import { readFileSync } from 'fs';
@@ -9,11 +6,9 @@ import path from 'path';
 import { config } from 'dotenv';
 import { fileURLToPath } from 'url';
 
-// Get current directory for ES modules
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// Load environment variables
 config({ path: path.join(__dirname, '..', '..', '..', '.env.local') });
 
 async function uploadFile(
@@ -24,10 +19,8 @@ async function uploadFile(
   console.log(`📤 Uploading ${localPath} → ${remotePath}`);
 
   try {
-    // Read file content
     const fileContent = readFileSync(localPath);
 
-    // Upload using official SDK
     const result = await put(remotePath, fileContent, {
       access: 'public',
       token: process.env.BLOB_READ_WRITE_TOKEN,
@@ -59,10 +52,8 @@ async function listBlobs(prefix = '') {
   }
 }
 
-// Export for use in the ingest pipeline
 export { uploadFile, listBlobs };
 
-// CLI usage
 if (process.argv.length >= 3) {
   const command = process.argv[2];
 
@@ -83,7 +74,6 @@ if (process.argv.length >= 3) {
         process.exit(1);
       });
   } else if (process.argv.length >= 4) {
-    // Upload command
     const localPath = process.argv[2];
     const remotePath = process.argv[3];
     const contentType = process.argv[4] || 'application/json';

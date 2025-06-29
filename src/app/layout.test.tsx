@@ -3,7 +3,6 @@ import { render, screen } from '@testing-library/react';
 import { describe, it, expect, vi } from 'vitest';
 import RootLayout, { metadata } from './layout';
 
-// Mock the font imports
 vi.mock('next/font/google', () => ({
   Geist: () => ({
     variable: '--font-geist-sans'
@@ -72,7 +71,6 @@ describe('RootLayout', () => {
       const { rerender } = render(<RootLayout>{mockChildren}</RootLayout>);
       rerender(<RootLayout>{mockChildren}</RootLayout>);
 
-      // Layout should render consistently
       expect(screen.getByTestId('page-content')).toBeInTheDocument();
       expect(screen.getByTestId('analytics-component')).toBeInTheDocument();
     });
@@ -133,7 +131,6 @@ describe('RootLayout', () => {
     it('should work with server-side data fetching approach', () => {
       render(<RootLayout>{mockChildren}</RootLayout>);
 
-      // Verify layout renders correctly for server-side approach
       expect(screen.getByTestId('page-content')).toBeInTheDocument();
       expect(screen.getByTestId('analytics-component')).toBeInTheDocument();
     });
@@ -141,7 +138,6 @@ describe('RootLayout', () => {
     it('should not include client-side resource hints', () => {
       render(<RootLayout>{mockChildren}</RootLayout>);
 
-      // Verify layout works without client-side preloading
       expect(screen.getByTestId('page-content')).toBeInTheDocument();
     });
   });

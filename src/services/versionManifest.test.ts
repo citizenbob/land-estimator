@@ -3,45 +3,22 @@ import {
   getVersionManifest,
   getCurrentVersion,
   getPreviousVersion,
-  clearVersionManifestCache,
-  type VersionManifest
+  clearVersionManifestCache
 } from './versionManifest';
+import { MOCK_VERSION_MANIFEST } from '@lib/testData';
+import {
+  createMockFetch,
+  mockSuccessResponse,
+  setupConsoleMocks
+} from '@lib/testUtils';
 
-// Mock fetch globally
-const mockFetch = vi.fn();
-global.fetch = mockFetch;
-
-const mockVersionManifest: VersionManifest = {
-  generated_at: '2024-01-15T10:30:00.000Z',
-  current: {
-    version: '1.2.3',
-    files: {
-      address_index:
-        'https://lchevt1wkhcax7cz.public.blob.vercel-storage.com/cdn/address-index-v1.2.3.json.gz',
-      parcel_metadata:
-        'https://lchevt1wkhcax7cz.public.blob.vercel-storage.com/cdn/parcel-metadata-v1.2.3.json.gz',
-      parcel_geometry:
-        'https://lchevt1wkhcax7cz.public.blob.vercel-storage.com/cdn/parcel-geometry-v1.2.3.json.gz'
-    }
-  },
-  previous: {
-    version: '1.2.2',
-    files: {
-      address_index:
-        'https://lchevt1wkhcax7cz.public.blob.vercel-storage.com/cdn/address-index-v1.2.2.json.gz',
-      parcel_metadata:
-        'https://lchevt1wkhcax7cz.public.blob.vercel-storage.com/cdn/parcel-metadata-v1.2.2.json.gz',
-      parcel_geometry:
-        'https://lchevt1wkhcax7cz.public.blob.vercel-storage.com/cdn/parcel-geometry-v1.2.2.json.gz'
-    }
-  },
-  available_versions: ['1.2.3', '1.2.2', '1.2.1']
-};
+const mockFetch = createMockFetch();
 
 describe('versionManifest service', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     clearVersionManifestCache();
+    setupConsoleMocks();
   });
 
   afterEach(() => {
@@ -50,15 +27,12 @@ describe('versionManifest service', () => {
 
   describe('getVersionManifest', () => {
     it('should fetch and return version manifest successfully', async () => {
-      mockFetch.mockResolvedValueOnce({
-        ok: true,
-        json: vi.fn().mockResolvedValue(mockVersionManifest)
-      });
+      mockSuccessResponse(mockFetch, MOCK_VERSION_MANIFEST);
 
       const result = await getVersionManifest();
 
       expect(mockFetch).toHaveBeenCalledWith(
-        'https://lchevt1wkhcax7cz.public.blob.vercel-storage.com/cdn/version-manifest.json',
+        'https://storage.googleapis.com/land-estimator-29ee9.firebasestorage.app/cdn/version-manifest.json',
         expect.objectContaining({
           cache: 'no-cache',
           headers: expect.objectContaining({
@@ -66,20 +40,18 @@ describe('versionManifest service', () => {
           })
         })
       );
-      expect(result).toEqual(mockVersionManifest);
+      expect(result).toEqual(MOCK_VERSION_MANIFEST);
     });
 
     it('should cache manifest and reuse cached version', async () => {
       mockFetch.mockResolvedValueOnce({
         ok: true,
-        json: vi.fn().mockResolvedValue(mockVersionManifest)
+        json: vi.fn().mockResolvedValue(MOCK_VERSION_MANIFEST)
       });
 
-      // First call
       const result1 = await getVersionManifest();
       expect(mockFetch).toHaveBeenCalledTimes(1);
 
-      // Second call should use cache - should still only be 1 fetch call
       const result2 = await getVersionManifest();
       expect(mockFetch).toHaveBeenCalledTimes(1);
       expect(result1).toEqual(result2);
@@ -100,7 +72,6 @@ describe('versionManifest service', () => {
     it('should throw error when manifest structure is invalid', async () => {
       const invalidManifest = {
         generated_at: '2024-01-15T10:30:00.000Z',
-        // Missing current.version and current.files
         current: {},
         previous: null,
         available_versions: []
@@ -129,7 +100,7 @@ describe('versionManifest service', () => {
     it('should return current version from manifest', async () => {
       mockFetch.mockResolvedValueOnce({
         ok: true,
-        json: vi.fn().mockResolvedValue(mockVersionManifest)
+        json: vi.fn().mockResolvedValue(MOCK_VERSION_MANIFEST)
       });
 
       const version = await getCurrentVersion();
@@ -141,7 +112,7 @@ describe('versionManifest service', () => {
     it('should return previous version when available', async () => {
       mockFetch.mockResolvedValueOnce({
         ok: true,
-        json: vi.fn().mockResolvedValue(mockVersionManifest)
+        json: vi.fn().mockResolvedValue(MOCK_VERSION_MANIFEST)
       });
 
       const version = await getPreviousVersion();
@@ -150,7 +121,7 @@ describe('versionManifest service', () => {
 
     it('should return null when no previous version exists', async () => {
       const manifestWithoutPrevious = {
-        ...mockVersionManifest,
+        ...MOCK_VERSION_MANIFEST,
         previous: null
       };
 
@@ -168,17 +139,14 @@ describe('versionManifest service', () => {
     it('should clear cache and force fresh fetch', async () => {
       mockFetch.mockResolvedValue({
         ok: true,
-        json: vi.fn().mockResolvedValue(mockVersionManifest)
+        json: vi.fn().mockResolvedValue(MOCK_VERSION_MANIFEST)
       });
 
-      // First call
       await getVersionManifest();
       expect(mockFetch).toHaveBeenCalledTimes(1);
 
-      // Clear cache
       clearVersionManifestCache();
 
-      // Next call should fetch again
       await getVersionManifest();
       expect(mockFetch).toHaveBeenCalledTimes(2);
     });

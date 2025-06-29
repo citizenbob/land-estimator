@@ -16,7 +16,6 @@ vi.mock('@services/logger', () => ({
   logEvent: vi.fn()
 }));
 
-// Mock fetch for API route testing
 global.fetch = vi.fn();
 const mockFetch = global.fetch as ReturnType<typeof vi.fn>;
 
@@ -103,7 +102,6 @@ describe('AddressInput', () => {
   });
 
   it('handles API failures gracefully and displays an error message', async () => {
-    // Mock fetch to reject with an error
     mockFetch.mockRejectedValueOnce(new Error('Internal Server Error'));
 
     const { input } = setup();
@@ -202,7 +200,6 @@ describe('AddressInput', () => {
   it('does not trigger an API call when a suggestion is selected', async () => {
     const mockApiRecord = createMockApiRecord(MOCK_LOCAL_ADDRESSES[1]);
 
-    // Mock the initial fetch call
     mockFetch.mockResolvedValueOnce({
       ok: true,
       json: async () => ({
@@ -343,7 +340,6 @@ describe('AddressInput', () => {
         display_name: '123 Test St, St. Louis, MO 63101'
       };
 
-      // Mock successful API response
       mockFetch.mockResolvedValueOnce({
         ok: true,
         json: async () => mockParcelData
@@ -398,7 +394,6 @@ describe('AddressInput', () => {
         display_name: '123 Test St, St. Louis, MO 63101'
       };
 
-      // Mock API failure
       mockFetch.mockRejectedValueOnce(new Error('API Error'));
 
       const mockLookup = createAddressLookupMock({
