@@ -70,7 +70,7 @@ export async function getVersionManifest(): Promise<VersionManifest> {
   try {
     console.log('🔍 Fetching version manifest from CDN...');
     const response = await fetch(
-      'https://lchevt1wkhcax7cz.public.blob.vercel-storage.com/cdn/version-manifest.json',
+      'https://storage.googleapis.com/land-estimator-29ee9.firebasestorage.app/cdn/version-manifest.json',
       {
         // Add cache control to ensure we get fresh data when needed
         cache: 'no-cache',

@@ -17,22 +17,22 @@ const mockVersionManifest: VersionManifest = {
     version: '1.2.3',
     files: {
       address_index:
-        'https://lchevt1wkhcax7cz.public.blob.vercel-storage.com/cdn/address-index-v1.2.3.json.gz',
+        'https://storage.googleapis.com/land-estimator-29ee9.firebasestorage.app/cdn/address-index-v1.2.3.json.gz',
       parcel_metadata:
-        'https://lchevt1wkhcax7cz.public.blob.vercel-storage.com/cdn/parcel-metadata-v1.2.3.json.gz',
+        'https://storage.googleapis.com/land-estimator-29ee9.firebasestorage.app/cdn/parcel-metadata-v1.2.3.json.gz',
       parcel_geometry:
-        'https://lchevt1wkhcax7cz.public.blob.vercel-storage.com/cdn/parcel-geometry-v1.2.3.json.gz'
+        'https://storage.googleapis.com/land-estimator-29ee9.firebasestorage.app/cdn/parcel-geometry-v1.2.3.json.gz'
     }
   },
   previous: {
     version: '1.2.2',
     files: {
       address_index:
-        'https://lchevt1wkhcax7cz.public.blob.vercel-storage.com/cdn/address-index-v1.2.2.json.gz',
+        'https://storage.googleapis.com/land-estimator-29ee9.firebasestorage.app/cdn/address-index-v1.2.2.json.gz',
       parcel_metadata:
-        'https://lchevt1wkhcax7cz.public.blob.vercel-storage.com/cdn/parcel-metadata-v1.2.2.json.gz',
+        'https://storage.googleapis.com/land-estimator-29ee9.firebasestorage.app/cdn/parcel-metadata-v1.2.2.json.gz',
       parcel_geometry:
-        'https://lchevt1wkhcax7cz.public.blob.vercel-storage.com/cdn/parcel-geometry-v1.2.2.json.gz'
+        'https://storage.googleapis.com/land-estimator-29ee9.firebasestorage.app/cdn/parcel-geometry-v1.2.2.json.gz'
     }
   },
   available_versions: ['1.2.3', '1.2.2', '1.2.1']
@@ -58,7 +58,7 @@ describe('versionManifest service', () => {
       const result = await getVersionManifest();
 
       expect(mockFetch).toHaveBeenCalledWith(
-        'https://lchevt1wkhcax7cz.public.blob.vercel-storage.com/cdn/version-manifest.json',
+        'https://storage.googleapis.com/land-estimator-29ee9.firebasestorage.app/cdn/version-manifest.json',
         expect.objectContaining({
           cache: 'no-cache',
           headers: expect.objectContaining({
