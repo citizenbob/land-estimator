@@ -4,3 +4,5 @@ dbfread>=2.0.7
 numpy>=1.20.0
 shapely>=2.0.0
 pyproj>=3.3.0
+requests>=2.28.0
+python-dotenv>=1.0.0
