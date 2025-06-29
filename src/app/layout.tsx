@@ -4,6 +4,7 @@ import { Geist, Geist_Mono } from 'next/font/google';
 import './globals.css';
 import { getThemeClass } from '@tokens/theme';
 import Analytics from '@components/PageAnalytics/PageAnalytics';
+import ServiceWorkerRegistration from '@components/ServiceWorkerRegistration/ServiceWorkerRegistration';
 
 const geistSans = Geist({
   variable: '--font-geist-sans',
@@ -50,6 +51,7 @@ export default function RootLayout({
           className={`${geistSans.variable} ${geistMono.variable} antialiased`}
         >
           <Analytics />
+          <ServiceWorkerRegistration />
           {children}
         </body>
       </html>
@@ -64,6 +66,7 @@ export default function RootLayout({
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
         <Analytics />
+        <ServiceWorkerRegistration />
         {children}
       </body>
     </html>

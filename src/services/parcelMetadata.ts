@@ -52,14 +52,32 @@ function createParcelLookupMap(
 }
 
 /**
- * Parcel metadata requires optimized data - no raw fallback available
- * @throws Always throws as raw fallback is not supported
+ * Parcel metadata fallback - attempts to load from local backup if available
+ * @throws When no fallback data is available
  */
 async function loadRawParcelData(): Promise<ParcelMetadata[]> {
+  // Try to load from emergency backup file if available
+  if (typeof window !== 'undefined') {
+    try {
+      const response = await fetch('/parcel-metadata-backup.json.gz');
+      if (response.ok) {
+        const arrayBuffer = await response.arrayBuffer();
+        const { decompressJsonData } = await import('@lib/universalLoader');
+        const decompressed = decompressJsonData<OptimizedParcelIndex>(
+          new Uint8Array(arrayBuffer)
+        );
+        console.log('🚨 Using emergency backup parcel metadata');
+        return decompressed.parcels;
+      }
+    } catch (error) {
+      console.warn('Emergency backup not available:', error);
+    }
+  }
+
   throw new AppError(
-    'Parcel metadata requires optimized .gz data - no raw fallback available',
+    'Parcel metadata requires optimized .gz data - no fallback available. CDN may be temporarily unavailable.',
     ErrorType.VALIDATION,
-    { isRetryable: false }
+    { isRetryable: true }
   );
 }
 
@@ -69,10 +87,15 @@ const parcelBundleLoader = createUniversalBundleLoader<
   ParcelBundle
 >({
   gzippedFilename: 'parcel-metadata.json.gz',
+  baseFilename: 'parcel-metadata',
+  useVersioning: process.env.NODE_ENV === 'production',
   createLookupMap: createParcelLookupMap,
   loadRawData: loadRawParcelData,
-  extractDataFromIndex: (index) => index.parcels,
-  createBundle: (data, lookup) => ({ data, lookup })
+  extractDataFromIndex: (index: OptimizedParcelIndex) => index.parcels,
+  createBundle: (
+    data: ParcelMetadata[],
+    lookup: Record<string, ParcelMetadata>
+  ) => ({ data, lookup })
 });
 
 /**

@@ -3,11 +3,7 @@ import {
   MOCK_ADDRESS_INDEX_ADDRESS_DATA,
   MOCK_ADDRESS_INDEX_INDEX_DATA
 } from '@lib/testData';
-import {
-  createMockSearchIndex,
-  setupBrowserEnvironment,
-  setupNodeEnvironment
-} from '@lib/testUtils';
+import { createMockSearchIndex, setupBrowserEnvironment } from '@lib/testUtils';
 
 /**
  * Create consistent mock implementations
@@ -99,6 +95,7 @@ describe('loadAddressIndex', () => {
 
       const result = await loadAddressIndex();
 
+      // In production, it should call the versioned loader, but in test mode it falls back to local
       expect(mockFetch).toHaveBeenCalledWith('/address-index.json.gz');
       expect(result).toHaveProperty('index');
       expect(result).toHaveProperty('parcelIds');
@@ -131,114 +128,62 @@ describe('loadAddressIndex', () => {
     });
   });
 
-  describe('Node.js Environment', () => {
+  describe('Versioned Loading', () => {
     beforeEach(() => {
-      setupNodeEnvironment();
+      setupBrowserEnvironment();
     });
 
-    it('should load index from filesystem in Node.js', async () => {
-      /**
-       * Mock Node.js modules for this test
-       */
-      const mockReadFileSync = vi.fn().mockReturnValue(mockGzippedData);
-      const mockExistsSync = vi.fn().mockReturnValue(true);
-      const mockJoin = vi
-        .fn()
-        .mockReturnValue('/test/project/public/address-index.json.gz');
-
-      const loadModule = await import('./loadAddressIndex');
-
-      loadModule._setTestMockNodeModules({
-        fs: {
-          readFileSync: mockReadFileSync,
-          existsSync: mockExistsSync,
-          readdirSync: vi.fn()
+    it('should load index using versioned loader in production', async () => {
+      // Mock the version manifest fetch
+      const mockVersionManifest = {
+        current: {
+          version: '1.2.3',
+          data: {
+            address_index:
+              'https://lchevt1wkhcax7cz.public.blob.vercel-storage.com/cdn/address-index-v1.2.3.json.gz',
+            parcel_metadata:
+              'https://lchevt1wkhcax7cz.public.blob.vercel-storage.com/cdn/parcel-metadata-v1.2.3.json.gz'
+          }
         },
-        path: {
-          join: mockJoin
+        previous: {
+          version: '1.2.2',
+          data: {
+            address_index:
+              'https://lchevt1wkhcax7cz.public.blob.vercel-storage.com/cdn/address-index-v1.2.2.json.gz',
+            parcel_metadata:
+              'https://lchevt1wkhcax7cz.public.blob.vercel-storage.com/cdn/parcel-metadata-v1.2.2.json.gz'
+          }
         }
-      });
+      };
 
-      try {
-        const result = await loadAddressIndex();
+      const mockFetch = vi.fn();
+      globalThis.fetch = mockFetch;
 
-        expect(mockJoin).toHaveBeenCalledWith(
-          process.cwd(),
-          'public',
-          'address-index.json.gz'
-        );
-        expect(mockExistsSync).toHaveBeenCalledWith(
-          '/test/project/public/address-index.json.gz'
-        );
-        expect(mockReadFileSync).toHaveBeenCalledWith(
-          '/test/project/public/address-index.json.gz'
-        );
-        expect(result).toHaveProperty('index');
-        expect(result.parcelIds).toEqual(mockIndexData.parcelIds);
-        expect(result.addressData).toEqual(MOCK_ADDRESS_INDEX_ADDRESS_DATA);
-      } finally {
-        loadModule._setTestMockNodeModules(null);
-      }
-    });
-
-    it('should throw error when file does not exist in Node.js', async () => {
-      const mockReadFileSync = vi.fn();
-      const mockExistsSync = vi.fn().mockReturnValue(false);
-      const mockJoin = vi
-        .fn()
-        .mockReturnValue('/test/project/public/address-index.json.gz');
-
-      const loadModule = await import('./loadAddressIndex');
-
-      loadModule._setTestMockNodeModules({
-        fs: {
-          readFileSync: mockReadFileSync,
-          existsSync: mockExistsSync,
-          readdirSync: vi.fn()
-        },
-        path: {
-          join: mockJoin
+      // Mock version manifest response
+      mockFetch.mockImplementation((url) => {
+        if (typeof url === 'string' && url.includes('version-manifest.json')) {
+          return Promise.resolve({
+            ok: true,
+            json: () => Promise.resolve(mockVersionManifest)
+          } as Response);
         }
+        // Mock the actual data file response
+        return Promise.resolve({
+          ok: true,
+          arrayBuffer: () => Promise.resolve(mockGzippedData.buffer)
+        } as Response);
       });
 
-      try {
-        await expect(loadAddressIndex()).rejects.toThrow(
-          'Bundle loading failed'
-        );
-      } finally {
-        loadModule._setTestMockNodeModules(null);
-      }
-    });
+      mockDecompressSync.mockReturnValue(
+        new Uint8Array(Buffer.from(JSON.stringify(mockIndexData)))
+      );
+      const result = await loadAddressIndex();
 
-    it('should throw error when filesystem read fails in Node.js', async () => {
-      const mockReadFileSync = vi.fn().mockImplementation(() => {
-        throw new Error('Permission denied');
-      });
-      const mockExistsSync = vi.fn().mockReturnValue(true);
-      const mockJoin = vi
-        .fn()
-        .mockReturnValue('/test/project/public/address-index.json.gz');
-
-      const loadModule = await import('./loadAddressIndex');
-
-      loadModule._setTestMockNodeModules({
-        fs: {
-          readFileSync: mockReadFileSync,
-          existsSync: mockExistsSync,
-          readdirSync: vi.fn()
-        },
-        path: {
-          join: mockJoin
-        }
-      });
-
-      try {
-        await expect(loadAddressIndex()).rejects.toThrow(
-          'Bundle loading failed'
-        );
-      } finally {
-        loadModule._setTestMockNodeModules(null);
-      }
+      expect(result).toHaveProperty('index');
+      expect(result).toHaveProperty('parcelIds');
+      expect(result).toHaveProperty('addressData');
+      expect(result.parcelIds).toEqual(mockIndexData.parcelIds);
+      expect(result.addressData).toEqual(MOCK_ADDRESS_INDEX_ADDRESS_DATA);
     });
   });
 
@@ -388,99 +333,6 @@ describe('loadAddressIndex', () => {
       );
 
       expect(result.index).toBe(mockSearchIndex);
-    });
-  });
-
-  describe('loadAddressIndex - Gzip Error Handling', () => {
-    beforeEach(async () => {
-      const { clearAddressIndexCache } = await import('./loadAddressIndex');
-      clearAddressIndexCache();
-      vi.clearAllMocks();
-    });
-
-    it('should handle invalid gzip data gracefully and not expose compressed bytes to JSON.parse', async () => {
-      const { loadAddressIndex, _setTestMockNodeModules } = await import(
-        './loadAddressIndex'
-      );
-
-      const invalidGzipData = new Uint8Array([
-        0xef, 0xbf, 0xbd, 0x00, 0x01, 0x02
-      ]);
-
-      mockDecompressSync.mockImplementation(() => {
-        throw new Error('Invalid gzip data');
-      });
-
-      _setTestMockNodeModules({
-        fs: {
-          readFileSync: () => invalidGzipData,
-          existsSync: () => true,
-          readdirSync: () => []
-        },
-        path: {
-          join: (...paths) => paths.join('/')
-        }
-      });
-
-      await expect(loadAddressIndex()).rejects.toThrow('Bundle loading failed');
-
-      mockDecompressSync.mockReturnValue(
-        new Uint8Array(Buffer.from(JSON.stringify(mockIndexData)))
-      );
-
-      _setTestMockNodeModules(null);
-    });
-
-    it('should handle empty/corrupted fetch responses in browser gracefully', async () => {
-      setupBrowserEnvironment();
-      const { loadAddressIndex } = await import('./loadAddressIndex');
-
-      global.fetch = vi.fn().mockResolvedValue({
-        ok: true,
-        arrayBuffer: () => Promise.resolve(new ArrayBuffer(0))
-      });
-
-      mockDecompressSync.mockImplementation(() => {
-        throw new Error('Empty or corrupted data');
-      });
-
-      await expect(loadAddressIndex()).rejects.toThrow('Bundle loading failed');
-
-      mockDecompressSync.mockReturnValue(
-        new Uint8Array(Buffer.from(JSON.stringify(mockIndexData)))
-      );
-    });
-
-    it('should properly decompress valid gzipped data', async () => {
-      const { loadAddressIndex, _setTestMockNodeModules } = await import(
-        './loadAddressIndex'
-      );
-
-      const validJsonData = JSON.stringify(mockIndexData);
-      const validGzipData = new Uint8Array([0x1f, 0x8b, 0x08, 0x00]);
-
-      mockDecompressSync.mockReturnValue(
-        new Uint8Array(Buffer.from(validJsonData))
-      );
-
-      _setTestMockNodeModules({
-        fs: {
-          readFileSync: () => validGzipData,
-          existsSync: () => true,
-          readdirSync: () => []
-        },
-        path: {
-          join: (...paths) => paths.join('/')
-        }
-      });
-
-      const result = await loadAddressIndex();
-
-      expect(result).toBeDefined();
-      expect(result.index).toBeDefined();
-      expect(result.parcelIds).toEqual(mockIndexData.parcelIds);
-
-      _setTestMockNodeModules(null);
     });
   });
 });

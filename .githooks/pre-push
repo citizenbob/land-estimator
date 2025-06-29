@@ -196,29 +196,6 @@ if ! git diff-index --quiet HEAD --; then
     git status --porcelain
 fi
 
-# Check if .gz files exist and are properly sized
-if [ -f "public/address-index.json.gz" ]; then
-    size=$(stat -c%s "public/address-index.json.gz" 2>/dev/null || stat -f%z "public/address-index.json.gz" 2>/dev/null || echo "0")
-    if [ "$size" -gt 1000000 ]; then  # > 1MB
-        echo -e "${GREEN}✅ address-index.json.gz exists (${size} bytes)${NC}"
-    else
-        echo -e "${YELLOW}⚠️  address-index.json.gz seems too small (${size} bytes)${NC}"
-    fi
-else
-    echo -e "${YELLOW}⚠️  address-index.json.gz not found${NC}"
-fi
-
-if [ -f "public/parcel-metadata.json.gz" ]; then
-    size=$(stat -c%s "public/parcel-metadata.json.gz" 2>/dev/null || stat -f%z "public/parcel-metadata.json.gz" 2>/dev/null || echo "0")
-    if [ "$size" -gt 10000000 ]; then  # > 10MB
-        echo -e "${GREEN}✅ parcel-metadata.json.gz exists (${size} bytes)${NC}"
-    else
-        echo -e "${YELLOW}⚠️  parcel-metadata.json.gz seems too small (${size} bytes)${NC}"
-    fi
-else
-    echo -e "${YELLOW}⚠️  parcel-metadata.json.gz not found${NC}"
-fi
-
 echo -e "\n${GREEN}🎉 All pre-push checks passed! Push is allowed.${NC}"
 echo -e "${BLUE}📝 Tip: You can skip hooks with SKIP_HOOK=true or SKIP_E2E=true for faster pushes during development.${NC}"
 

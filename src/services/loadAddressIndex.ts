@@ -1,7 +1,7 @@
 import FlexSearch from 'flexsearch';
 import { createUniversalBundleLoader } from '@lib/universalBundleLoader';
 import { AppError, ErrorType } from '@lib/errorUtils';
-import type { NodeModules } from '@lib/universalLoader';
+import { decompressJsonData } from '@lib/universalLoader';
 
 /**
  * Creates address lookup map for search result mapping
@@ -44,29 +44,50 @@ function createSearchIndex(
 }
 
 /**
- * Address index requires optimized data - no raw fallback available
- * @throws Always throws as raw fallback is not supported
+ * Address index fallback - attempts to load from local backup if available
+ * @throws When no fallback data is available
  */
 async function loadRawAddressData(): Promise<
   FlexSearch.PrecomputedIndexData[]
 > {
+  // Try to load from emergency backup file if available
+  if (typeof window !== 'undefined') {
+    try {
+      const response = await fetch('/address-index-backup.json.gz');
+      if (response.ok) {
+        const arrayBuffer = await response.arrayBuffer();
+        const decompressed =
+          decompressJsonData<FlexSearch.PrecomputedIndexData>(
+            new Uint8Array(arrayBuffer)
+          );
+        console.log('🚨 Using emergency backup address index');
+        return [decompressed];
+      }
+    } catch (error) {
+      console.warn('Emergency backup not available:', error);
+    }
+  }
+
   throw new AppError(
-    'Address index requires optimized .gz data - no raw fallback available',
+    'Address index requires optimized .gz data - no fallback available. CDN may be temporarily unavailable.',
     ErrorType.VALIDATION,
-    { isRetryable: false }
+    { isRetryable: true }
   );
 }
 
+// Universal address index loader with versioning support
 const addressIndexLoader = createUniversalBundleLoader<
   FlexSearch.PrecomputedIndexData,
   FlexSearch.PrecomputedIndexData,
   FlexSearch.FlexSearchIndexBundle
 >({
   gzippedFilename: 'address-index.json.gz',
+  baseFilename: 'address-index',
+  useVersioning: process.env.NODE_ENV === 'production',
   createLookupMap: () => ({}),
   loadRawData: loadRawAddressData,
-  extractDataFromIndex: (index) => [index],
-  createBundle: async (data) => {
+  extractDataFromIndex: (index: FlexSearch.PrecomputedIndexData) => [index],
+  createBundle: async (data: FlexSearch.PrecomputedIndexData[]) => {
     const indexData = data[0];
     const searchIndex = createSearchIndex(indexData);
     const addressData = await createAddressLookupMap(indexData);
@@ -78,13 +99,6 @@ const addressIndexLoader = createUniversalBundleLoader<
     };
   }
 });
-
-/**
- * Sets mock Node.js modules for testing
- */
-export function _setTestMockNodeModules(mockModules: NodeModules | null): void {
-  addressIndexLoader.setTestMockModules(mockModules);
-}
 
 /**
  * Universal address index loader that works in both browser and Node.js environments

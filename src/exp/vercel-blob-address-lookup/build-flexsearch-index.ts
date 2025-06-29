@@ -9,9 +9,8 @@ import { fileURLToPath } from 'url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
-// Use Vercel Blob as source instead of Firebase
-const SOURCE_URL =
-  'https://lchevt1wkhcax7cz.public.blob.vercel-storage.com/address-index.json.gz';
+// Import the versioned loading system
+import { loadAddressIndex } from '@services/loadAddressIndex';
 
 interface IndexEntry {
   id: number;
@@ -20,55 +19,19 @@ interface IndexEntry {
 }
 
 async function buildFlexSearchIndex() {
-  console.log('🔄 Building FlexSearch index from Vercel Blob data...');
+  console.log('🔄 Building FlexSearch index from versioned data...');
 
   try {
-    // Download and parse source data from Vercel Blob
-    console.log('📥 Fetching source data from Vercel Blob...');
-    const res = await fetch(SOURCE_URL);
-    if (!res.ok) throw new Error(`Failed to fetch: ${res.statusText}`);
+    // Use the versioned loading system
+    console.log('📥 Loading address index via versioned loader...');
+    const addressIndexBundle = await loadAddressIndex();
 
-    const buffer = Buffer.from(await res.arrayBuffer());
-    console.log(`📦 Downloaded ${buffer.length} bytes from Vercel Blob`);
-
-    const jsonText = zlib.gunzipSync(buffer).toString('utf-8');
-    const parsed = JSON.parse(jsonText);
-
-    // Handle multiple Vercel Blob JSON formats (as in addressLookup.vercel.ts)
-    let searchStrings: string[] = [];
-
-    if (parsed && parsed.addresses && Array.isArray(parsed.addresses)) {
-      searchStrings = parsed.addresses.map((addr: unknown) =>
-        typeof addr === 'string'
-          ? addr
-          : (addr as { searchable?: string })?.searchable || String(addr)
-      );
-    } else if (
-      parsed &&
-      parsed.searchStrings &&
-      Array.isArray(parsed.searchStrings)
-    ) {
-      searchStrings = parsed.searchStrings;
-    } else if (Array.isArray(parsed)) {
-      searchStrings = parsed.map((item: unknown) =>
-        typeof item === 'string'
-          ? item
-          : (item as { searchable?: string })?.searchable || String(item)
-      );
-    } else if (parsed && typeof parsed === 'object') {
-      const values = Object.values(parsed);
-      searchStrings = values.map((val: unknown) =>
-        typeof val === 'string'
-          ? val
-          : (val as { searchable?: string })?.searchable || String(val)
-      );
-    }
-
+    // Extract the search strings from the bundle
+    const searchStrings = Object.keys(addressIndexBundle.addressData);
     console.log(
-      `📋 Processing ${searchStrings.length} address strings from Vercel Blob`
+      `📦 Loaded ${searchStrings.length} addresses from versioned system`
     );
 
-    // Create FlexSearch index
     console.log('🔍 Creating FlexSearch index...');
     const flexIndex = new FlexSearch.Index({
       tokenize: 'forward',
@@ -112,7 +75,7 @@ async function buildFlexSearchIndex() {
       metadata: {
         totalEntries: entries.length,
         buildTime: new Date().toISOString(),
-        sourceUrl: SOURCE_URL,
+        sourceUrl: 'versioned-system',
         sourceType: 'vercel-blob',
         version: '1.0-vercel',
         indexConfig: {
