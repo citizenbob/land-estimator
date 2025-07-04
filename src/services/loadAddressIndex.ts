@@ -120,6 +120,17 @@ class StaticAddressIndexLoader {
    */
   private async _tryLoadFromStatic(): Promise<FlexSearchIndexBundle | null> {
     try {
+      // Detect if we're on server (Node.js) vs client (browser)
+      const isServer = typeof window === 'undefined';
+
+      // For server-side (API routes), we need to read from filesystem
+      if (isServer) {
+        console.log(
+          '🖥️ Server-side detected, loading static files from filesystem...'
+        );
+        return await this._loadFromFileSystem();
+      }
+
       const manifestResponse = await fetch('/search/latest.json');
       if (!manifestResponse.ok) {
         console.log('📭 Static manifest not found, will try CDN fallback');
@@ -177,6 +188,62 @@ class StaticAddressIndexLoader {
       };
     } catch (error) {
       console.log(`⚠️ Static loading failed: ${error}`);
+      return null;
+    }
+  }
+
+  /**
+   * Load static files from filesystem (server-side only)
+   */
+  private async _loadFromFileSystem(): Promise<FlexSearchIndexBundle | null> {
+    try {
+      // Use dynamic import to avoid webpack warnings
+      const { loadStaticFilesFromFileSystem } = await import(
+        './fileSystemLoader'
+      );
+
+      const result = await loadStaticFilesFromFileSystem();
+      if (!result) {
+        return null;
+      }
+
+      const { manifest, lookupData } = result;
+
+      // Try to load exported FlexSearch index first
+      const loadedFromExport = await this._tryLoadFromExportedFiles(
+        manifest,
+        lookupData
+      );
+      if (loadedFromExport) {
+        console.log(
+          '✅ Loaded from static exported FlexSearch index (filesystem)'
+        );
+        return loadedFromExport;
+      }
+
+      console.log(
+        '🔄 Rebuilding FlexSearch index from static search strings (filesystem)...'
+      );
+      const rebuildStart = performance.now();
+
+      const searchIndex = new Index(FLEXSEARCH_CONFIG);
+
+      lookupData.searchStrings.forEach((searchString, idx) => {
+        searchIndex.add(idx, searchString);
+      });
+
+      const rebuildTime = performance.now() - rebuildStart;
+      console.log(
+        `⚡ Static address index rebuilt in ${rebuildTime.toFixed(2)}ms (filesystem)`
+      );
+
+      return {
+        index: searchIndex,
+        parcelIds: lookupData.parcelIds,
+        addressData: lookupData.addressData
+      };
+    } catch (error) {
+      console.log(`⚠️ Filesystem loading failed: ${error}`);
       return null;
     }
   }

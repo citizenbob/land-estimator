@@ -32,7 +32,8 @@
     "test:e2e:open": "CYPRESS=true cypress open",
     "test:all": "yarn test:run && yarn test:python && yarn test:e2e",
     "storybook": "storybook dev -p 6006",
-    "storybook:build": "storybook build"
+    "storybook:build": "storybook build",
+    "debug:static-loading": "tsx src/config/scripts/debug-static-loading.ts"
   },
   "dependencies": {
     "@vercel/blob": "^1.1.1",

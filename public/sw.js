@@ -163,12 +163,9 @@ async function preloadStaticFiles() {
     }
 
     const staticBaseUrl = '/search/';
-    const urlsToPreload = [
-      '/search/latest.json',
-      `${staticBaseUrl}${manifest.version}-lookup.json`,
-      `${staticBaseUrl}${manifest.version}-metadata.json`
-    ];
+    const urlsToPreload = ['/search/latest.json'];
 
+    // Add all files from manifest (these have the correct names)
     urlsToPreload.push(
       ...manifest.files.map((file) => `${staticBaseUrl}${file}`)
     );
@@ -303,44 +300,46 @@ async function preloadVersionedIndexes() {
   }
 }
 
-self.addEventListener('fetch', (event) => {
-  const url = event.request.url;
+// TEMPORARILY DISABLED - Service worker fetch interception is corrupting static file requests
+// self.addEventListener('fetch', (event) => {
+//   const url = event.request.url;
 
-  if (
-    url.includes('address-index-v') ||
-    url.includes('parcel-metadata-v') ||
-    url.includes('/search/') ||
-    url.includes('/public/search/')
-  ) {
-    event.respondWith(handleVersionedIndexFetch(event.request));
-  }
-});
+//   if (
+//     url.includes('address-index-v') ||
+//     url.includes('parcel-metadata-v') ||
+//     url.includes('/search/') ||
+//     url.includes('/public/search/')
+//   ) {
+//     event.respondWith(handleVersionedIndexFetch(event.request));
+//   }
+// });
 
-async function handleVersionedIndexFetch(request) {
-  try {
-    const cache = await caches.open(CACHE_NAME);
-    const cachedResponse = await cache.match(request);
+// TEMPORARILY DISABLED - Function for handling versioned index fetching
+// async function handleVersionedIndexFetch(request) {
+//   try {
+//     const cache = await caches.open(CACHE_NAME);
+//     const cachedResponse = await cache.match(request);
 
-    if (cachedResponse) {
-      console.log('[SW] Serving from cache:', request.url);
-      return cachedResponse;
-    }
+//     if (cachedResponse) {
+//       console.log('[SW] Serving from cache:', request.url);
+//       return cachedResponse;
+//     }
 
-    console.log('[SW] Fetching from network:', request.url);
-    const networkResponse = await fetch(request);
+//     console.log('[SW] Fetching from network:', request.url);
+//     const networkResponse = await fetch(request);
 
-    if (networkResponse.ok) {
-      const responseToCache = networkResponse.clone();
-      await cache.put(request, responseToCache);
-      console.log('[SW] Cached network response:', request.url);
-    }
+//     if (networkResponse.ok) {
+//       const responseToCache = networkResponse.clone();
+//       await cache.put(request, responseToCache);
+//       console.log('[SW] Cached network response:', request.url);
+//     }
 
-    return networkResponse;
-  } catch (error) {
-    console.error('[SW] Fetch failed:', request.url, error);
-    return new Response('Service worker fetch failed', {
-      status: 500,
-      statusText: 'Service Worker Error'
-    });
-  }
-}
+//     return networkResponse;
+//   } catch (error) {
+//     console.error('[SW] Fetch failed:', request.url, error);
+//     return new Response('Service worker fetch failed', {
+//       status: 500,
+//       statusText: 'Service Worker Error'
+//     });
+//   }
+// }

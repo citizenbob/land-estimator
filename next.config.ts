@@ -10,7 +10,7 @@ const nextConfig: NextConfig = {
   },
   serverExternalPackages: ['flexsearch'],
 
-  webpack: (config) => {
+  webpack: (config, { isServer }) => {
     config.resolve.alias = {
       ...config.resolve.alias,
       '@': path.resolve(__dirname, 'src'),
@@ -32,6 +32,32 @@ const nextConfig: NextConfig = {
       '@app-types': path.resolve(__dirname, 'src/types'),
       '@workers': path.resolve(__dirname, 'src/workers')
     };
+
+    // Exclude Node.js-only scripts from client-side bundle
+    if (!isServer) {
+      config.externals = config.externals || [];
+      config.externals.push({
+        // Exclude Node.js filesystem modules from browser bundle
+        fs: 'commonjs fs',
+        path: 'commonjs path',
+        zlib: 'commonjs zlib',
+        crypto: 'commonjs crypto',
+
+        // Exclude server-side file system loader
+        './fileSystemLoader': 'commonjs ./fileSystemLoader',
+
+        // Exclude Node.js-only script files
+        './src/config/scripts/create_emergency_backups':
+          'commonjs ./src/config/scripts/create_emergency_backups',
+        './src/config/scripts/debug-static-loading':
+          'commonjs ./src/config/scripts/debug-static-loading',
+        './src/config/scripts/flexsearch_builder':
+          'commonjs ./src/config/scripts/flexsearch_builder',
+        './src/config/scripts/upload_blob':
+          'commonjs ./src/config/scripts/upload_blob'
+      });
+    }
+
     return config;
   },
 

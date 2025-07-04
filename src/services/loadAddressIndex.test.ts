@@ -247,4 +247,55 @@ describe('loadAddressIndex', () => {
       expect(result1).not.toBe(result2);
     });
   });
+
+  describe('Static File Loading Debugging', () => {
+    it('debugs URL parsing for static files', async () => {
+      // Test the exact scenario that's failing
+      const consoleLogSpy = vi.spyOn(console, 'log');
+
+      mockFetch.mockRejectedValueOnce(
+        new TypeError('Failed to parse URL from /search/latest.json')
+      );
+
+      mockCDNLoader.mockResolvedValueOnce({
+        index: mockSearchIndex,
+        parcelIds: ['P001'],
+        addressData: { P001: 'Test Address from CDN' }
+      });
+
+      expect(consoleLogSpy).toHaveBeenCalledWith(
+        expect.stringContaining('Static loading failed')
+      );
+      expect(mockCDNLoader).toHaveBeenCalled();
+    });
+
+    it('tests exact fetch URLs being generated', async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: () =>
+          Promise.resolve({
+            version: 'v20250704-787dd7fd',
+            files: ['address-v20250704-787dd7fd-lookup.json']
+          })
+      });
+
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: () =>
+          Promise.resolve({
+            parcelIds: ['P001'],
+            searchStrings: ['Test'],
+            addressData: { P001: 'Test' }
+          })
+      });
+
+      await loadAddressIndex();
+
+      // Verify exact URLs being called
+      expect(mockFetch).toHaveBeenCalledWith('/search/latest.json');
+      expect(mockFetch).toHaveBeenCalledWith(
+        '/search/address-v20250704-787dd7fd-lookup.json'
+      );
+    });
+  });
 });
