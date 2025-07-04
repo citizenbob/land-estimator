@@ -57,6 +57,25 @@ self.addEventListener('message', async (event) => {
     }
   }
 
+  if (event.data?.type === 'PRELOAD_STATIC_FILES') {
+    try {
+      console.log('[SW] Starting static files preload...');
+      await preloadStaticFiles();
+
+      event.ports[0]?.postMessage({
+        type: 'PRELOAD_STATIC_COMPLETE',
+        success: true
+      });
+    } catch (error) {
+      console.error('[SW] Static preload failed:', error);
+      event.ports[0]?.postMessage({
+        type: 'PRELOAD_STATIC_COMPLETE',
+        success: false,
+        error: error.message
+      });
+    }
+  }
+
   if (event.data?.type === 'CLEAR_CACHE') {
     try {
       console.log('[SW] Clearing versioned index cache...');
@@ -123,6 +142,76 @@ self.addEventListener('message', async (event) => {
   }
 });
 
+async function preloadStaticFiles() {
+  try {
+    console.log('[SW] Fetching static manifest...');
+
+    const manifestResponse = await fetch('/search/latest.json');
+
+    if (!manifestResponse.ok) {
+      throw new Error(`Static manifest not found: ${manifestResponse.status}`);
+    }
+
+    const manifest = await manifestResponse.json();
+    console.log('[SW] Static manifest loaded:', {
+      version: manifest.version,
+      recordCount: manifest.recordCount
+    });
+
+    if (!manifest.files) {
+      throw new Error('Invalid static manifest: missing files array');
+    }
+
+    const staticBaseUrl = '/search/';
+    const urlsToPreload = [
+      '/search/latest.json',
+      `${staticBaseUrl}${manifest.version}-lookup.json`,
+      `${staticBaseUrl}${manifest.version}-metadata.json`
+    ];
+
+    urlsToPreload.push(
+      ...manifest.files.map((file) => `${staticBaseUrl}${file}`)
+    );
+
+    console.log('[SW] Static URLs to preload:', urlsToPreload.length, 'files');
+
+    const cache = await caches.open(CACHE_NAME);
+
+    const preloadPromises = urlsToPreload.map(async (url) => {
+      try {
+        const cachedResponse = await cache.match(url);
+        if (cachedResponse) {
+          console.log('[SW] Static file already cached:', url);
+          return;
+        }
+
+        console.log('[SW] Preloading static file:', url);
+        const response = await fetch(url);
+
+        if (!response.ok) {
+          console.warn(
+            '[SW] Failed to preload static file:',
+            url,
+            response.status
+          );
+          return;
+        }
+
+        await cache.put(url, response);
+        console.log('[SW] Successfully cached static file:', url);
+      } catch (error) {
+        console.warn('[SW] Error preloading static file:', url, error.message);
+      }
+    });
+
+    await Promise.all(preloadPromises);
+    console.log('[SW] Static files preload completed');
+  } catch (error) {
+    console.error('[SW] Static files preload failed:', error);
+    throw error;
+  }
+}
+
 async function preloadVersionedIndexes() {
   try {
     console.log('[SW] Fetching version manifest...');
@@ -161,9 +250,8 @@ async function preloadVersionedIndexes() {
       throw new Error('Invalid version manifest: missing current files');
     }
 
-    // Convert relative paths to full CDN URLs
     const baseCdnUrl =
-      'https://storage.googleapis.com/land-estimator-29ee9.firebasestorage.app/';
+      'https://storage.googleapis.com/land-estimator-29ee9.firebasestorage.app/cdn/';
 
     const urlsToPreload = [
       manifest.current.files.address_index,
@@ -171,7 +259,6 @@ async function preloadVersionedIndexes() {
     ]
       .filter(Boolean)
       .map((url) => {
-        // Handle both relative and absolute URLs
         return url.startsWith('http') ? url : `${baseCdnUrl}${url}`;
       });
 
@@ -218,7 +305,13 @@ async function preloadVersionedIndexes() {
 
 self.addEventListener('fetch', (event) => {
   const url = event.request.url;
-  if (url.includes('address-index-v') || url.includes('parcel-metadata-v')) {
+
+  if (
+    url.includes('address-index-v') ||
+    url.includes('parcel-metadata-v') ||
+    url.includes('/search/') ||
+    url.includes('/public/search/')
+  ) {
     event.respondWith(handleVersionedIndexFetch(event.request));
   }
 });

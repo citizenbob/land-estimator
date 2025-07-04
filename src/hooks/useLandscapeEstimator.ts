@@ -1,5 +1,5 @@
 import { useState, useCallback } from 'react';
-import { EnrichedAddressSuggestion } from '@typez/addressMatchTypes';
+import { EnrichedAddressSuggestion } from '@app-types';
 import { estimateLandscapingPrice } from '@services/landscapeEstimator';
 import { createInsufficientDataError, getErrorMessage } from '@lib/errorUtils';
 

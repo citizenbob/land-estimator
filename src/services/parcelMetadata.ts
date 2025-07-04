@@ -2,7 +2,6 @@ import {
   loadVersionedBundle,
   clearMemoryCache
 } from '@workers/versionedBundleLoader';
-import { AppError, ErrorType } from '@lib/errorUtils';
 
 export interface ParcelMetadata {
   id: string;
@@ -54,42 +53,75 @@ function createParcelLookupMap(
 }
 
 /**
- * Parcel metadata fallback - attempts to load from local backup if available
- * @throws When no fallback data is available
- */
-async function loadRawParcelData(): Promise<ParcelMetadata[]> {
-  if (typeof window !== 'undefined') {
-    try {
-      const response = await fetch('/parcel-metadata-backup.json.gz');
-      if (response.ok) {
-        const arrayBuffer = await response.arrayBuffer();
-        const { decompressVersionedJsonData } = await import(
-          '@workers/versionedBundleLoader'
-        );
-        const decompressed =
-          decompressVersionedJsonData<OptimizedParcelIndex>(arrayBuffer);
-        console.log('🚨 Using emergency backup parcel metadata');
-        return decompressed.parcels;
-      }
-    } catch (error) {
-      console.warn('Emergency backup not available:', error);
-    }
-  }
-
-  throw new AppError(
-    'Parcel metadata requires optimized .gz data - no fallback available. CDN may be temporarily unavailable.',
-    ErrorType.VALIDATION,
-    { isRetryable: true }
-  );
-}
-
-/**
  * Configuration for parcel metadata bundle loading
  */
 const parcelBundleConfig = {
   baseFilename: 'parcel-metadata',
   createLookupMap: createParcelLookupMap,
-  extractDataFromIndex: (index: OptimizedParcelIndex) => index.parcels,
+  extractDataFromIndex: (
+    index: OptimizedParcelIndex | ParcelMetadata[] | unknown
+  ) => {
+    console.log('🔍 [DEBUG] Parcel index structure:', {
+      type: typeof index,
+      isArray: Array.isArray(index),
+      keys: typeof index === 'object' && index ? Object.keys(index) : 'N/A'
+    });
+
+    // Handle different possible structures
+    if (Array.isArray(index)) {
+      console.log('🔧 [DEBUG] Index is array, using directly');
+      return index;
+    }
+
+    // Type guard for OptimizedParcelIndex
+    if (index && typeof index === 'object' && 'parcels' in index) {
+      const typedIndex = index as OptimizedParcelIndex;
+      console.log('🔧 [DEBUG] Found parcels property, checking if array:', {
+        parcelsType: typeof typedIndex.parcels,
+        isArray: Array.isArray(typedIndex.parcels),
+        length: Array.isArray(typedIndex.parcels)
+          ? typedIndex.parcels.length
+          : 'N/A',
+        parcelsValue: typedIndex.parcels ? 'exists' : 'null/undefined',
+        firstFewKeys:
+          typedIndex.parcels && typeof typedIndex.parcels === 'object'
+            ? Object.keys(typedIndex.parcels).slice(0, 5)
+            : 'N/A'
+      });
+
+      if (Array.isArray(typedIndex.parcels)) {
+        console.log('🔧 [DEBUG] Found parcels array in index');
+        return typedIndex.parcels;
+      } else if (typedIndex.parcels && typeof typedIndex.parcels === 'object') {
+        console.log('🔧 [DEBUG] parcels is object, converting to array');
+        // If parcels is an object (lookup map), convert to array
+        const parcelsArray = Object.values(
+          typedIndex.parcels
+        ) as ParcelMetadata[];
+        console.log('🔧 [DEBUG] Converted parcels object to array:', {
+          length: parcelsArray.length
+        });
+        return parcelsArray;
+      } else {
+        console.log(
+          '❌ [DEBUG] parcels property exists but is not an array or object'
+        );
+      }
+    }
+
+    // If it's an object but parcels is not an array, try to find the actual array
+    if (index && typeof index === 'object') {
+      const indexObj = index as Record<string, unknown>;
+      const firstKey = Object.keys(indexObj)[0];
+      if (firstKey && Array.isArray(indexObj[firstKey])) {
+        console.log('🔧 [DEBUG] Using first array property:', firstKey);
+        return indexObj[firstKey] as ParcelMetadata[];
+      }
+    }
+
+    console.error('❌ [DEBUG] Could not find parcels array in index structure');
+    throw new Error(`Invalid parcel index structure: ${typeof index}`);
+  },
   createBundle: (
     data: ParcelMetadata[],
     lookup: Record<string, ParcelMetadata>
@@ -138,22 +170,8 @@ export async function loadParcelMetadata(): Promise<ParcelBundle> {
     return loadVersionedBundle(parcelBundleConfig);
   }
 
-  console.warn(
-    '⚠️ [DEV] Loading raw parcel data (versioned loader disabled in development)'
-  );
-  try {
-    const rawData = await loadRawParcelData();
-    const lookup = createParcelLookupMap(rawData);
-
-    return { data: rawData, lookup };
-  } catch (error) {
-    console.error('[DEV] Failed to load raw parcel data:', error);
-    throw new AppError(
-      'Parcel data not available in development mode. Ensure data files are present.',
-      ErrorType.VALIDATION,
-      { isRetryable: false }
-    );
-  }
+  console.log('🌐 [DEV] Using CDN loader in development mode for reliability');
+  return loadVersionedBundle(parcelBundleConfig);
 }
 
 /**

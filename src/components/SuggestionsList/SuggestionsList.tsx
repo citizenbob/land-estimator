@@ -1,5 +1,5 @@
 import React from 'react';
-import { AddressSuggestion } from '@typez/addressMatchTypes';
+import { AddressSuggestion } from '@app-types';
 import {
   SuggestionsListStyles as List,
   SuggestionItemStyles as ListItem

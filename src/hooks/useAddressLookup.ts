@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { AddressLookupRecord } from '@services/addressSearch';
-import { LocalAddressRecord } from '@typez/localAddressTypes';
+import { LocalAddressRecord } from '@app-types';
 import { createNetworkError, getErrorMessage, logError } from '@lib/errorUtils';
 
 export function useAddressLookup() {

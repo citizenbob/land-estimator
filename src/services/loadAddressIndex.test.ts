@@ -1,58 +1,43 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import {
-  MOCK_ADDRESS_INDEX_ADDRESS_DATA,
-  MOCK_ADDRESS_INDEX_INDEX_DATA
-} from '@lib/testData';
-import { createMockSearchIndex, setupBrowserEnvironment } from '@lib/testUtils';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+import type {
+  FlexSearchIndexBundle,
+  StaticAddressManifest,
+  AddressLookupData
+} from '@app-types';
 
 /**
- * Create consistent mock implementations
+ * Mock FlexSearch to return a search index that works
  */
-const mockSearchIndex = createMockSearchIndex();
-const mockIndexData = MOCK_ADDRESS_INDEX_INDEX_DATA;
+const mockSearchIndex = {
+  search: vi.fn(() => []),
+  add: vi.fn(),
+  import: vi.fn(),
+  remove: vi.fn(),
+  update: vi.fn(),
+  export: vi.fn()
+};
 
-/**
- * Mock FlexSearch constructor
- */
 vi.mock('flexsearch', () => ({
   default: {
     Index: vi.fn(() => mockSearchIndex)
-  }
+  },
+  Index: vi.fn(() => mockSearchIndex)
 }));
 
 /**
- * Mock fflate decompression and compression
+ * Mock the CDN loader (fallback)
  */
-const mockDecompressSync = vi.fn();
-const mockCompressSync = vi.fn();
-vi.mock('fflate', () => ({
-  decompressSync: mockDecompressSync,
-  compressSync: mockCompressSync
-}));
-
-/**
- * Mock address index import
- */
-vi.mock('@data/address_index.json', () => ({
-  default: MOCK_ADDRESS_INDEX_ADDRESS_DATA
-}));
-
-/**
- * Mock versioned bundle loader with configurable behavior
- */
-const mockLoadVersionedBundle = vi.fn();
-const mockClearMemoryCache = vi.fn();
-
+const mockCDNLoader = vi.fn();
 vi.mock('@workers/versionedBundleLoader', () => ({
-  loadVersionedBundle: mockLoadVersionedBundle,
-  clearMemoryCache: mockClearMemoryCache
+  loadVersionedBundle: mockCDNLoader,
+  clearMemoryCache: vi.fn()
 }));
 
-mockLoadVersionedBundle.mockResolvedValue({
-  index: mockSearchIndex,
-  parcelIds: mockIndexData.parcelIds,
-  addressData: MOCK_ADDRESS_INDEX_ADDRESS_DATA
-});
+/**
+ * Mock fetch for static files
+ */
+const mockFetch = vi.fn();
+global.fetch = mockFetch;
 
 describe('loadAddressIndex', () => {
   let loadAddressIndex: typeof import('./loadAddressIndex').loadAddressIndex;
@@ -61,178 +46,205 @@ describe('loadAddressIndex', () => {
   beforeEach(async () => {
     vi.clearAllMocks();
 
-    /**
-     * Reset mock behavior to default success
-     */
-    mockLoadVersionedBundle.mockResolvedValue({
-      index: mockSearchIndex,
-      parcelIds: mockIndexData.parcelIds,
-      addressData: MOCK_ADDRESS_INDEX_ADDRESS_DATA
+    Object.defineProperty(globalThis, 'window', {
+      value: { location: { origin: 'http://localhost:3000' } },
+      configurable: true
     });
 
-    /**
-     * Set up default mock behavior for decompression
-     */
-    mockDecompressSync.mockReturnValue(
-      new Uint8Array(Buffer.from(JSON.stringify(mockIndexData)))
-    );
-
-    /**
-     * Re-import the module to ensure fresh state
-     */
     const loadModule = await import('./loadAddressIndex');
     loadAddressIndex = loadModule.loadAddressIndex;
     clearAddressIndexCache = loadModule.clearAddressIndexCache;
 
-    /**
-     * Clear any cached data and reset the mock call count
-     */
     clearAddressIndexCache();
-    vi.clearAllMocks();
   });
 
-  afterEach(() => {
-    vi.clearAllMocks();
-    /**
-     * Clean up global environment
-     */
-    if ('window' in globalThis) {
-      delete (globalThis as Record<string, unknown>).window;
-    }
-    if ('fetch' in globalThis) {
-      delete (globalThis as Record<string, unknown>).fetch;
-    }
-  });
+  describe('Static Files (Primary Path)', () => {
+    it('loads successfully from static files', async () => {
+      const mockManifest: StaticAddressManifest = {
+        version: 'v20250702-abc123',
+        timestamp: '2025-07-02T10:00:00.000Z',
+        recordCount: 2,
+        config: {
+          tokenize: 'forward',
+          cache: 100,
+          resolution: 3
+        },
+        files: ['address-v20250702-abc123-lookup.json']
+      };
 
-  describe('Browser Environment', () => {
-    beforeEach(() => {
-      setupBrowserEnvironment();
-    });
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve(mockManifest)
+      });
 
-    it('should load index successfully in test environment', async () => {
+      const mockLookupData: AddressLookupData = {
+        parcelIds: ['P001', 'P002'],
+        searchStrings: ['123 Main St P001', '456 Oak Ave P002'],
+        addressData: {
+          P001: '123 Main St, City, State',
+          P002: '456 Oak Ave, City, State'
+        }
+      };
+
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve(mockLookupData)
+      });
+
       const result = await loadAddressIndex();
 
       expect(result).toHaveProperty('index');
       expect(result).toHaveProperty('parcelIds');
       expect(result).toHaveProperty('addressData');
-      expect(result.parcelIds).toEqual(mockIndexData.parcelIds);
-      expect(result.addressData).toEqual(MOCK_ADDRESS_INDEX_ADDRESS_DATA);
-      expect(mockLoadVersionedBundle).toHaveBeenCalledTimes(1);
+      expect(result.parcelIds).toEqual(['P001', 'P002']);
+      expect(result.addressData).toEqual(mockLookupData.addressData);
+      expect(mockFetch).toHaveBeenCalledWith('/search/latest.json');
+      expect(mockCDNLoader).not.toHaveBeenCalled();
     });
 
-    it('should handle loader errors gracefully', async () => {
-      const errorMessage =
-        'Unable to load address-index data. This may be due to network connectivity issues or temporary service unavailability. Please try refreshing the page or check your internet connection.';
-      mockLoadVersionedBundle.mockRejectedValue(new Error(errorMessage));
+    it('handles missing static manifest by falling back to CDN', async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: false,
+        status: 404
+      });
 
-      await expect(loadAddressIndex()).rejects.toThrow(errorMessage);
-      expect(mockLoadVersionedBundle).toHaveBeenCalledTimes(1);
-    });
+      const mockCDNResult: FlexSearchIndexBundle = {
+        index: mockSearchIndex,
+        parcelIds: ['P001'],
+        addressData: { P001: 'Test Address from CDN' }
+      };
 
-    it('should handle unexpected loader failures', async () => {
-      mockLoadVersionedBundle.mockRejectedValue(new Error('Network error'));
+      mockCDNLoader.mockResolvedValueOnce(mockCDNResult);
 
-      await expect(loadAddressIndex()).rejects.toThrow('Network error');
-      expect(mockLoadVersionedBundle).toHaveBeenCalledTimes(1);
-    });
-  });
-
-  describe('Versioned Loading', () => {
-    beforeEach(() => {
-      setupBrowserEnvironment();
-    });
-
-    it('should load index using versioned loader in production', async () => {
       const result = await loadAddressIndex();
 
       expect(result).toHaveProperty('index');
       expect(result).toHaveProperty('parcelIds');
       expect(result).toHaveProperty('addressData');
-      expect(result.parcelIds).toEqual(mockIndexData.parcelIds);
-      expect(result.addressData).toEqual(MOCK_ADDRESS_INDEX_ADDRESS_DATA);
-      expect(mockLoadVersionedBundle).toHaveBeenCalledTimes(1);
+      expect(result.parcelIds).toEqual(['P001']);
+      expect(result.addressData).toEqual({ P001: 'Test Address from CDN' });
+      expect(mockFetch).toHaveBeenCalledWith('/search/latest.json');
+      expect(mockCDNLoader).toHaveBeenCalled();
+    });
+
+    it('handles missing lookup file by falling back to CDN', async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: () =>
+          Promise.resolve({
+            version: 'v1',
+            files: ['address-v1-lookup.json']
+          })
+      });
+
+      mockFetch.mockResolvedValueOnce({
+        ok: false,
+        status: 404
+      });
+
+      mockCDNLoader.mockResolvedValueOnce({
+        index: mockSearchIndex,
+        parcelIds: ['P001'],
+        addressData: { P001: 'Test Address' }
+      });
+
+      const result = await loadAddressIndex();
+
+      expect(result).toHaveProperty('index');
+      expect(mockCDNLoader).toHaveBeenCalled();
     });
   });
 
-  describe('Data Processing', () => {
-    beforeEach(() => {
-      setupBrowserEnvironment();
-    });
+  describe('CDN Fallback', () => {
+    it('loads from CDN when static files fail', async () => {
+      mockFetch.mockRejectedValue(new Error('Static files unavailable'));
 
-    it('should handle versioned loader errors gracefully', async () => {
-      mockLoadVersionedBundle.mockRejectedValue(
-        new Error(
-          'Unable to load address-index data. This may be due to network connectivity issues or temporary service unavailability. Please try refreshing the page or check your internet connection.'
-        )
-      );
+      mockCDNLoader.mockResolvedValueOnce({
+        index: mockSearchIndex,
+        parcelIds: ['P001', 'P002'],
+        addressData: { P001: 'Address 1', P002: 'Address 2' }
+      });
 
-      await expect(loadAddressIndex()).rejects.toThrow(
-        'Unable to load address-index data'
-      );
-      expect(mockLoadVersionedBundle).toHaveBeenCalledTimes(1);
-    });
-
-    it('should handle data corruption errors gracefully', async () => {
-      mockLoadVersionedBundle.mockRejectedValue(
-        new Error('Failed to decompress data')
-      );
-
-      await expect(loadAddressIndex()).rejects.toThrow(
-        'Failed to decompress data'
-      );
-      expect(mockLoadVersionedBundle).toHaveBeenCalledTimes(1);
-    });
-
-    it('should use the versioned bundle loader for all data processing', async () => {
       const result = await loadAddressIndex();
 
-      expect(result.addressData).toEqual(MOCK_ADDRESS_INDEX_ADDRESS_DATA);
-      expect(mockLoadVersionedBundle).toHaveBeenCalledTimes(1);
+      expect(result).toHaveProperty('index');
+      expect(result.parcelIds).toEqual(['P001', 'P002']);
+      expect(mockCDNLoader).toHaveBeenCalled();
+    });
+
+    it('throws error when both static and CDN fail', async () => {
+      mockFetch.mockRejectedValue(new Error('Static unavailable'));
+
+      mockCDNLoader.mockRejectedValue(new Error('CDN unavailable'));
+
+      await expect(loadAddressIndex()).rejects.toThrow('CDN unavailable');
     });
   });
 
   describe('Caching', () => {
-    beforeEach(() => {
-      setupBrowserEnvironment();
-    });
+    it('caches results between calls', async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: () =>
+          Promise.resolve({
+            version: 'v1',
+            files: ['address-v1-lookup.json']
+          })
+      });
 
-    it('should call the versioned loader for each request', async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: () =>
+          Promise.resolve({
+            parcelIds: ['P001'],
+            searchStrings: ['Test'],
+            addressData: { P001: 'Test' }
+          })
+      });
+
       const result1 = await loadAddressIndex();
-      expect(mockLoadVersionedBundle).toHaveBeenCalledTimes(1);
-
       const result2 = await loadAddressIndex();
-      expect(mockLoadVersionedBundle).toHaveBeenCalledTimes(2);
 
-      expect(result1).toEqual(result2);
+      expect(result1).toBe(result2);
+      expect(mockFetch).toHaveBeenCalledTimes(2);
     });
 
-    it('should call clearCache on the versioned loader when clearAddressIndexCache is called', async () => {
-      await loadAddressIndex();
-      expect(mockLoadVersionedBundle).toHaveBeenCalledTimes(1);
+    it('reloads after cache clear', async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve({ version: 'v1', files: ['lookup.json'] })
+      });
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: () =>
+          Promise.resolve({
+            parcelIds: ['P1'],
+            searchStrings: ['1'],
+            addressData: {}
+          })
+      });
+
+      const result1 = await loadAddressIndex();
 
       clearAddressIndexCache();
-      expect(mockClearMemoryCache).toHaveBeenCalledTimes(1);
 
-      await loadAddressIndex();
-      expect(mockLoadVersionedBundle).toHaveBeenCalledTimes(2);
-    });
-  });
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve({ version: 'v2', files: ['lookup.json'] })
+      });
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: () =>
+          Promise.resolve({
+            parcelIds: ['P2'],
+            searchStrings: ['2'],
+            addressData: {}
+          })
+      });
 
-  describe('FlexSearch Index Creation', () => {
-    beforeEach(() => {
-      setupBrowserEnvironment();
-    });
+      const result2 = await loadAddressIndex();
 
-    it('should create FlexSearch index with correct configuration', async () => {
-      const result = await loadAddressIndex();
-
-      expect(result).toHaveProperty('index');
-      expect(result).toHaveProperty('parcelIds');
-      expect(result).toHaveProperty('addressData');
-
-      expect(result.index).toBe(mockSearchIndex);
-
-      expect(mockLoadVersionedBundle).toHaveBeenCalledTimes(1);
+      expect(result1).not.toBe(result2);
     });
   });
 });

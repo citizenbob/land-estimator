@@ -2,7 +2,7 @@ import { renderHook, act } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { useLandscapeEstimator } from './useLandscapeEstimator';
 import * as estimatorModule from '@services/landscapeEstimator';
-import { EnrichedAddressSuggestion } from '@typez/addressMatchTypes';
+import { EnrichedAddressSuggestion } from '@app-types';
 import {
   MOCK_PRICE_BREAKDOWN,
   MOCK_ENRICHED_ADDRESS_DATA,

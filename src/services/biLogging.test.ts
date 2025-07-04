@@ -1,8 +1,8 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { logEstimateForBI } from '@services/biLogging';
 import { logEvent } from '@services/logger';
-import type { EstimateResult } from '@typez/landscapeEstimatorTypes';
-import type { EnrichedAddressSuggestion } from '@typez/addressMatchTypes';
+import type { EstimateResult } from '@app-types';
+import type { EnrichedAddressSuggestion } from '@app-types';
 import { MOCK_ENRICHED_ADDRESS_DATA, MOCK_BI_TEST_DATA } from '@lib/testData';
 
 vi.mock('@services/logger', () => ({

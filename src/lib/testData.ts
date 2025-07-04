@@ -1,10 +1,7 @@
+import type { FlexSearchIndexBundle } from '@app-types';
 import { vi } from 'vitest';
-import type {
-  LocalAddressRecord,
-  AddressSuggestion
-} from '@typez/localAddressTypes';
+import type { LocalAddressRecord, AddressSuggestion } from '@app-types';
 import type { VersionManifest } from '@services/versionManifest';
-import FlexSearch from 'flexsearch';
 
 export const MOCK_LOCAL_ADDRESSES: LocalAddressRecord[] = [
   {
@@ -430,7 +427,7 @@ export const EXPECTED_TEST_BUNDLE: TestBundle = {
 /**
  * Mock FlexSearch index bundle for testing
  */
-export const MOCK_FLEXSEARCH_BUNDLE: FlexSearch.FlexSearchIndexBundle = {
+export const MOCK_FLEXSEARCH_BUNDLE: FlexSearchIndexBundle = {
   index: {
     add: vi.fn(),
     search: vi.fn().mockReturnValue([0, 1, 2]),
@@ -438,7 +435,7 @@ export const MOCK_FLEXSEARCH_BUNDLE: FlexSearch.FlexSearchIndexBundle = {
     update: vi.fn(),
     clear: vi.fn(),
     length: 3
-  } as unknown as FlexSearch.Index,
+  } as unknown as NonNullable<FlexSearchIndexBundle['index']>,
   parcelIds: MOCK_ADDRESS_INDEX_INDEX_DATA.parcelIds,
   addressData: MOCK_ADDRESS_INDEX_ADDRESS_DATA
 };

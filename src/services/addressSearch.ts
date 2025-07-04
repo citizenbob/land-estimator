@@ -1,6 +1,6 @@
 import { loadAddressIndex } from '@services/loadAddressIndex';
 import { createNetworkError, logError } from '@lib/errorUtils';
-import type FlexSearch from 'flexsearch';
+import type { FlexSearchIndexBundle } from '@app-types';
 
 export interface AddressLookupRecord {
   id: string;
@@ -9,7 +9,7 @@ export interface AddressLookupRecord {
   normalized: string;
 }
 
-let addressSearchBundle: FlexSearch.FlexSearchIndexBundle | null = null;
+let addressSearchBundle: FlexSearchIndexBundle | null = null;
 
 /**
  * Resets the cached address search bundle (for testing purposes)
@@ -44,13 +44,13 @@ function extractRegion(displayName: string): string {
 /**
  * Converts search results to standardized address lookup records.
  * @param {number[]} searchResults - Array of search result indices
- * @param {FlexSearch.FlexSearchIndexBundle} bundle - Search bundle with lookup data
+ * @param {FlexSearchIndexBundle} bundle - Search bundle with lookup data
  * @param {number} limit - Maximum number of results to return
  * @returns {AddressLookupRecord[]} Array of formatted address records
  */
 function formatSearchResults(
   searchResults: number[],
-  bundle: FlexSearch.FlexSearchIndexBundle,
+  bundle: FlexSearchIndexBundle,
   limit: number
 ): AddressLookupRecord[] {
   return searchResults.slice(0, limit).map((index) => {
@@ -102,6 +102,10 @@ export async function searchAddresses(
 
     if (!addressSearchBundle) {
       addressSearchBundle = await loadAddressIndex();
+    }
+
+    if (!addressSearchBundle) {
+      throw new Error('Failed to load address search bundle');
     }
 
     const normalizedQuery = normalizeQuery(query);

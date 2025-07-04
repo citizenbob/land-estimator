@@ -10,11 +10,12 @@
  */
 
 import FlexSearch from 'flexsearch';
-import fs from 'fs';
-import path from 'path';
-import zlib from 'zlib';
+import * as fs from 'fs';
+import * as path from 'path';
+import * as zlib from 'zlib';
 import { fileURLToPath } from 'url';
 
+// ESM module compatibility
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
@@ -323,7 +324,7 @@ class FlexSearchBuilder {
   }
 
   async testIndex(
-    flexIndex: FlexSearch.Index,
+    flexIndex: InstanceType<typeof FlexSearch.Index>,
     searchStrings: string[]
   ): Promise<void> {
     console.log('\n🧪 Testing FlexSearch index...');
@@ -332,13 +333,11 @@ class FlexSearchBuilder {
       const testQueries = ['626', '1st St', 'Main', 'Louis'];
 
       for (const query of testQueries) {
-        const results = flexIndex.search(query, { limit: 3 });
+        const results = flexIndex.search(query, { limit: 3 }) as number[];
 
         console.log(`   "${query}" → ${results.length} results`);
-        if (results.length > 0 && searchStrings[results[0] as number]) {
-          console.log(
-            `      ${searchStrings[results[0] as number].substring(0, 50)}...`
-          );
+        if (results.length > 0 && searchStrings[results[0]]) {
+          console.log(`      ${searchStrings[results[0]].substring(0, 50)}...`);
         }
       }
 
@@ -412,7 +411,8 @@ async function main(): Promise<void> {
   process.exit(success ? 0 : 1);
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) {
+// Run if this is the main module
+if (process.argv[1] && process.argv[1].includes('flexsearch_builder')) {
   main().catch(console.error);
 }
 

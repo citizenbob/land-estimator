@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
+    "build:address-index": "tsx scripts/build-address-index-static.ts",
     "postbuild": "bash -c 'echo \"Verifying CDN data availability...\"; curl -sf https://storage.googleapis.com/land-estimator-29ee9.firebasestorage.app/cdn/version-manifest.json > /dev/null && echo \"✅ CDN version manifest accessible\" || echo \"⚠️ Warning: CDN version manifest not accessible\"'",
     "build:full": "NODE_OPTIONS='--max-old-space-size=16384' yarn build",
     "build:data": "cd src/config/scripts && python3 ingest_scripts.py --dataset-size=large",

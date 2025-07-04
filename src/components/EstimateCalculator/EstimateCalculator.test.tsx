@@ -5,7 +5,7 @@ import '@testing-library/jest-dom';
 import { EstimateCalculator } from './EstimateCalculator';
 import { useLandscapeEstimator } from '@hooks/useLandscapeEstimator';
 import { MOCK_ENRICHED_ADDRESS_DATA } from '../../lib/testData';
-import type { EnrichedAddressSuggestion } from '@typez/addressMatchTypes';
+import type { EnrichedAddressSuggestion } from '@app-types';
 
 vi.mock('@hooks/useLandscapeEstimator');
 const mockUseLandscapeEstimator =

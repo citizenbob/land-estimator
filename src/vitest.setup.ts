@@ -5,6 +5,8 @@ import * as matchers from '@testing-library/jest-dom/matchers';
 import '@testing-library/jest-dom';
 import '@testing-library/jest-dom/vitest';
 
+process.env.NEXT_PUBLIC_MIXPANEL = 'test-token';
+
 expect.extend(matchers);
 
 afterEach(() => {
@@ -55,3 +57,21 @@ vi.mock('next/image', () => ({
   default: (props: React.ComponentProps<'img'>) =>
     React.createElement('img', props)
 }));
+
+vi.mock('mixpanel-browser', () => {
+  const mockMixpanelTrack = vi.fn(() => true);
+  const mockMixpanelInit = vi.fn();
+  const mockMixpanelRegister = vi.fn();
+  const mockMixpanelIdentify = vi.fn();
+  const mockMixpanelReset = vi.fn();
+
+  return {
+    default: {
+      init: mockMixpanelInit,
+      register: mockMixpanelRegister,
+      track: mockMixpanelTrack,
+      identify: mockMixpanelIdentify,
+      reset: mockMixpanelReset
+    }
+  };
+});

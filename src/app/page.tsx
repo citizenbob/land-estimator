@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import AddressInput from '@components/AddressInput/AddressInput';
-import { EnrichedAddressSuggestion } from '@typez/addressMatchTypes';
+import { EnrichedAddressSuggestion } from '../types';
 import { EstimateCalculator } from '@components/EstimateCalculator/EstimateCalculator';
 import Icon from '@components/Icon/Icon';
 

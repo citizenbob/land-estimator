@@ -86,6 +86,40 @@ class ServiceWorkerClient {
   }
 
   /**
+   * Preload static files
+   */
+  async preloadStaticFiles(options: PreloadOptions = {}): Promise<boolean> {
+    if (!this.isSupported || !this.registration) {
+      console.log(
+        '[SW Client] Service worker not available for static preload'
+      );
+      return false;
+    }
+
+    const { timeout = 30000 } = options;
+
+    try {
+      console.log('[SW Client] Requesting preload of static files...');
+
+      const success = await this.sendMessage(
+        { type: 'PRELOAD_STATIC_FILES' },
+        timeout
+      );
+
+      if (success) {
+        console.log('[SW Client] Static files preload completed successfully');
+        return true;
+      } else {
+        console.warn('[SW Client] Static files preload failed');
+        return false;
+      }
+    } catch (error) {
+      console.error('[SW Client] Static files preload request failed:', error);
+      return false;
+    }
+  }
+
+  /**
    * Clear the versioned index cache
    */
   async clearCache(): Promise<boolean> {

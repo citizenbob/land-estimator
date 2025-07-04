@@ -11,7 +11,6 @@ export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams;
   const query = searchParams.get('query');
 
-  // Reduce logging noise in test environment
   const isTestEnv =
     process.env.NODE_ENV === 'test' || process.env.CYPRESS === 'true';
 

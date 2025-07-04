@@ -73,8 +73,26 @@ declare module 'flexsearch' {
     }
 
     interface FlexSearchIndexBundle {
-      index: FlexSearch.Index;
+      index: Index;
       parcelIds: string[];
+      addressData: Record<string, string>;
+    }
+
+    interface StaticAddressManifest {
+      version: string;
+      timestamp: string;
+      recordCount: number;
+      config: {
+        tokenize: string;
+        cache: number;
+        resolution: number;
+      };
+      files: string[];
+    }
+
+    interface AddressLookupData {
+      parcelIds: string[];
+      searchStrings: string[];
       addressData: Record<string, string>;
     }
 
@@ -84,15 +102,6 @@ declare module 'flexsearch' {
     }
   }
 
-  export = FlexSearch;
-}
-
-declare module 'flexsearch/lite' {
-  import * as FlexSearch from 'flexsearch';
-  export = FlexSearch;
-}
-
-declare module 'flexsearch/dist/module' {
-  import * as FlexSearch from 'flexsearch';
+  // Export the namespace as default
   export = FlexSearch;
 }

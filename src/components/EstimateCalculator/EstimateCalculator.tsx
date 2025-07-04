@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useLandscapeEstimator } from '@hooks/useLandscapeEstimator';
-import { EnrichedAddressSuggestion } from '@typez/addressMatchTypes';
+import { EnrichedAddressSuggestion } from '@app-types';
 import { logEvent } from '@services/logger';
 import Alert from '@components/Alert/Alert';
 import InputField from '@components/InputField/InputField';

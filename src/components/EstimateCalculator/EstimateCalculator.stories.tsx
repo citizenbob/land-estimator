@@ -1,6 +1,6 @@
 import type { Meta, StoryObj } from '@storybook/react';
 import { EstimateCalculator } from './EstimateCalculator';
-import type { EnrichedAddressSuggestion } from '@typez/addressMatchTypes';
+import type { EnrichedAddressSuggestion } from '@app-types';
 
 const mockAddressData: EnrichedAddressSuggestion = {
   place_id: '1',

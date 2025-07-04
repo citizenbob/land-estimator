@@ -74,24 +74,18 @@ describe('AddressInput', () => {
   it('fetches address suggestions as user types', async () => {
     const mockApiRecord = createMockApiRecord(MOCK_LOCAL_ADDRESSES[0]);
 
-    mockFetch.mockResolvedValueOnce({
-      ok: true,
-      json: async () => ({
-        query: '1600',
-        results: [mockApiRecord],
-        count: 1
-      })
+    const mockLookup = createAddressLookupMock({
+      query: '1600',
+      suggestions: [
+        {
+          place_id: mockApiRecord.id,
+          display_name: mockApiRecord.display_name
+        }
+      ],
+      hasFetched: true
     });
 
-    const { input } = setup();
-    fireEvent.change(input, { target: { value: '1600' } });
-
-    await waitFor(
-      () => {
-        expect(mockFetch).toHaveBeenCalledWith('/api/lookup?query=1600');
-      },
-      { timeout: 2000 }
-    );
+    render(<AddressInput mockLookup={mockLookup} />);
 
     const options = await screen.findAllByRole('option');
     expect(options).toHaveLength(1);

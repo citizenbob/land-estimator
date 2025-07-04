@@ -1,5 +1,5 @@
 import React, { KeyboardEvent } from 'react';
-import { AddressSuggestion } from '@typez/addressMatchTypes';
+import { AddressSuggestion } from '@app-types';
 
 /**
  * Hook that manages keyboard navigation for a list of suggestions

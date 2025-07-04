@@ -14,20 +14,8 @@ import { MOCK_ANALYTICS_EVENTS } from '@lib/testData';
 
 const mockFetch = createMockFetch();
 
-const setupLoggerMocks = () => {
-  vi.mock('mixpanel-browser', () => ({
-    default: {
-      track: vi.fn(() => true)
-    }
-  }));
-
-  return {
-    mockMixpanelTrack: mixpanel.track as ReturnType<typeof vi.fn>
-  };
-};
-
 describe('logEvent', () => {
-  const { mockMixpanelTrack } = setupLoggerMocks();
+  const mockMixpanelTrack = mixpanel.track as ReturnType<typeof vi.fn>;
   let consoleSpies: {
     errorSpy: ReturnType<typeof vi.spyOn>;
     warnSpy: ReturnType<typeof vi.spyOn>;

@@ -1,11 +1,10 @@
 'use client';
 
 import { useEffect } from 'react';
-import serviceWorkerClient from '@workers/serviceWorkerClient';
 
 /**
  * Service Worker Registration Component
- * Handles automatic registration and preloading of versioned indexes
+ * Handles service worker registration and background preloading
  */
 export default function ServiceWorkerRegistration() {
   useEffect(() => {
@@ -13,29 +12,37 @@ export default function ServiceWorkerRegistration() {
       return;
     }
 
-    const initServiceWorker = async () => {
+    const registerServiceWorker = async () => {
       try {
         console.log('[SW Registration] Initializing service worker...');
 
-        const registered = await serviceWorkerClient.register();
+        const { default: serviceWorkerClient } = await import(
+          '@workers/serviceWorkerClient'
+        );
 
-        if (registered) {
+        const registration = await serviceWorkerClient.register();
+
+        if (registration) {
           console.log(
             '[SW Registration] Service worker registered successfully'
           );
 
+          // Start background preload after a short delay
           setTimeout(async () => {
             try {
               console.log('[SW Registration] Starting background preload...');
-              await serviceWorkerClient.preloadVersionedIndexes();
+              await serviceWorkerClient.preloadStaticFiles();
+              console.log(
+                '[SW Registration] Static files preloaded successfully'
+              );
               console.log('[SW Registration] Background preload completed');
-            } catch (error) {
+            } catch (preloadError) {
               console.warn(
                 '[SW Registration] Background preload failed:',
-                error
+                preloadError
               );
             }
-          }, 2000);
+          }, 1000);
         } else {
           console.log(
             '[SW Registration] Service worker registration failed or not supported'
@@ -49,11 +56,20 @@ export default function ServiceWorkerRegistration() {
       }
     };
 
+    // Wait for window load event if document is not ready
     if (document.readyState === 'complete') {
-      initServiceWorker();
+      registerServiceWorker();
     } else {
-      window.addEventListener('load', initServiceWorker);
-      return () => window.removeEventListener('load', initServiceWorker);
+      const handleLoad = () => {
+        registerServiceWorker();
+        window.removeEventListener('load', handleLoad);
+      };
+      window.addEventListener('load', handleLoad);
+
+      // Cleanup function
+      return () => {
+        window.removeEventListener('load', handleLoad);
+      };
     }
   }, []);
 

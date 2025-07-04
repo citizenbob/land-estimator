@@ -39,7 +39,8 @@ class BackgroundPreloader {
 
       this.status.isComplete = true;
       this.status.endTime = Date.now();
-      const duration = this.status.endTime - this.status.startTime!;
+      const duration =
+        (this.status.endTime ?? 0) - (this.status.startTime ?? 0);
 
       console.log(
         `✅ [Background Preloader] Address index preloaded in ${duration}ms`
@@ -50,9 +51,10 @@ class BackgroundPreloader {
           detail: { duration }
         })
       );
-    } catch (error) {
-      this.status.error =
-        error instanceof Error ? error.message : String(error);
+    } catch (error: unknown) {
+      const errorMessage =
+        error instanceof Error ? (error as Error).message : String(error);
+      this.status.error = errorMessage;
       this.status.endTime = Date.now();
 
       console.warn(

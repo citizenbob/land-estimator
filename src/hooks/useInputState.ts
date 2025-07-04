@@ -1,8 +1,5 @@
 import { useMemo } from 'react';
-import {
-  AddressSuggestion,
-  EnrichedAddressSuggestion
-} from '@typez/addressMatchTypes';
+import { AddressSuggestion, EnrichedAddressSuggestion } from '@app-types';
 
 interface InputState {
   showLoading: boolean;

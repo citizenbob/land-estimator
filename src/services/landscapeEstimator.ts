@@ -3,7 +3,7 @@ import {
   sumByProperty,
   sumMinMaxProperty,
   firstDefinedProperty
-} from '@lib/arrayUtils';
+} from '../lib/arrayUtils';
 
 /**
  * Type definition for bounding box coordinates in the format [latMin, latMax, lonMin, lonMax]

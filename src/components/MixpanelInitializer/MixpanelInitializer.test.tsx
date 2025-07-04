@@ -153,6 +153,8 @@ describe('MixpanelInitializer', () => {
     });
 
     it('logs warning when token is not configured', () => {
+      vi.stubEnv('NEXT_PUBLIC_MIXPANEL', '');
+
       Object.defineProperty(document, 'readyState', {
         writable: true,
         value: 'complete'
@@ -326,6 +328,7 @@ describe('MixpanelInitializer', () => {
 
     it('handles test environment gracefully', () => {
       vi.stubEnv('NODE_ENV', 'test');
+      vi.stubEnv('NEXT_PUBLIC_MIXPANEL', '');
 
       Object.defineProperty(document, 'readyState', {
         writable: true,

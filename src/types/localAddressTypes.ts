@@ -1,18 +1,14 @@
-export interface LocalAddressRecord {
+import type {
+  PropertyCalculations,
+  PropertyOwner,
+  RegionalLocation
+} from './geographic';
+
+export interface LocalAddressRecord extends RegionalLocation {
   id: string;
   full_address: string;
-  region: string;
-  latitude: number;
-  longitude: number;
-  calc: {
-    landarea: number;
-    building_sqft: number;
-    estimated_landscapable_area: number;
-    property_type: string;
-  };
-  owner: {
-    name: string;
-  };
+  calc: PropertyCalculations;
+  owner: PropertyOwner;
   affluence_score: number;
   source_file: string;
   processed_date: string;
@@ -23,15 +19,9 @@ export interface AddressSuggestion {
   display_name: string;
 }
 
-export interface EnrichedAddressSuggestion extends AddressSuggestion {
-  latitude: number;
-  longitude: number;
-  region: string;
-  calc: {
-    landarea: number;
-    building_sqft: number;
-    estimated_landscapable_area: number;
-    property_type: string;
-  };
+export interface EnrichedAddressSuggestion
+  extends AddressSuggestion,
+    RegionalLocation {
+  calc: PropertyCalculations;
   affluence_score: number;
 }

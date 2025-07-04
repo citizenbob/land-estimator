@@ -27,12 +27,15 @@
       "@hocs/*": ["hocs/*"],
       "@hooks/*": ["hooks/*"],
       "@lib/*": ["lib/*"],
+      "@lib": ["lib/index.ts"],
       "@services/*": ["services/*"],
+      "@services": ["services/index.ts"],
       "@store/*": ["store/*"],
       "@tokens/*": ["tokens/*"],
-      "@types/*": ["types/*"],
-      "@typez/*": ["types/*"],
-      "@workers/*": ["workers/*"]
+      "@app-types/*": ["types/*"],
+      "@app-types": ["types/index.ts"],
+      "@workers/*": ["workers/*"],
+      "@workers": ["workers/index.ts"]
     },
     "types": [
       "cypress",

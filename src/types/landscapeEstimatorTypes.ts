@@ -64,9 +64,3 @@ export interface EstimateResult {
   /** Final price range estimate in USD */
   finalEstimate: { min: number; max: number };
 }
-
-/**
- * Bounding box coordinates as a tuple of string values representing latitude and longitude
- * Format: [minLat, maxLat, minLon, maxLon]
- */
-export type BoundingBox = [string, string, string, string];

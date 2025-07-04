@@ -6,7 +6,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import backgroundPreloader from '@workers/backgroundPreloader';
+import { backgroundPreloader } from '@workers';
 
 export default function BackgroundPreloadStatus() {
   const [status, setStatus] = useState(backgroundPreloader.getStatus());

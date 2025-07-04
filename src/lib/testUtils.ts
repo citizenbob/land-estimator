@@ -2,7 +2,7 @@ import { fireEvent, screen, waitFor } from '@testing-library/react';
 import { expect, vi } from 'vitest';
 import { MOCK_LOCAL_ADDRESSES, TestItem, TestBundle } from './testData';
 import { useAddressLookup } from '@hooks/useAddressLookup';
-import { EventMap, LogOptions } from '@typez/analytics';
+import { EventMap, LogOptions } from '@app-types';
 
 export const typeAndSelectSuggestion = async (
   input: HTMLElement,
