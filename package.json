@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
-    "build:address-index": "tsx scripts/build-address-index-static.ts",
+    "build:address-index": "tsx src/config/scripts/flexsearch_builder.ts --static",
     "postbuild": "bash -c 'echo \"Verifying CDN data availability...\"; curl -sf https://storage.googleapis.com/land-estimator-29ee9.firebasestorage.app/cdn/version-manifest.json > /dev/null && echo \"✅ CDN version manifest accessible\" || echo \"⚠️ Warning: CDN version manifest not accessible\"'",
     "build:full": "NODE_OPTIONS='--max-old-space-size=16384' yarn build",
     "build:data": "cd src/config/scripts && python3 ingest_scripts.py --dataset-size=large",
@@ -26,6 +26,9 @@
     "test:coverage": "vitest run --coverage",
     "test:python": "pip install -r src/config/scripts/requirements.txt && python -m unittest discover src/data 'test_*.py'",
     "test:e2e": "bash -c 'echo \"Starting fresh dev server with Cypress mode...\"; pkill -f \"next dev\" || true; sleep 2; CYPRESS=true yarn dev & DEV_PID=$!; sleep 10; echo \"Waiting for server to be ready...\"; until curl -s http://localhost:3000 > /dev/null; do sleep 1; done; echo \"Running E2E tests...\"; CYPRESS=true cypress run; TEST_RESULT=$?; echo \"Stopping dev server...\"; kill $DEV_PID || true; sleep 2; exit $TEST_RESULT'",
+    "test:e2e:integration": "bash -c 'echo \"Running CDN integration tests...\"; CYPRESS=true cypress run --spec \"cypress/e2e/cdn-integration.cy.ts\"'",
+    "test:e2e:mocked": "bash -c 'echo \"Running mocked E2E tests...\"; CYPRESS=true cypress run --spec \"cypress/e2e/issue-*.cy.ts\"'",
+    "test:e2e:comprehensive": "bash -c 'yarn test:e2e:mocked && yarn test:e2e:integration'",
     "test:e2e:open": "CYPRESS=true cypress open",
     "test:all": "yarn test:run && yarn test:python && yarn test:e2e",
     "storybook": "storybook dev -p 6006",

@@ -1,0 +1,15 @@
+{
+  "version": "v20250704-f1c0309d",
+  "timestamp": "2025-07-04T15:18:52.475Z",
+  "recordCount": 0,
+  "config": {
+    "tokenize": "forward",
+    "cache": 100,
+    "resolution": 3
+  },
+  "exportedFiles": [
+    "address-v20250704-f1c0309d-lookup.json",
+    "address-v20250704-f1c0309d-metadata.json"
+  ],
+  "source": "flexsearch_builder"
+}

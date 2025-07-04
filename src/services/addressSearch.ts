@@ -86,13 +86,33 @@ export async function searchAddresses(
   }
 
   try {
+    // Always try to use local index first (both browser and server)
+    if (!addressSearchBundle) {
+      console.log('🔍 Loading address index for local search...');
+      addressSearchBundle = await loadAddressIndex();
+    }
+
+    // If we have a local index, use it directly
+    if (addressSearchBundle) {
+      console.log('⚡ Using local FlexSearch index for instant search');
+      const normalizedQuery = normalizeQuery(query);
+      const searchResults = addressSearchBundle.index.search(normalizedQuery, {
+        bool: 'and',
+        limit
+      }) as number[];
+
+      return formatSearchResults(searchResults, addressSearchBundle, limit);
+    }
+
+    // Fallback to API only if local index failed to load
     if (typeof window !== 'undefined') {
+      console.log('🌐 Falling back to API lookup...');
       const response = await fetch(
         `/api/lookup?query=${encodeURIComponent(query.trim())}`
       );
       if (!response.ok) {
         throw createNetworkError(
-          `Lookup failed: ${response.status} ${response.statusText}`,
+          `Failed to fetch address suggestions: ${response.status} ${response.statusText}`,
           { status: response.status, statusText: response.statusText }
         );
       }
@@ -100,21 +120,9 @@ export async function searchAddresses(
       return results;
     }
 
-    if (!addressSearchBundle) {
-      addressSearchBundle = await loadAddressIndex();
-    }
-
-    if (!addressSearchBundle) {
-      throw new Error('Failed to load address search bundle');
-    }
-
-    const normalizedQuery = normalizeQuery(query);
-    const searchResults = addressSearchBundle.index.search(normalizedQuery, {
-      bool: 'and',
-      limit
-    }) as number[];
-
-    return formatSearchResults(searchResults, addressSearchBundle, limit);
+    throw new Error(
+      'Failed to load address search bundle - no fallback available'
+    );
   } catch (error) {
     logError(error, {
       operation: 'address_search',

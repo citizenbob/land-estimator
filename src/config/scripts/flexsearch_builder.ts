@@ -1,4 +1,4 @@
-#!/usr/bin/env node
+#!/usr/bin/env tsx
 /**
  * FlexSearch Index Builder for Ingest Pipeline
  *
@@ -6,22 +6,35 @@
  * the patterns established in the experimental implementations.
  *
  * Input: /temp/raw/address_index.json (from integration bucket)
- * Output: /temp/address-index.json.gz (for CDN upload)
+ * Output: /temp/address-index.json.gz (for CDN upload) OR /public/search/ (for static deployment)
+ *
+ * Usage:
+ *   tsx src/config/scripts/flexsearch_builder.ts                    # Use existing temp data
+ *   tsx src/config/scripts/flexsearch_builder.ts --nuke-and-pave   # Fetch fresh from Firebase Storage
+ *   tsx src/config/scripts/flexsearch_builder.ts --static          # Output to /public/search/
  */
 
 import FlexSearch from 'flexsearch';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as zlib from 'zlib';
+import * as crypto from 'crypto';
 import { fileURLToPath } from 'url';
 
 // ESM module compatibility
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
+// Parse command line arguments
+const args = process.argv.slice(2);
+const NUKE_AND_PAVE = args.includes('--nuke-and-pave');
+const STATIC_OUTPUT = args.includes('--static');
+
 const TEMP_DIR = path.join(__dirname, 'temp');
 const TEMP_RAW_DIR = path.join(TEMP_DIR, 'raw');
-const OUTPUT_DIR = TEMP_DIR;
+const OUTPUT_DIR = STATIC_OUTPUT
+  ? path.join(__dirname, '..', '..', '..', 'public', 'search')
+  : TEMP_DIR;
 
 const FLEXSEARCH_CONFIG = {
   tokenize: 'forward',
@@ -100,6 +113,159 @@ class FlexSearchBuilder {
     console.log(`📂 Temp directory: ${TEMP_DIR}`);
     console.log(`📥 Input directory: ${TEMP_RAW_DIR}`);
     console.log(`📤 Output directory: ${OUTPUT_DIR}`);
+
+    if (NUKE_AND_PAVE) {
+      console.log(
+        '💣 NUKE AND PAVE mode enabled - will fetch fresh data from Firebase Storage'
+      );
+    }
+    if (STATIC_OUTPUT) {
+      console.log(
+        '📁 Static output mode - will create files for /public/search/'
+      );
+    }
+  }
+
+  /**
+   * Fetch fresh address data from Firebase Storage
+   */
+  async fetchFromFirebaseStorage(): Promise<boolean> {
+    console.log('🔥 Fetching fresh address data from Firebase Storage...');
+
+    try {
+      // Load environment variables
+      const dotenv = await import('dotenv');
+      const envPath = path.join(__dirname, '..', '..', '..', '.env.local');
+
+      if (fs.existsSync(envPath)) {
+        dotenv.config({ path: envPath });
+      }
+
+      const projectId = process.env.FIREBASE_PROJECT_ID;
+      const clientEmail = process.env.FIREBASE_CLIENT_EMAIL;
+      const privateKey = process.env.FIREBASE_PRIVATE_KEY;
+      const storageBucket = process.env.FIREBASE_STORAGE_BUCKET;
+
+      if (!projectId || !clientEmail || !privateKey || !storageBucket) {
+        throw new Error('Missing Firebase environment variables in .env.local');
+      }
+
+      console.log(`🔑 Connecting to Firebase Storage: ${storageBucket}`);
+
+      const { initializeApp, cert } = await import('firebase-admin/app');
+      const { getStorage } = await import('firebase-admin/storage');
+
+      const serviceAccount = {
+        projectId,
+        clientEmail,
+        privateKey: privateKey.replace(/\\n/g, '\n')
+      };
+
+      const app = initializeApp({
+        credential: cert(serviceAccount),
+        storageBucket
+      });
+
+      const bucket = getStorage(app).bucket();
+
+      // List files in the cdn/ directory to find the latest address index
+      console.log('📂 Scanning Firebase Storage for address index files...');
+      const [files] = await bucket.getFiles({ prefix: 'cdn/' });
+
+      const addressIndexFiles = files.filter(
+        (file) =>
+          file.name.includes('address-index') && file.name.endsWith('.json.gz')
+      );
+
+      if (addressIndexFiles.length === 0) {
+        console.log(
+          '⚠️ No address index files found in Firebase Storage cdn/ folder'
+        );
+        return false;
+      }
+
+      // Sort by metadata creation time to get the latest
+      const filesWithMetadata = await Promise.all(
+        addressIndexFiles.map(async (file) => {
+          const [metadata] = await file.getMetadata();
+          return { file, metadata };
+        })
+      );
+
+      filesWithMetadata.sort(
+        (a, b) =>
+          new Date(b.metadata.timeCreated || 0).getTime() -
+          new Date(a.metadata.timeCreated || 0).getTime()
+      );
+
+      const latestFile = filesWithMetadata[0].file;
+      console.log(`📥 Found latest address index: ${latestFile.name}`);
+      console.log(`📅 Created: ${filesWithMetadata[0].metadata.timeCreated}`);
+
+      // Download and decompress the file
+      const tempPath = path.join(TEMP_RAW_DIR, 'address_index.json.gz');
+      const outputPath = path.join(TEMP_RAW_DIR, 'address_index.json');
+
+      // Ensure temp directory exists
+      if (!fs.existsSync(TEMP_RAW_DIR)) {
+        fs.mkdirSync(TEMP_RAW_DIR, { recursive: true });
+      }
+
+      console.log('⬇️  Downloading compressed address index...');
+      await latestFile.download({ destination: tempPath });
+
+      console.log('📦 Decompressing address index...');
+      const compressedData = fs.readFileSync(tempPath);
+      const decompressedData = zlib.gunzipSync(compressedData);
+      fs.writeFileSync(outputPath, decompressedData);
+
+      // Clean up compressed file
+      fs.unlinkSync(tempPath);
+
+      // Verify the data structure and convert to expected format
+      const indexData = JSON.parse(fs.readFileSync(outputPath, 'utf8'));
+      if (indexData.parcelIds && indexData.searchStrings) {
+        console.log(
+          `📊 Downloaded ${indexData.parcelIds.length} addresses from Firebase Storage`
+        );
+
+        // Convert to the expected format for the rest of the script
+        const convertedData = {
+          addresses: indexData.parcelIds.map(
+            (parcelId: string, idx: number) => {
+              const searchString = indexData.searchStrings[idx];
+              const address = searchString.replace(` ${parcelId}`, '');
+
+              return {
+                display_name: address,
+                parcel_id: parcelId,
+                region: 'Missouri',
+                latitude: 0,
+                longitude: 0
+              };
+            }
+          ),
+          metadata: {
+            timestamp: indexData.timestamp,
+            recordCount: indexData.recordCount,
+            source: 'firebase_storage'
+          }
+        };
+
+        // Overwrite the file with the converted format
+        fs.writeFileSync(outputPath, JSON.stringify(convertedData), 'utf8');
+
+        console.log(
+          `✅ Successfully converted ${convertedData.addresses.length} addresses to expected format`
+        );
+        return true;
+      } else {
+        throw new Error('Invalid address index data structure');
+      }
+    } catch (error) {
+      console.error(`❌ Failed to fetch from Firebase Storage: ${error}`);
+      return false;
+    }
   }
 
   async buildAddressIndex(): Promise<boolean> {
@@ -108,8 +274,30 @@ class FlexSearchBuilder {
     try {
       const addressIndexPath = path.join(TEMP_RAW_DIR, 'address_index.json');
 
+      // If --nuke-and-pave is set, try to fetch fresh data from Firebase Storage
+      if (NUKE_AND_PAVE) {
+        console.log(
+          '💣 NUKE AND PAVE: Removing existing data and fetching fresh from Firebase Storage...'
+        );
+
+        // Remove existing file if it exists
+        if (fs.existsSync(addressIndexPath)) {
+          fs.unlinkSync(addressIndexPath);
+          console.log('🗑️ Removed existing address index file');
+        }
+
+        const fetchSuccess = await this.fetchFromFirebaseStorage();
+        if (!fetchSuccess) {
+          throw new Error(
+            'Failed to fetch fresh data from Firebase Storage in NUKE AND PAVE mode'
+          );
+        }
+      }
+
       if (!fs.existsSync(addressIndexPath)) {
-        throw new Error(`Address index not found: ${addressIndexPath}`);
+        throw new Error(
+          `Address index not found: ${addressIndexPath}. Run the full data pipeline first: npm run build:data`
+        );
       }
 
       const addressData: AddressData = JSON.parse(
@@ -149,8 +337,92 @@ class FlexSearchBuilder {
 
       const jsonString = JSON.stringify(indexData);
       const compressed = zlib.gzipSync(Buffer.from(jsonString));
-      const compressedPath = path.join(OUTPUT_DIR, 'address-index.json.gz');
-      fs.writeFileSync(compressedPath, compressed);
+
+      // Ensure output directory exists
+      if (!fs.existsSync(OUTPUT_DIR)) {
+        fs.mkdirSync(OUTPUT_DIR, { recursive: true });
+      }
+
+      if (STATIC_OUTPUT) {
+        // For static deployment, create multiple files like the web expects
+        console.log('📁 Creating static deployment files...');
+
+        // Create a version hash for cache busting
+        const hash = crypto.createHash('md5').update(jsonString).digest('hex');
+        const date = new Date().toISOString().split('T')[0].replace(/-/g, '');
+        const version = `v${date}-${hash.substring(0, 8)}`;
+
+        // Create lookup data file
+        const lookupData = {
+          parcelIds: indexData.parcelIds,
+          searchStrings: indexData.searchStrings,
+          addressData: indexData.parcelIds.reduce(
+            (acc: Record<string, string>, parcelId: string, idx: number) => {
+              const searchString = indexData.searchStrings[idx];
+              const address = searchString.replace(` ${parcelId}`, '').trim();
+              acc[parcelId] = address;
+              return acc;
+            },
+            {}
+          )
+        };
+
+        const lookupFilename = `address-${version}-lookup.json`;
+        fs.writeFileSync(
+          path.join(OUTPUT_DIR, lookupFilename),
+          JSON.stringify(lookupData),
+          'utf8'
+        );
+
+        // Create metadata file
+        const metadataFilename = `address-${version}-metadata.json`;
+        const metadata = {
+          version,
+          timestamp: new Date().toISOString(),
+          recordCount: addresses.length,
+          config: FLEXSEARCH_CONFIG,
+          exportedFiles: [lookupFilename, metadataFilename],
+          source: 'flexsearch_builder'
+        };
+
+        fs.writeFileSync(
+          path.join(OUTPUT_DIR, metadataFilename),
+          JSON.stringify(metadata, null, 2),
+          'utf8'
+        );
+
+        // Create latest.json manifest
+        const latestManifest = {
+          version,
+          timestamp: new Date().toISOString(),
+          recordCount: addresses.length,
+          config: FLEXSEARCH_CONFIG,
+          files: [lookupFilename, metadataFilename],
+          source: 'flexsearch_builder'
+        };
+
+        fs.writeFileSync(
+          path.join(OUTPUT_DIR, 'latest.json'),
+          JSON.stringify(latestManifest, null, 2),
+          'utf8'
+        );
+
+        console.log(`✅ Static files created in ${OUTPUT_DIR}`);
+        console.log(
+          `📁 Files: ${lookupFilename}, ${metadataFilename}, latest.json`
+        );
+
+        this.stats.indexesBuilt.push(
+          lookupFilename,
+          metadataFilename,
+          'latest.json'
+        );
+      } else {
+        // For CDN deployment, create compressed file
+        const compressedPath = path.join(OUTPUT_DIR, 'address-index.json.gz');
+        fs.writeFileSync(compressedPath, compressed);
+        this.stats.indexesBuilt.push('address-index.json.gz');
+      }
 
       console.log(`✅ Address index built: ${addresses.length} entries`);
       console.log(`📊 Uncompressed: ${Math.round(jsonString.length / 1024)}KB`);
@@ -375,8 +647,14 @@ class FlexSearchBuilder {
     this.stats.buildTime = new Date().toISOString();
 
     try {
+      // Create temp directory if it doesn't exist (for static mode)
       if (!fs.existsSync(TEMP_DIR)) {
-        throw new Error(`Temp directory not found: ${TEMP_DIR}`);
+        console.log(`📁 Creating temp directory: ${TEMP_DIR}`);
+        fs.mkdirSync(TEMP_DIR, { recursive: true });
+      }
+      if (!fs.existsSync(TEMP_RAW_DIR)) {
+        console.log(`📁 Creating temp raw directory: ${TEMP_RAW_DIR}`);
+        fs.mkdirSync(TEMP_RAW_DIR, { recursive: true });
       }
 
       const addressSuccess = await this.buildAddressIndex();
