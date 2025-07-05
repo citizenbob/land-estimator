@@ -185,19 +185,26 @@ describe('/api/lookup route', () => {
     });
 
     it('should handle service timeout errors gracefully', async () => {
-      const consoleErrorSpy = vi
-        .spyOn(console, 'error')
+      const consoleLogSpy = vi
+        .spyOn(console, 'log')
         .mockImplementation(() => {});
-      mockSearchAddresses.mockRejectedValue(new Error('Request timeout'));
+      mockSearchAddresses.mockRejectedValue(
+        new Error('Search timeout - index may be loading')
+      );
 
       const request = createRequest('timeout test');
       const response = await GET(request);
       const data = await response.json();
 
-      expect(response.status).toBe(500);
-      expect(data.error).toBe('Internal server error');
+      expect(response.status).toBe(200);
+      expect(data.query).toBe('timeout test');
+      expect(data.results).toEqual([]);
+      expect(data.count).toBe(0);
+      expect(data.message).toBe(
+        'Search index is initializing. Please try again in a moment.'
+      );
 
-      consoleErrorSpy.mockRestore();
+      consoleLogSpy.mockRestore();
     });
   });
 

@@ -38,14 +38,23 @@ export async function GET(request: NextRequest) {
     }
 
     /**
-     * Use deduplication for the search request
-     * No debounce in API - let frontend handle debouncing
+     * Use deduplication for the search request with timeout protection
+     * Set a reasonable timeout to prevent 504 errors
      */
-    const results = await deduplicatedLookup(
+    const searchPromise = deduplicatedLookup(
       query.trim(),
       (normalizedQuery) => searchAddresses(normalizedQuery, 10),
       { debounce: false }
     );
+
+    // Set a timeout to prevent 504 errors (10 seconds max)
+    const timeoutPromise = new Promise<never>((_, reject) => {
+      setTimeout(() => {
+        reject(new Error('Search timeout - index may be loading'));
+      }, 10000);
+    });
+
+    const results = await Promise.race([searchPromise, timeoutPromise]);
 
     if (!isTestEnv) {
       console.log('✅ Search completed:', { resultCount: results.length });
@@ -64,6 +73,21 @@ export async function GET(request: NextRequest) {
 
     return response;
   } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+
+    // Handle timeout errors gracefully
+    if (errorMessage.includes('timeout') || errorMessage.includes('loading')) {
+      if (!isTestEnv) {
+        console.log('⏳ Search timed out - index may be initializing');
+      }
+      return NextResponse.json({
+        query: query.trim(),
+        results: [],
+        count: 0,
+        message: 'Search index is initializing. Please try again in a moment.'
+      });
+    }
+
     logError(error, {
       operation: 'api_lookup',
       endpoint: '/api/lookup',
