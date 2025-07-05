@@ -72,11 +72,9 @@ class StaticAddressIndexLoader {
     // Start warming up on server start (Node.js only)
     if (typeof window === 'undefined' && !this.warmupStarted) {
       this.warmupStarted = true;
-      // Use setImmediate to avoid blocking server startup, but start immediately
-      setImmediate(() => {
-        this.warmupServerIndex().catch((error) => {
-          devWarn('⚠️ Server index warmup failed:', error);
-        });
+      // Start warmup immediately and synchronously to avoid 504 timeouts
+      this.warmupServerIndex().catch((error) => {
+        devWarn('⚠️ Server index warmup failed:', error);
       });
     }
   }
@@ -90,21 +88,33 @@ class StaticAddressIndexLoader {
 
   /**
    * Load address index from static files with CDN fallback
+   * Ensures the index is loaded before returning, blocking if necessary
    */
   async loadAddressIndex(): Promise<FlexSearchIndexBundle> {
+    // If we already have the bundle, return it immediately
     if (this.bundle) {
+      devLog('⚡ Using cached address index');
       return this.bundle;
     }
 
+    // If we're already loading, wait for that to complete
     if (this.loadingPromise) {
+      devLog('⏳ Waiting for existing load operation...');
       return this.loadingPromise;
     }
 
+    // Start a new load operation
+    devLog('🚀 Starting fresh address index load...');
     this.loadingPromise = this._loadFromStaticFiles();
-    this.bundle = await this.loadingPromise;
-    this.loadingPromise = null;
 
-    return this.bundle;
+    try {
+      this.bundle = await this.loadingPromise;
+      devLog('✅ Address index loaded and cached');
+      return this.bundle;
+    } finally {
+      // Clear the loading promise whether successful or not
+      this.loadingPromise = null;
+    }
   }
 
   /**
