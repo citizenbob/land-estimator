@@ -190,7 +190,7 @@ if (parcel) {
 
 ---
 
-## logger.ts
+## logger.ts (Event Logging)
 
 **Exports**
 
@@ -209,6 +209,45 @@ await logEvent(
   { toMixpanel: true, toFirestore: true }
 );
 ```
+
+---
+
+## ../lib/logger.ts (Environment-Aware Logging)
+
+**Exports**
+
+- `devLog(...args: unknown[]): void`
+- `devWarn(...args: unknown[]): void`
+- `logError(...args: unknown[]): void`
+- `prodLog(...args: unknown[]): void`
+
+Environment-aware logging utility that respects deployment boundaries. Development and debugging logs are automatically suppressed in production unless explicitly enabled.
+
+**Logging Levels**
+
+- **devLog/devWarn**: Only logs in development, test, or when `ENABLE_LOGGING=true`
+- **logError**: Always logs errors regardless of environment
+- **prodLog**: Always logs important production messages
+
+**Usage**
+
+```ts
+import { devLog, devWarn, logError, prodLog } from '@lib/logger';
+
+// Development-only verbose logging
+devLog('🚀 Starting data load process...');
+devWarn('⚠️ Fallback mechanism activated');
+
+// Always logged
+logError('❌ Critical error occurred:', error);
+prodLog('✅ Application started successfully');
+```
+
+**Environment Variables**
+
+- `NODE_ENV=development`: Enables devLog/devWarn output
+- `NODE_ENV=test`: Enables devLog/devWarn output
+- `ENABLE_LOGGING=true`: Force-enables devLog/devWarn in any environment
 
 ---
 

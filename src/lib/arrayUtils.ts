@@ -1,5 +1,5 @@
 /**
- * Utility functions for common array operations and reductions
+ * @fileoverview Utility functions for common array operations and reductions
  */
 
 /**

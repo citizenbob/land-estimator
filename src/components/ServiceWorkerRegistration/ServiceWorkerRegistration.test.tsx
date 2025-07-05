@@ -57,13 +57,8 @@ describe('ServiceWorkerRegistration', () => {
     });
 
     it('does not run on server side (SSR)', () => {
-      // Test setup ensures window exists, but this test checks the component logic
       const { container } = render(<ServiceWorkerRegistration />);
       expect(container.firstChild).toBeNull();
-
-      // Since setupBrowserEnvironment provides window, the component will run
-      // In real SSR, window would be undefined and registration wouldn't happen
-      // This test just verifies the component renders without crashing
     });
   });
 
@@ -76,15 +71,12 @@ describe('ServiceWorkerRegistration', () => {
 
       render(<ServiceWorkerRegistration />);
 
-      // Wait for async operations to complete
       await vi.runAllTimersAsync();
 
       expect(consoleSpies.logSpy).toHaveBeenCalledWith(
         '[SW Registration] Initializing service worker...'
       );
 
-      // The service worker registration is working (we can see the logs),
-      // but dynamic imports bypass the vi.mock setup. This is expected behavior.
       expect(consoleSpies.logSpy).toHaveBeenCalledWith(
         '[SW Registration] Service worker registered successfully'
       );
@@ -183,7 +175,7 @@ describe('ServiceWorkerRegistration', () => {
       await vi.runOnlyPendingTimersAsync();
 
       expect(consoleSpies.logSpy).toHaveBeenCalledWith(
-        '[SW Registration] Starting background preload...'
+        '[SW Registration] Starting static file cache warmup...'
       );
       expect(mockServiceWorkerClient.preloadStaticFiles).toHaveBeenCalledTimes(
         1
@@ -201,10 +193,10 @@ describe('ServiceWorkerRegistration', () => {
       await vi.runOnlyPendingTimersAsync();
 
       expect(consoleSpies.logSpy).toHaveBeenCalledWith(
-        '[SW Registration] Static files preloaded successfully'
+        '[SW Registration] Static files cached successfully'
       );
       expect(consoleSpies.logSpy).toHaveBeenCalledWith(
-        '[SW Registration] Background preload completed'
+        '[SW Registration] Cache warmup completed'
       );
     });
 
@@ -222,7 +214,7 @@ describe('ServiceWorkerRegistration', () => {
       await vi.runOnlyPendingTimersAsync();
 
       expect(consoleSpies.warnSpy).toHaveBeenCalledWith(
-        '[SW Registration] Background preload failed:',
+        '[SW Registration] Cache warmup failed:',
         preloadError
       );
     });
@@ -310,13 +302,13 @@ describe('ServiceWorkerRegistration', () => {
         '[SW Registration] Service worker registered successfully'
       );
       expect(consoleSpies.logSpy).toHaveBeenCalledWith(
-        '[SW Registration] Starting background preload...'
+        '[SW Registration] Starting static file cache warmup...'
       );
       expect(consoleSpies.logSpy).toHaveBeenCalledWith(
-        '[SW Registration] Static files preloaded successfully'
+        '[SW Registration] Static files cached successfully'
       );
       expect(consoleSpies.logSpy).toHaveBeenCalledWith(
-        '[SW Registration] Background preload completed'
+        '[SW Registration] Cache warmup completed'
       );
     });
 

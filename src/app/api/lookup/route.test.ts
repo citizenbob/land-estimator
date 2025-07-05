@@ -90,7 +90,7 @@ describe('/api/lookup route', () => {
 
       expect(response.status).toBe(400);
       expect(data).toEqual({
-        error: 'Query parameter must be at least 2 characters'
+        error: 'Query parameter must be at least 3 characters'
       });
       expect(mockSearchAddresses).not.toHaveBeenCalled();
     });
@@ -102,7 +102,7 @@ describe('/api/lookup route', () => {
 
       expect(response.status).toBe(400);
       expect(data).toEqual({
-        error: 'Query parameter must be at least 2 characters'
+        error: 'Query parameter must be at least 3 characters'
       });
       expect(mockSearchAddresses).not.toHaveBeenCalled();
     });
@@ -114,7 +114,7 @@ describe('/api/lookup route', () => {
 
       expect(response.status).toBe(400);
       expect(data).toEqual({
-        error: 'Query parameter must be at least 2 characters'
+        error: 'Query parameter must be at least 3 characters'
       });
       expect(mockSearchAddresses).not.toHaveBeenCalled();
     });
@@ -126,19 +126,31 @@ describe('/api/lookup route', () => {
 
       expect(response.status).toBe(400);
       expect(data).toEqual({
-        error: 'Query parameter must be at least 2 characters'
+        error: 'Query parameter must be at least 3 characters'
       });
       expect(mockSearchAddresses).not.toHaveBeenCalled();
     });
 
-    it('should accept exactly 2 character query', async () => {
+    it('should return 400 for two character query', async () => {
+      const request = createRequest('ab');
+      const response = await GET(request);
+      const data = await response.json();
+
+      expect(response.status).toBe(400);
+      expect(data).toEqual({
+        error: 'Query parameter must be at least 3 characters'
+      });
+      expect(mockSearchAddresses).not.toHaveBeenCalled();
+    });
+
+    it('should accept exactly 3 character query', async () => {
       mockSearchAddresses.mockResolvedValue([]);
 
-      const request = createRequest('ab');
+      const request = createRequest('abc');
       const response = await GET(request);
 
       expect(response.status).toBe(200);
-      expect(mockSearchAddresses).toHaveBeenCalledWith('ab', 10);
+      expect(mockSearchAddresses).toHaveBeenCalledWith('abc', 10);
     });
   });
 
@@ -213,7 +225,10 @@ describe('/api/lookup route', () => {
 
       expect(response.status).toBe(200);
       expect(data.query).toBe(unicodeQuery);
-      expect(mockSearchAddresses).toHaveBeenCalledWith(unicodeQuery, 10);
+      expect(mockSearchAddresses).toHaveBeenCalledWith(
+        unicodeQuery.toLowerCase(),
+        10
+      );
     });
 
     it('should handle very long queries', async () => {

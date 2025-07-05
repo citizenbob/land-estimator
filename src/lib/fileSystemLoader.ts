@@ -1,5 +1,5 @@
 /**
- * Server-side file system loader for static address index files
+ * @fileoverview Server-side file system loader for static address index files
  * This module is only imported on the server side to avoid webpack warnings
  */
 
@@ -9,13 +9,18 @@ import type { StaticAddressManifest, AddressLookupData } from '@app-types';
 
 /**
  * Load static address index files from the filesystem (server-side only)
+ *
+ * Attempts to load the manifest and lookup data from the public/search directory.
+ * This function should only be called on the server side to avoid webpack warnings.
+ *
+ * @returns Promise resolving to manifest and lookup data, or null if files are not found
+ * @throws Never throws - all errors are caught and logged, returning null instead
  */
 export async function loadStaticFilesFromFileSystem(): Promise<{
   manifest: StaticAddressManifest;
   lookupData: AddressLookupData;
 } | null> {
   try {
-    // Get the public/search directory path
     const publicSearchDir = path.join(process.cwd(), 'public', 'search');
     const manifestPath = path.join(publicSearchDir, 'latest.json');
 

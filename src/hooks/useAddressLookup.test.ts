@@ -89,7 +89,7 @@ describe('useAddressLookup', () => {
 
     expect(mockFetch).toHaveBeenCalledTimes(1);
     expect(mockFetch).toHaveBeenCalledWith(
-      `/api/lookup?query=${encodeURIComponent(TEST_LOCATIONS.FIRST_STREET)}`
+      `/api/lookup?query=${encodeURIComponent(TEST_LOCATIONS.FIRST_STREET.toLowerCase())}`
     );
 
     expect(result.current.suggestions[0]).toEqual({
@@ -323,5 +323,35 @@ describe('useAddressLookup', () => {
       affluence_score: MOCK_LOCAL_ADDRESSES[1].affluence_score,
       source_file: MOCK_LOCAL_ADDRESSES[1].source_file
     });
+  });
+
+  it('should clear all state when handleClear is called', () => {
+    const { result } = renderHook(() => useAddressLookup());
+
+    // First, set up some state by performing a search and selection
+    act(() => {
+      result.current.handleChange('test query');
+    });
+
+    act(() => {
+      result.current.handleSelect('Selected Address');
+    });
+
+    // Verify initial state
+    expect(result.current.query).toBe('Selected Address');
+    expect(result.current.locked).toBe(true);
+
+    // Now clear everything
+    act(() => {
+      result.current.handleClear();
+    });
+
+    // Verify everything is reset
+    expect(result.current.query).toBe('');
+    expect(result.current.suggestions).toEqual([]);
+    expect(result.current.locked).toBe(false);
+    expect(result.current.isFetching).toBe(false);
+    expect(result.current.hasFetched).toBe(false);
+    expect(result.current.error).toBe(null);
   });
 });

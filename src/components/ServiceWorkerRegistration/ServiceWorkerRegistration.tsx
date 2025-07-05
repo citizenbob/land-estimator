@@ -27,18 +27,17 @@ export default function ServiceWorkerRegistration() {
             '[SW Registration] Service worker registered successfully'
           );
 
-          // Start background preload after a short delay
           setTimeout(async () => {
             try {
-              console.log('[SW Registration] Starting background preload...');
-              await serviceWorkerClient.preloadStaticFiles();
               console.log(
-                '[SW Registration] Static files preloaded successfully'
+                '[SW Registration] Starting static file cache warmup...'
               );
-              console.log('[SW Registration] Background preload completed');
+              await serviceWorkerClient.preloadStaticFiles();
+              console.log('[SW Registration] Static files cached successfully');
+              console.log('[SW Registration] Cache warmup completed');
             } catch (preloadError) {
               console.warn(
-                '[SW Registration] Background preload failed:',
+                '[SW Registration] Cache warmup failed:',
                 preloadError
               );
             }
@@ -56,7 +55,6 @@ export default function ServiceWorkerRegistration() {
       }
     };
 
-    // Wait for window load event if document is not ready
     if (document.readyState === 'complete') {
       registerServiceWorker();
     } else {
@@ -66,7 +64,6 @@ export default function ServiceWorkerRegistration() {
       };
       window.addEventListener('load', handleLoad);
 
-      // Cleanup function
       return () => {
         window.removeEventListener('load', handleLoad);
       };

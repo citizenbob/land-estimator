@@ -86,13 +86,11 @@ export async function searchAddresses(
   }
 
   try {
-    // Always try to use local index first (both browser and server)
     if (!addressSearchBundle) {
       console.log('🔍 Loading address index for local search...');
       addressSearchBundle = await loadAddressIndex();
     }
 
-    // If we have a local index, use it directly
     if (addressSearchBundle) {
       console.log('⚡ Using local FlexSearch index for instant search');
       const normalizedQuery = normalizeQuery(query);
@@ -104,7 +102,6 @@ export async function searchAddresses(
       return formatSearchResults(searchResults, addressSearchBundle, limit);
     }
 
-    // Fallback to API only if local index failed to load
     if (typeof window !== 'undefined') {
       console.log('🌐 Falling back to API lookup...');
       const response = await fetch(

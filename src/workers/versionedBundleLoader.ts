@@ -2,7 +2,6 @@ import { getVersionManifest } from '@services/versionManifest';
 import { logError } from '@lib/errorUtils';
 import { decompressSync } from 'fflate';
 
-// Type for cache entries
 type CacheEntry = {
   bundle: unknown;
   version: string;
@@ -10,7 +9,6 @@ type CacheEntry = {
   sizeBytes: number;
 };
 
-// Type for the cache Map
 type CacheMap = Map<string, CacheEntry>;
 
 /**
@@ -21,7 +19,6 @@ const getMemoryCache = (): CacheMap => {
   const globalKey = '__versionedBundleCache';
 
   if (typeof globalThis !== 'undefined') {
-    // Use global cache that survives module reloads
     if (!(globalThis as Record<string, unknown>)[globalKey]) {
       (globalThis as Record<string, unknown>)[globalKey] = new Map<
         string,
@@ -34,7 +31,6 @@ const getMemoryCache = (): CacheMap => {
     return (globalThis as Record<string, unknown>)[globalKey] as CacheMap;
   }
 
-  // Fallback for environments without globalThis
   if (typeof global !== 'undefined') {
     if (!(global as Record<string, unknown>)[globalKey]) {
       (global as Record<string, unknown>)[globalKey] = new Map<
@@ -45,13 +41,11 @@ const getMemoryCache = (): CacheMap => {
     return (global as Record<string, unknown>)[globalKey] as CacheMap;
   }
 
-  // Final fallback
   return new Map<string, CacheEntry>();
 };
 
 const memoryCache = getMemoryCache();
 
-// Promise cache to prevent parallel requests for the same resource
 const promiseCache = new Map<string, Promise<unknown>>();
 
 const MEMORY_CACHE_DURATION =
@@ -162,7 +156,6 @@ export async function loadVersionedBundle<TData, TOptimizedIndex, TBundle>(
       return cached.bundle as TBundle;
     }
 
-    // Check if there's already a promise in flight for this resource
     const existingPromise = promiseCache.get(promiseKey);
     if (existingPromise) {
       console.log(
@@ -175,7 +168,6 @@ export async function loadVersionedBundle<TData, TOptimizedIndex, TBundle>(
       `🌐 [Memory Cache] Cache miss for ${baseFilename}, fetching from CDN...`
     );
 
-    // Create and cache the promise to prevent parallel requests
     const loadPromise = (async (): Promise<TBundle> => {
       try {
         const manifest = await getVersionManifest();
@@ -190,7 +182,6 @@ export async function loadVersionedBundle<TData, TOptimizedIndex, TBundle>(
           throw new Error(`File URL not found for ${baseFilename}`);
         }
 
-        // Construct full CDN URL - handle both relative and absolute paths
         const cdnUrl = fileUrl.startsWith('http')
           ? fileUrl
           : `https://storage.googleapis.com/land-estimator-29ee9.firebasestorage.app/${fileUrl}`;
@@ -217,7 +208,6 @@ export async function loadVersionedBundle<TData, TOptimizedIndex, TBundle>(
 
         return bundle;
       } finally {
-        // Clean up the promise cache once the request completes
         promiseCache.delete(promiseKey);
       }
     })();

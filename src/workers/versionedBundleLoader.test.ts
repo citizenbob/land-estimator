@@ -310,7 +310,6 @@ describe('versionedBundleLoader', () => {
 
   describe('CDN URL construction', () => {
     it('should construct correct CDN URL from relative manifest paths', async () => {
-      // Mock a manifest with relative paths like the real one
       const manifestWithRelativePaths = {
         ...MOCK_VERSION_MANIFEST,
         current: {
@@ -329,7 +328,6 @@ describe('versionedBundleLoader', () => {
 
       await loadVersionedBundle(testConfig);
 
-      // Should construct full CDN URL by prepending base URL
       expect(mockFetch).toHaveBeenCalledWith(
         'https://storage.googleapis.com/land-estimator-29ee9.firebasestorage.app/cdn/address-index-v1.20250629_163501.json.gz',
         { cache: 'no-store' }
@@ -337,7 +335,6 @@ describe('versionedBundleLoader', () => {
     });
 
     it('should handle manifest paths that already include full URLs', async () => {
-      // Mock a manifest with full URLs (edge case)
       const manifestWithFullUrls = {
         ...MOCK_VERSION_MANIFEST,
         current: {
@@ -357,7 +354,6 @@ describe('versionedBundleLoader', () => {
 
       await loadVersionedBundle(testConfig);
 
-      // Should use full URL as-is (no double prefixing)
       expect(mockFetch).toHaveBeenCalledWith(
         'https://storage.googleapis.com/land-estimator-29ee9.firebasestorage.app/cdn/address-index-v1.20250629_163501.json.gz',
         { cache: 'no-store' }

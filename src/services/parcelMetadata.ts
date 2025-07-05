@@ -67,13 +67,11 @@ const parcelBundleConfig = {
       keys: typeof index === 'object' && index ? Object.keys(index) : 'N/A'
     });
 
-    // Handle different possible structures
     if (Array.isArray(index)) {
       console.log('🔧 [DEBUG] Index is array, using directly');
       return index;
     }
 
-    // Type guard for OptimizedParcelIndex
     if (index && typeof index === 'object' && 'parcels' in index) {
       const typedIndex = index as OptimizedParcelIndex;
       console.log('🔧 [DEBUG] Found parcels property, checking if array:', {
@@ -94,7 +92,6 @@ const parcelBundleConfig = {
         return typedIndex.parcels;
       } else if (typedIndex.parcels && typeof typedIndex.parcels === 'object') {
         console.log('🔧 [DEBUG] parcels is object, converting to array');
-        // If parcels is an object (lookup map), convert to array
         const parcelsArray = Object.values(
           typedIndex.parcels
         ) as ParcelMetadata[];
@@ -109,7 +106,6 @@ const parcelBundleConfig = {
       }
     }
 
-    // If it's an object but parcels is not an array, try to find the actual array
     if (index && typeof index === 'object') {
       const indexObj = index as Record<string, unknown>;
       const firstKey = Object.keys(indexObj)[0];

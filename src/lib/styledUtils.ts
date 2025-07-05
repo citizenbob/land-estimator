@@ -1,3 +1,7 @@
+/**
+ * @fileoverview Styled-components utility functions for theme-aware styling and responsive design
+ */
+
 import { css } from 'styled-components';
 import tokens from '@tokens/tokens.json';
 import { getToken } from '@tokens/tokenUtils';

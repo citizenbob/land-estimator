@@ -1,4 +1,5 @@
 import { loadAddressIndex } from '@services/loadAddressIndex';
+import { devLog, devWarn } from '@lib/logger';
 
 interface PreloadStatus {
   isLoading: boolean;
@@ -8,7 +9,18 @@ interface PreloadStatus {
   endTime: number | null;
 }
 
+/**
+ * Extend window interface for Fast Refresh-resistant deduplication
+ */
+declare global {
+  interface Window {
+    __addressIndexPreloadStarted?: boolean;
+  }
+}
+
 class BackgroundPreloader {
+  private static instance: BackgroundPreloader | null = null;
+
   private status: PreloadStatus = {
     isLoading: false,
     isComplete: false,
@@ -17,8 +29,23 @@ class BackgroundPreloader {
     endTime: null
   };
 
+  static getInstance(): BackgroundPreloader {
+    if (!BackgroundPreloader.instance) {
+      BackgroundPreloader.instance = new BackgroundPreloader();
+    }
+    return BackgroundPreloader.instance;
+  }
+
   async start(): Promise<void> {
     if (typeof window === 'undefined') {
+      return;
+    }
+
+    // Use window property for Fast Refresh-resistant deduplication
+    if (window.__addressIndexPreloadStarted) {
+      devLog(
+        '🔄 [Background Preloader] Already started elsewhere, skipping...'
+      );
       return;
     }
 
@@ -26,11 +53,18 @@ class BackgroundPreloader {
       return;
     }
 
+    window.__addressIndexPreloadStarted = true;
+
     this.status.isLoading = true;
     this.status.startTime = Date.now();
     this.status.error = null;
 
-    console.log(
+    // Small delay to let server warmup complete first (skip in tests)
+    if (process.env.NODE_ENV !== 'test') {
+      await new Promise((resolve) => setTimeout(resolve, 100));
+    }
+
+    devLog(
       '🚀 [Background Preloader] Starting aggressive address index preload...'
     );
 
@@ -42,7 +76,7 @@ class BackgroundPreloader {
       const duration =
         (this.status.endTime ?? 0) - (this.status.startTime ?? 0);
 
-      console.log(
+      devLog(
         `✅ [Background Preloader] Address index preloaded in ${duration}ms`
       );
 
@@ -57,10 +91,7 @@ class BackgroundPreloader {
       this.status.error = errorMessage;
       this.status.endTime = Date.now();
 
-      console.warn(
-        '⚠️ [Background Preloader] Preload failed:',
-        this.status.error
-      );
+      devWarn('⚠️ [Background Preloader] Preload failed:', this.status.error);
 
       window.dispatchEvent(
         new CustomEvent('addressIndexPreloadError', {
@@ -84,6 +115,11 @@ class BackgroundPreloader {
       startTime: null,
       endTime: null
     };
+
+    // Reset the global flag so start() can be called again
+    if (typeof window !== 'undefined') {
+      window.__addressIndexPreloadStarted = false;
+    }
   }
 
   isDataReady(): boolean {
@@ -91,7 +127,7 @@ class BackgroundPreloader {
   }
 }
 
-const backgroundPreloader = new BackgroundPreloader();
+const backgroundPreloader = BackgroundPreloader.getInstance();
 
 if (typeof window !== 'undefined') {
   if (document.readyState === 'loading') {

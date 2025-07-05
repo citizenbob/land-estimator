@@ -1,7 +1,9 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useRef } from 'react';
 import { AddressLookupRecord } from '@services/addressSearch';
 import { LocalAddressRecord } from '@app-types';
 import { createNetworkError, getErrorMessage, logError } from '@lib/errorUtils';
+import { deduplicatedLookup } from '@lib/requestDeduplication';
+import { devLog } from '@lib/logger';
 
 export function useAddressLookup() {
   const [query, setQuery] = useState<string>('');
@@ -14,7 +16,6 @@ export function useAddressLookup() {
   const [error, setError] = useState<string | null>(null);
 
   const rawDataRef = useRef<Record<string, AddressLookupRecord>>({});
-  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const handleChange = (value: string) => {
     if (locked) return;
@@ -22,17 +23,28 @@ export function useAddressLookup() {
     setSuggestions([]);
     setError(null);
     setHasFetched(false);
-    if (timerRef.current) clearTimeout(timerRef.current);
+
+    if (!value) {
+      setIsFetching(false);
+      return;
+    }
+
+    // Don't search for queries shorter than 3 characters
+    if (value.trim().length < 3) {
+      setIsFetching(false);
+      return;
+    }
+
     setIsFetching(true);
 
-    timerRef.current = setTimeout(async () => {
-      if (!value) {
-        setIsFetching(false);
-        return;
-      }
-      try {
+    /**
+     * Use deduplication utility for debounced, deduplicated lookups
+     */
+    deduplicatedLookup(
+      value,
+      async (normalizedQuery) => {
         const response = await fetch(
-          `/api/lookup?query=${encodeURIComponent(value)}`
+          `/api/lookup?query=${encodeURIComponent(normalizedQuery)}`
         );
         if (!response.ok) {
           throw createNetworkError(
@@ -41,12 +53,20 @@ export function useAddressLookup() {
           );
         }
         const responseData = await response.json();
-        console.log('📥 API response:', responseData);
+        devLog('📥 API response:', responseData);
 
         const results: AddressLookupRecord[] = Array.isArray(responseData)
           ? responseData
           : responseData.results || [];
 
+        return results;
+      },
+      { debounce: true, debounceDelay: 200 }
+    )
+      .then((results) => {
+        /**
+         * Only update state if this query is still current
+         */
         const simplified = results.map((item) => {
           rawDataRef.current[item.id] = item;
           return {
@@ -56,7 +76,8 @@ export function useAddressLookup() {
         });
         setSuggestions(simplified);
         setHasFetched(true);
-      } catch (err: unknown) {
+      })
+      .catch((err: unknown) => {
         logError(err, {
           operation: 'address_lookup',
           query: value
@@ -65,16 +86,28 @@ export function useAddressLookup() {
         setError(errorMessage);
         setSuggestions([]);
         setHasFetched(true);
-      } finally {
+      })
+      .finally(() => {
         setIsFetching(false);
-      }
-    }, 300);
+      });
   };
 
   const handleSelect = (selected: string) => {
     setQuery(selected);
     setSuggestions([]);
     setLocked(true);
+  };
+
+  /**
+   * Clear the input and reset all state
+   */
+  const handleClear = () => {
+    setQuery('');
+    setSuggestions([]);
+    setLocked(false);
+    setIsFetching(false);
+    setHasFetched(false);
+    setError(null);
   };
 
   const getSuggestionData = async (
@@ -135,12 +168,6 @@ export function useAddressLookup() {
     };
   };
 
-  useEffect(() => {
-    return () => {
-      if (timerRef.current) clearTimeout(timerRef.current);
-    };
-  }, []);
-
   return {
     query,
     suggestions,
@@ -150,6 +177,7 @@ export function useAddressLookup() {
     error,
     handleChange,
     handleSelect,
+    handleClear,
     getSuggestionData
   };
 }

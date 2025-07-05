@@ -44,7 +44,7 @@ const nextConfig: NextConfig = {
         crypto: 'commonjs crypto',
 
         // Exclude server-side file system loader
-        './fileSystemLoader': 'commonjs ./fileSystemLoader',
+        '@lib/fileSystemLoader': 'commonjs @lib/fileSystemLoader',
 
         // Exclude Node.js-only script files
         './src/config/scripts/create_emergency_backups':

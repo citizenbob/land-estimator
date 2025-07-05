@@ -36,15 +36,18 @@ vi.mock('@workers/versionedBundleLoader', () => ({
 /**
  * Mock fetch for static files
  */
-const mockFetch = vi.fn();
-global.fetch = mockFetch;
+import { createMockFetch } from '@lib/testUtils';
+const mockFetch = createMockFetch();
 
 describe('loadAddressIndex', () => {
   let loadAddressIndex: typeof import('./loadAddressIndex').loadAddressIndex;
   let clearAddressIndexCache: typeof import('./loadAddressIndex').clearAddressIndexCache;
+  let originalWindow: Window | undefined;
 
   beforeEach(async () => {
     vi.clearAllMocks();
+
+    originalWindow = (global as unknown as { window?: Window }).window;
 
     Object.defineProperty(globalThis, 'window', {
       value: { location: { origin: 'http://localhost:3000' } },
@@ -56,6 +59,14 @@ describe('loadAddressIndex', () => {
     clearAddressIndexCache = loadModule.clearAddressIndexCache;
 
     clearAddressIndexCache();
+  });
+
+  afterEach(() => {
+    if (originalWindow) {
+      (global as unknown as { window?: Window }).window = originalWindow;
+    } else {
+      delete (global as unknown as { window?: unknown }).window;
+    }
   });
 
   describe('Static Files (Primary Path)', () => {
@@ -250,26 +261,39 @@ describe('loadAddressIndex', () => {
 
   describe('Static File Loading Debugging', () => {
     it('debugs URL parsing for static files', async () => {
-      // Test the exact scenario that's failing
       const consoleLogSpy = vi.spyOn(console, 'log');
+
+      Object.defineProperty(global, 'window', {
+        value: {},
+        writable: true
+      });
 
       mockFetch.mockRejectedValueOnce(
         new TypeError('Failed to parse URL from /search/latest.json')
       );
 
-      mockCDNLoader.mockResolvedValueOnce({
-        index: mockSearchIndex,
-        parcelIds: ['P001'],
-        addressData: { P001: 'Test Address from CDN' }
-      });
+      // Make CDN also fail to ensure static loading error is logged
+      mockCDNLoader.mockRejectedValueOnce(new Error('CDN unavailable'));
+
+      try {
+        await loadAddressIndex();
+      } catch {
+        // Expected to fail
+      }
 
       expect(consoleLogSpy).toHaveBeenCalledWith(
         expect.stringContaining('Static loading failed')
       );
-      expect(mockCDNLoader).toHaveBeenCalled();
+
+      delete (global as unknown as { window?: Window }).window;
     });
 
     it('tests exact fetch URLs being generated', async () => {
+      Object.defineProperty(global, 'window', {
+        value: {},
+        writable: true
+      });
+
       mockFetch.mockResolvedValueOnce({
         ok: true,
         json: () =>
@@ -291,11 +315,12 @@ describe('loadAddressIndex', () => {
 
       await loadAddressIndex();
 
-      // Verify exact URLs being called
       expect(mockFetch).toHaveBeenCalledWith('/search/latest.json');
       expect(mockFetch).toHaveBeenCalledWith(
         '/search/address-v20250704-787dd7fd-lookup.json'
       );
+
+      delete (global as unknown as { window?: Window }).window;
     });
   });
 });

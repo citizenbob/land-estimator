@@ -6,6 +6,7 @@
  */
 
 import { Index } from 'flexsearch';
+import { devLog, devWarn, logError } from '@lib/logger';
 import type {
   FlexSearchIndexBundle,
   PrecomputedIndexData,
@@ -13,7 +14,6 @@ import type {
   AddressLookupData
 } from '@app-types';
 
-// Re-export types for backward compatibility
 export type {
   FlexSearchIndexBundle,
   PrecomputedIndexData,
@@ -48,7 +48,7 @@ async function createAddressLookupMapFromData(
  * Creates a search index from search strings for CDN fallback
  */
 function createSearchIndexFromData(indexData: PrecomputedIndexData): Index {
-  console.log('⚡ Building FlexSearch index from CDN data');
+  devLog('⚡ Building FlexSearch index from CDN data');
 
   const searchIndex = new Index(FLEXSEARCH_CONFIG);
 
@@ -66,8 +66,20 @@ class StaticAddressIndexLoader {
   private static instance: StaticAddressIndexLoader | null = null;
   private bundle: FlexSearchIndexBundle | null = null;
   private loadingPromise: Promise<FlexSearchIndexBundle> | null = null;
+  private warmupStarted: boolean = false;
 
-  private constructor() {}
+  private constructor() {
+    // Start warming up on server start (Node.js only)
+    if (typeof window === 'undefined' && !this.warmupStarted) {
+      this.warmupStarted = true;
+      // Use setImmediate to avoid blocking server startup, but start immediately
+      setImmediate(() => {
+        this.warmupServerIndex().catch((error) => {
+          devWarn('⚠️ Server index warmup failed:', error);
+        });
+      });
+    }
+  }
 
   static getInstance(): StaticAddressIndexLoader {
     if (!StaticAddressIndexLoader.instance) {
@@ -99,7 +111,7 @@ class StaticAddressIndexLoader {
    * Internal method to load from static files with fallback
    */
   private async _loadFromStaticFiles(): Promise<FlexSearchIndexBundle> {
-    console.log('📥 Loading address index from static files...');
+    devLog('📥 Loading address index from static files...');
 
     try {
       const staticResult = await this._tryLoadFromStatic();
@@ -107,10 +119,10 @@ class StaticAddressIndexLoader {
         return staticResult;
       }
 
-      console.log('🌐 Static files unavailable, falling back to CDN...');
+      devLog('🌐 Static files unavailable, falling back to CDN...');
       return await this._loadFromCDN();
     } catch (error) {
-      console.error('❌ All loading methods failed:', error);
+      logError('❌ All loading methods failed:', error);
       throw new Error(`Address index loading failed: ${error}`);
     }
   }
@@ -120,12 +132,10 @@ class StaticAddressIndexLoader {
    */
   private async _tryLoadFromStatic(): Promise<FlexSearchIndexBundle | null> {
     try {
-      // Detect if we're on server (Node.js) vs client (browser)
       const isServer = typeof window === 'undefined';
 
-      // For server-side (API routes), we need to read from filesystem
       if (isServer) {
-        console.log(
+        devLog(
           '🖥️ Server-side detected, loading static files from filesystem...'
         );
         return await this._loadFromFileSystem();
@@ -133,24 +143,24 @@ class StaticAddressIndexLoader {
 
       const manifestResponse = await fetch('/search/latest.json');
       if (!manifestResponse.ok) {
-        console.log('📭 Static manifest not found, will try CDN fallback');
+        devLog('📭 Static manifest not found, will try CDN fallback');
         return null;
       }
 
       const manifest: StaticAddressManifest = await manifestResponse.json();
-      console.log(
+      devLog(
         `📊 Found static address index v${manifest.version} with ${manifest.recordCount} records`
       );
 
       const lookupFile = manifest.files.find((f) => f.includes('lookup'));
       if (!lookupFile) {
-        console.log('📭 Static lookup file not found, will try CDN fallback');
+        devLog('📭 Static lookup file not found, will try CDN fallback');
         return null;
       }
 
       const lookupResponse = await fetch(`/search/${lookupFile}`);
       if (!lookupResponse.ok) {
-        console.log('📭 Static lookup data unavailable, will try CDN fallback');
+        devLog('📭 Static lookup data unavailable, will try CDN fallback');
         return null;
       }
 
@@ -161,25 +171,20 @@ class StaticAddressIndexLoader {
         lookupData
       );
       if (loadedFromExport) {
-        console.log('✅ Loaded from static exported FlexSearch index');
+        devLog('✅ Loaded from static exported FlexSearch index');
         return loadedFromExport;
       }
 
-      console.log(
-        '🔄 Rebuilding FlexSearch index from static search strings...'
-      );
+      devLog('🔄 Rebuilding FlexSearch index from static search strings...');
       const rebuildStart = performance.now();
 
       const searchIndex = new Index(FLEXSEARCH_CONFIG);
 
-      lookupData.searchStrings.forEach((searchString, idx) => {
-        searchIndex.add(idx, searchString);
-      });
+      // Build index in chunks to prevent UI blocking
+      await this._buildIndexInChunks(searchIndex, lookupData.searchStrings);
 
       const rebuildTime = performance.now() - rebuildStart;
-      console.log(
-        `⚡ Static address index rebuilt in ${rebuildTime.toFixed(2)}ms`
-      );
+      devLog(`⚡ Static address index rebuilt in ${rebuildTime.toFixed(2)}ms`);
 
       return {
         index: searchIndex,
@@ -187,7 +192,7 @@ class StaticAddressIndexLoader {
         addressData: lookupData.addressData
       };
     } catch (error) {
-      console.log(`⚠️ Static loading failed: ${error}`);
+      devLog(`⚠️ Static loading failed: ${error}`);
       return null;
     }
   }
@@ -197,9 +202,8 @@ class StaticAddressIndexLoader {
    */
   private async _loadFromFileSystem(): Promise<FlexSearchIndexBundle | null> {
     try {
-      // Use dynamic import to avoid webpack warnings
       const { loadStaticFilesFromFileSystem } = await import(
-        './fileSystemLoader'
+        '@lib/fileSystemLoader'
       );
 
       const result = await loadStaticFilesFromFileSystem();
@@ -209,31 +213,27 @@ class StaticAddressIndexLoader {
 
       const { manifest, lookupData } = result;
 
-      // Try to load exported FlexSearch index first
       const loadedFromExport = await this._tryLoadFromExportedFiles(
         manifest,
         lookupData
       );
       if (loadedFromExport) {
-        console.log(
-          '✅ Loaded from static exported FlexSearch index (filesystem)'
-        );
+        devLog('✅ Loaded from static exported FlexSearch index (filesystem)');
         return loadedFromExport;
       }
 
-      console.log(
+      devLog(
         '🔄 Rebuilding FlexSearch index from static search strings (filesystem)...'
       );
       const rebuildStart = performance.now();
 
       const searchIndex = new Index(FLEXSEARCH_CONFIG);
 
-      lookupData.searchStrings.forEach((searchString, idx) => {
-        searchIndex.add(idx, searchString);
-      });
+      // Build index in chunks to prevent UI blocking
+      await this._buildIndexInChunks(searchIndex, lookupData.searchStrings);
 
       const rebuildTime = performance.now() - rebuildStart;
-      console.log(
+      devLog(
         `⚡ Static address index rebuilt in ${rebuildTime.toFixed(2)}ms (filesystem)`
       );
 
@@ -243,7 +243,7 @@ class StaticAddressIndexLoader {
         addressData: lookupData.addressData
       };
     } catch (error) {
-      console.log(`⚠️ Filesystem loading failed: ${error}`);
+      devLog(`⚠️ Filesystem loading failed: ${error}`);
       return null;
     }
   }
@@ -252,7 +252,7 @@ class StaticAddressIndexLoader {
    * Load from CDN as fallback
    */
   private async _loadFromCDN(): Promise<FlexSearchIndexBundle> {
-    console.log('🌐 Loading address index from CDN fallback...');
+    devLog('🌐 Loading address index from CDN fallback...');
 
     try {
       const { loadVersionedBundle } = await import(
@@ -276,12 +276,12 @@ class StaticAddressIndexLoader {
         }
       };
 
-      console.log('📡 Using CDN versioned bundle loader...');
+      devLog('📡 Using CDN versioned bundle loader...');
       const result = await loadVersionedBundle(addressIndexConfig);
-      console.log('✅ Successfully loaded from CDN fallback');
+      devLog('✅ Successfully loaded from CDN fallback');
       return result;
     } catch (error) {
-      console.error('❌ CDN fallback also failed:', error);
+      logError('❌ CDN fallback also failed:', error);
       throw new Error(`Both static and CDN loading failed: ${error}`);
     }
   }
@@ -294,7 +294,7 @@ class StaticAddressIndexLoader {
     lookupData: AddressLookupData
   ): Promise<FlexSearchIndexBundle | null> {
     try {
-      console.log('📤 Attempting to load from exported FlexSearch files...');
+      devLog('📤 Attempting to load from exported FlexSearch files...');
 
       const indexFiles = manifest.files.filter(
         (f) =>
@@ -305,11 +305,11 @@ class StaticAddressIndexLoader {
       );
 
       if (indexFiles.length === 0) {
-        console.log('📭 No exported index files found');
+        devLog('📭 No exported index files found');
         return null;
       }
 
-      console.log(`📥 Loading ${indexFiles.length} index files...`);
+      devLog(`📥 Loading ${indexFiles.length} index files...`);
 
       const searchIndex = new Index(FLEXSEARCH_CONFIG);
 
@@ -343,12 +343,88 @@ class StaticAddressIndexLoader {
   }
 
   /**
+   * Warmup server index (background loading on server start)
+   */
+  private async warmupServerIndex(): Promise<void> {
+    if (typeof window !== 'undefined') {
+      return;
+    }
+
+    try {
+      devLog('🔥 [Server Warmup] Pre-warming address index...');
+      const startTime = performance.now();
+
+      const bundle = await this.loadAddressIndex();
+
+      const duration = performance.now() - startTime;
+      const addressCount = bundle.parcelIds.length;
+
+      devLog(
+        `✅ [Server Warmup] Address index pre-warmed in ${duration.toFixed(2)}ms`
+      );
+      devLog(
+        `📊 [Server Warmup] Ready to serve ${addressCount.toLocaleString()} addresses instantly`
+      );
+    } catch (error: unknown) {
+      const errorMessage =
+        error instanceof Error ? error.message : String(error);
+      devWarn(
+        `⚠️ [Server Warmup] Failed to pre-warm address index: ${errorMessage}`
+      );
+      devWarn(
+        '📍 [Server Warmup] First search will experience cold-start delay'
+      );
+    }
+  }
+
+  /**
    * Clear cached data
    */
   clearCache(): void {
     this.bundle = null;
     this.loadingPromise = null;
-    console.log('🗑️ Address index cache cleared');
+    devLog('🗑️ Address index cache cleared');
+  }
+
+  /**
+   * Build FlexSearch index in chunks to prevent UI blocking
+   */
+  private async _buildIndexInChunks(
+    searchIndex: Index,
+    searchStrings: string[]
+  ): Promise<void> {
+    // Process 1000 items at a time
+    const CHUNK_SIZE = 1000;
+    const totalItems = searchStrings.length;
+    let processed = 0;
+
+    // Only yield control in the browser, not on the server
+    const shouldYield = typeof window !== 'undefined';
+
+    for (let i = 0; i < totalItems; i += CHUNK_SIZE) {
+      const end = Math.min(i + CHUNK_SIZE, totalItems);
+
+      // Process this chunk
+      for (let j = i; j < end; j++) {
+        searchIndex.add(j, searchStrings[j]);
+      }
+
+      processed = end;
+
+      // Show progress for large datasets
+      if (processed % 50000 === 0 || processed === totalItems) {
+        devLog(
+          `📊 Index building progress: ${processed.toLocaleString()}/${totalItems.toLocaleString()} (${Math.round(
+            (processed / totalItems) * 100
+          )}%)`
+        );
+      }
+
+      // Yield control to the main thread in the browser
+      if (shouldYield && i + CHUNK_SIZE < totalItems) {
+        await new Promise((resolve) => setTimeout(resolve, 0));
+      }
+    }
   }
 }
 
@@ -372,7 +448,7 @@ export function clearAddressIndexCache(): void {
     import('@workers/versionedBundleLoader').then(({ clearMemoryCache }) => {
       clearMemoryCache();
     });
-  } catch {
-    // Ignore dynamic import errors
+  } catch (error) {
+    console.debug('Failed to clear cache:', error);
   }
 }

@@ -13,7 +13,6 @@ export default function TestStaticLoadingPage() {
   const [networkLogs, setNetworkLogs] = useState<string[]>([]);
   const [searchResults, setSearchResults] = useState<string[]>([]);
 
-  // Monitor network requests
   useEffect(() => {
     const originalFetch = window.fetch;
     const logs: string[] = [];
@@ -53,7 +52,6 @@ export default function TestStaticLoadingPage() {
       setAddressCount(result.parcelIds.length);
       setLoadingStatus('✅ Success!');
 
-      // Test some searches
       const testQueries = ['Gateway', 'Arch', 'Main St'];
       const results: string[] = [];
 

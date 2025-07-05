@@ -48,6 +48,7 @@ const AddressInput = ({
     suggestions,
     handleChange,
     handleSelect,
+    handleClear,
     isFetching,
     locked,
     hasFetched,
@@ -176,8 +177,13 @@ const AddressInput = ({
   const { handleInputKeyDown, handleSuggestionKeyDown } =
     useSuggestionNavigation(inputRef, onSelect, suggestionRefs.current);
 
+  const handleSubmit = (e: React.FormEvent) => {
+    // Prevent form submission and page refresh
+    e.preventDefault();
+  };
+
   return (
-    <Form>
+    <Form onSubmit={handleSubmit}>
       <div className="relative input-group">
         <InputField
           ref={inputRef}
@@ -196,8 +202,12 @@ const AddressInput = ({
         )}
         {showClearButton && (
           <IconButton
+            type="button"
             aria-label="Change Address"
-            onClick={() => handleChange('')}
+            onClick={() => {
+              handleClear();
+              selectedSuggestion.current = null;
+            }}
           >
             ×
           </IconButton>

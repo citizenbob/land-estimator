@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { searchAddresses } from '@services/addressSearch';
 import { logError } from '@lib/errorUtils';
+import { deduplicatedLookup } from '@lib/requestDeduplication';
 
 /**
  * Address lookup endpoint with fuzzy search capabilities
@@ -21,12 +22,12 @@ export async function GET(request: NextRequest) {
     });
   }
 
-  if (!query || query.trim().length < 2) {
+  if (!query || query.trim().length < 3) {
     if (!isTestEnv) {
       console.log('❌ Query too short:', query);
     }
     return NextResponse.json(
-      { error: 'Query parameter must be at least 2 characters' },
+      { error: 'Query parameter must be at least 3 characters' },
       { status: 400 }
     );
   }
@@ -35,7 +36,17 @@ export async function GET(request: NextRequest) {
     if (!isTestEnv) {
       console.log('🚀 Starting searchAddresses for:', query.trim());
     }
-    const results = await searchAddresses(query.trim(), 10);
+
+    /**
+     * Use deduplication for the search request
+     * No debounce in API - let frontend handle debouncing
+     */
+    const results = await deduplicatedLookup(
+      query.trim(),
+      (normalizedQuery) => searchAddresses(normalizedQuery, 10),
+      { debounce: false }
+    );
+
     if (!isTestEnv) {
       console.log('✅ Search completed:', { resultCount: results.length });
     }

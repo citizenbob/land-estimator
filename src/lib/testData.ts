@@ -1,8 +1,15 @@
+/**
+ * @fileoverview Mock data and test fixtures for testing address lookup and estimation functionality
+ */
+
 import type { FlexSearchIndexBundle } from '@app-types';
 import { vi } from 'vitest';
 import type { LocalAddressRecord, AddressSuggestion } from '@app-types';
 import type { VersionManifest } from '@services/versionManifest';
 
+/**
+ * Mock local address records for testing address lookup functionality
+ */
 export const MOCK_LOCAL_ADDRESSES: LocalAddressRecord[] = [
   {
     id: '10001000005',
@@ -64,6 +71,9 @@ export const MOCK_LOCAL_ADDRESSES: LocalAddressRecord[] = [
   }
 ];
 
+/**
+ * Mock address suggestions for testing autocomplete functionality
+ */
 export const MOCK_SUGGESTIONS: AddressSuggestion[] = [
   {
     place_id: '10001000005',
@@ -80,6 +90,9 @@ export const MOCK_SUGGESTIONS: AddressSuggestion[] = [
   }
 ];
 
+/**
+ * Test location constants for consistent address testing
+ */
 export const TEST_LOCATIONS = {
   FIRST_STREET: '626 1st, St. Louis, MO 63103',
   DUNN_VIEW: '11308 Dunn View Dr., St. Louis County (Unincorporated), MO 63102',
@@ -88,12 +101,18 @@ export const TEST_LOCATIONS = {
   VOLZ_DRIVE: '907 Volz Dr, Crestwood, MO 63126'
 };
 
+/**
+ * Test coordinate data corresponding to test locations
+ */
 export const TEST_COORDINATES = {
   FIRST_STREET: { lat: 4278231.181849, lon: 744902.380139 },
   DUNN_VIEW: { lat: 4294879.84416, lon: 743862.085717 },
   VOLZ_DRIVE: { lat: 4271623.637581, lon: 728460.487376 }
 };
 
+/**
+ * Pre-selected mock address data for consistent testing
+ */
 export const MOCK_ADDRESS_DATA = MOCK_LOCAL_ADDRESSES.find(
   (address) => address.id === '25L440198'
 )!;

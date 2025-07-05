@@ -7,8 +7,6 @@ import Analytics from '@components/PageAnalytics/PageAnalytics';
 import ServiceWorkerRegistration from '@components/ServiceWorkerRegistration/ServiceWorkerRegistration';
 import BackgroundPreloadStatus from '@components/BackgroundPreloadStatus/BackgroundPreloadStatus';
 
-import '@workers/backgroundPreloader';
-
 const geistSans = Geist({
   variable: '--font-geist-sans',
   subsets: ['latin']

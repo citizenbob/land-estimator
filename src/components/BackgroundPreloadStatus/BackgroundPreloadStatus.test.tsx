@@ -1,11 +1,16 @@
 import React from 'react';
 import { render, screen, act } from '@testing-library/react';
 import { vi, describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { setupBrowserEnvironment, createConsoleMocks } from '@lib/testUtils';
+import {
+  setupBrowserEnvironment,
+  createConsoleMocks,
+  createMockPreloadStatus
+} from '@lib/testUtils';
 
 vi.mock('@workers/backgroundPreloader', () => ({
   default: {
-    getStatus: vi.fn()
+    getStatus: vi.fn(),
+    start: vi.fn().mockResolvedValue(undefined)
   }
 }));
 
@@ -13,25 +18,6 @@ import BackgroundPreloadStatus from './BackgroundPreloadStatus';
 import backgroundPreloader from '@workers/backgroundPreloader';
 
 const mockBackgroundPreloader = vi.mocked(backgroundPreloader);
-
-function createMockPreloadStatus(
-  overrides: Partial<{
-    isLoading: boolean;
-    isComplete: boolean;
-    error: string | null;
-    startTime: number | null;
-    endTime: number | null;
-  }> = {}
-) {
-  return {
-    isLoading: false,
-    isComplete: false,
-    error: null,
-    startTime: null,
-    endTime: null,
-    ...overrides
-  };
-}
 
 describe('BackgroundPreloadStatus', () => {
   const { restore } = createConsoleMocks();
@@ -72,7 +58,13 @@ describe('BackgroundPreloadStatus', () => {
       );
 
       render(<BackgroundPreloadStatus />);
-      expect(screen.getByText('🚀 Preloading...')).toBeInTheDocument();
+
+      // Wait for delayed status to show
+      act(() => {
+        vi.advanceTimersByTime(1000);
+      });
+
+      expect(screen.getByText('⚡ Loading...')).toBeInTheDocument();
     });
   });
 
@@ -88,7 +80,12 @@ describe('BackgroundPreloadStatus', () => {
 
       render(<BackgroundPreloadStatus />);
 
-      const indicator = screen.getByText('🚀 Preloading...');
+      // Wait for delayed status to show
+      act(() => {
+        vi.advanceTimersByTime(1000);
+      });
+
+      const indicator = screen.getByText('⚡ Loading...');
       expect(indicator).toBeInTheDocument();
 
       expect(indicator.parentElement).toBeTruthy();
@@ -103,7 +100,12 @@ describe('BackgroundPreloadStatus', () => {
 
       render(<BackgroundPreloadStatus />);
 
-      expect(screen.getByText('🚀 Preloading...')).toBeInTheDocument();
+      // Wait for delayed status to show
+      act(() => {
+        vi.advanceTimersByTime(1000);
+      });
+
+      expect(screen.getByText('⚡ Loading...')).toBeInTheDocument();
 
       mockBackgroundPreloader.getStatus.mockReturnValue(
         createMockPreloadStatus({ isLoading: false, isComplete: true })
@@ -173,7 +175,12 @@ describe('BackgroundPreloadStatus', () => {
 
       render(<BackgroundPreloadStatus />);
 
-      expect(screen.getByText('🚀 Preloading...')).toBeInTheDocument();
+      // Wait for delayed status to show
+      act(() => {
+        vi.advanceTimersByTime(1000);
+      });
+
+      expect(screen.getByText('⚡ Loading...')).toBeInTheDocument();
 
       mockBackgroundPreloader.getStatus.mockReturnValue(
         createMockPreloadStatus({ error: 'Preload failed' })
@@ -267,7 +274,12 @@ describe('BackgroundPreloadStatus', () => {
 
       render(<BackgroundPreloadStatus />);
 
-      const indicator = screen.getByText('🚀 Preloading...');
+      // Wait for delayed status to show
+      act(() => {
+        vi.advanceTimersByTime(1000);
+      });
+
+      const indicator = screen.getByText('⚡ Loading...');
       const container = indicator.parentElement;
 
       expect(container).toBeTruthy();
@@ -282,7 +294,12 @@ describe('BackgroundPreloadStatus', () => {
 
       const { rerender } = render(<BackgroundPreloadStatus />);
 
-      const loadingIndicator = screen.getByText('🚀 Preloading...');
+      // Wait for delayed status to show
+      act(() => {
+        vi.advanceTimersByTime(1000);
+      });
+
+      const loadingIndicator = screen.getByText('⚡ Loading...');
       expect(loadingIndicator).toBeInTheDocument();
       expect(loadingIndicator.parentElement).toBeTruthy();
 

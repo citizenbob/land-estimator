@@ -7,23 +7,33 @@
 
 import React, { useState, useEffect } from 'react';
 import { backgroundPreloader } from '@workers';
+import { devLog, devWarn } from '@lib/logger';
 
 export default function BackgroundPreloadStatus() {
   const [status, setStatus] = useState(backgroundPreloader.getStatus());
   const [showStatus, setShowStatus] = useState(false);
 
   useEffect(() => {
+    // Ensure backgroundPreloader starts
+    backgroundPreloader.start().catch((error) => {
+      console.warn('Failed to start background preloader:', error);
+    });
+
     const handlePreloaded = () => {
-      console.log('🎯 Address index preloaded, search will be instant');
+      devLog('🎯 Address index preloaded, search will be instant');
       setStatus(backgroundPreloader.getStatus());
 
+      // Show success message briefly
       setShowStatus(true);
-      setTimeout(() => setShowStatus(false), 3000);
+      setTimeout(() => setShowStatus(false), 2000);
     };
 
     const handlePreloadError = () => {
-      console.warn('Preload failed, first search may be slower');
+      devWarn('Preload failed, first search may be slower');
       setStatus(backgroundPreloader.getStatus());
+      // Show error message briefly
+      setShowStatus(true);
+      setTimeout(() => setShowStatus(false), 3000);
     };
 
     window.addEventListener(
@@ -35,16 +45,23 @@ export default function BackgroundPreloadStatus() {
       handlePreloadError as EventListener
     );
 
+    // Don't show loading state immediately - wait a bit to avoid flashing
     const initialStatus = backgroundPreloader.getStatus();
     if (initialStatus.isLoading) {
-      setShowStatus(true);
+      setTimeout(() => {
+        const currentStatus = backgroundPreloader.getStatus();
+        if (currentStatus.isLoading && !currentStatus.isComplete) {
+          setShowStatus(true);
+        }
+      }, 1000);
     }
 
     const interval = setInterval(() => {
       const currentStatus = backgroundPreloader.getStatus();
       setStatus(currentStatus);
 
-      if (!currentStatus.isLoading && showStatus) {
+      if (!currentStatus.isLoading && showStatus && !currentStatus.error) {
+        // Hide loading state when complete
         setShowStatus(false);
       }
     }, 500);
@@ -87,7 +104,7 @@ export default function BackgroundPreloadStatus() {
         transition: 'all 0.3s ease'
       }}
     >
-      {status.isLoading && '🚀 Preloading...'}
+      {status.isLoading && '⚡ Loading...'}
       {status.isComplete && !status.error && '✅ Ready'}
       {status.error && '⚠️ Error'}
     </div>

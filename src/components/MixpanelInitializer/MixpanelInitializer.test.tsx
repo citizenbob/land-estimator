@@ -26,7 +26,6 @@ describe('MixpanelInitializer', () => {
     mockMixpanel.register.mockReset();
     mockMixpanel.init.mockReset();
     mockMixpanel.track.mockReset();
-
     mockMixpanel.register.mockReturnValue(undefined);
   });
 

@@ -7,6 +7,10 @@ import { setupBrowserEnvironment } from '@lib/testUtils';
 import { MOCK_FLEXSEARCH_BUNDLE } from '@lib/testData';
 
 vi.mock('@services/loadAddressIndex');
+vi.mock('@lib/logger', () => ({
+  devLog: vi.fn(),
+  devWarn: vi.fn()
+}));
 
 describe('BackgroundPreloader', () => {
   let preloader: BackgroundPreloader;
@@ -23,7 +27,8 @@ describe('BackgroundPreloader', () => {
 
     Object.defineProperty(global, 'window', {
       value: {
-        dispatchEvent: mockDispatchEvent
+        dispatchEvent: mockDispatchEvent,
+        __addressIndexPreloadStarted: undefined
       },
       writable: true
     });
@@ -36,6 +41,10 @@ describe('BackgroundPreloader', () => {
     });
 
     preloader = new BackgroundPreloader();
+
+    // Reset singleton state for tests
+    backgroundPreloader.reset();
+
     vi.clearAllMocks();
   });
 
@@ -91,15 +100,16 @@ describe('BackgroundPreloader', () => {
     });
 
     it('should successfully preload address index', async () => {
+      const { devLog } = vi.mocked(await import('@lib/logger'));
       mockLoadAddressIndex.mockResolvedValue(MOCK_FLEXSEARCH_BUNDLE);
 
       await preloader.start();
 
       expect(mockLoadAddressIndex).toHaveBeenCalledOnce();
-      expect(console.log).toHaveBeenCalledWith(
+      expect(devLog).toHaveBeenCalledWith(
         '🚀 [Background Preloader] Starting aggressive address index preload...'
       );
-      expect(console.log).toHaveBeenCalledWith(
+      expect(devLog).toHaveBeenCalledWith(
         '✅ [Background Preloader] Address index preloaded in 1000ms'
       );
     });
@@ -147,12 +157,13 @@ describe('BackgroundPreloader', () => {
     });
 
     it('should log error during failed preload', async () => {
+      const { devWarn } = vi.mocked(await import('@lib/logger'));
       const testError = new Error('Network failure');
       mockLoadAddressIndex.mockRejectedValue(testError);
 
       await preloader.start();
 
-      expect(console.warn).toHaveBeenCalledWith(
+      expect(devWarn).toHaveBeenCalledWith(
         '⚠️ [Background Preloader] Preload failed:',
         'Network failure'
       );
@@ -305,6 +316,12 @@ describe('backgroundPreloader singleton', () => {
   it('should allow manual start operation', async () => {
     const mockLoadAddressIndex = vi.mocked(loadAddressIndex);
     mockLoadAddressIndex.mockResolvedValue(MOCK_FLEXSEARCH_BUNDLE);
+
+    // Reset singleton state to ensure clean test
+    backgroundPreloader.reset();
+
+    // Clear any previous mock calls
+    mockLoadAddressIndex.mockClear();
 
     await backgroundPreloader.start();
 

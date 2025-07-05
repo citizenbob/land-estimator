@@ -9,22 +9,20 @@ import {
 import userEvent from '@testing-library/user-event';
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import AddressInput from '@components/AddressInput/AddressInput';
-import { setupConsoleMocks, createAddressLookupMock } from '@lib/testUtils';
+import {
+  setupConsoleMocks,
+  createAddressLookupMock,
+  createMockFetch,
+  createMockApiRecordFactory
+} from '@lib/testUtils';
 import { MOCK_LOCAL_ADDRESSES } from '@lib/testData';
 
 vi.mock('@services/logger', () => ({
   logEvent: vi.fn()
 }));
 
-global.fetch = vi.fn();
-const mockFetch = global.fetch as ReturnType<typeof vi.fn>;
-
-const createMockApiRecord = (address: (typeof MOCK_LOCAL_ADDRESSES)[0]) => ({
-  id: address.id,
-  display_name: address.full_address,
-  region: address.region,
-  normalized: address.full_address.toLowerCase()
-});
+const mockFetch = createMockFetch();
+const createMockApiRecord = createMockApiRecordFactory();
 
 const setup = () => {
   render(<AddressInput />);
@@ -210,7 +208,7 @@ describe('AddressInput', () => {
     await waitFor(
       () => {
         expect(mockFetch).toHaveBeenCalledWith(
-          '/api/lookup?query=2323%20E%20Highland'
+          '/api/lookup?query=2323%20e%20highland'
         );
       },
       { timeout: 2000 }

@@ -346,7 +346,8 @@ if (typeof window !== 'undefined') {
     const registered = await serviceWorkerClient.register();
 
     if (registered) {
-      serviceWorkerClient.backgroundPreload();
+      // Disabled: backgroundPreload is handled by dedicated backgroundPreloader.ts
+      // serviceWorkerClient.backgroundPreload();
 
       setTimeout(async () => {
         try {

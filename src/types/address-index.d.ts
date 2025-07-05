@@ -102,6 +102,5 @@ declare module 'flexsearch' {
     }
   }
 
-  // Export the namespace as default
   export = FlexSearch;
 }

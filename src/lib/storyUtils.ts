@@ -1,3 +1,7 @@
+/**
+ * @fileoverview Storybook utility functions for consistent story creation and configuration
+ */
+
 import React from 'react';
 import type { Meta, StoryObj } from '@storybook/react';
 
