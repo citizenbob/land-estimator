@@ -7,7 +7,7 @@
     "cache": 100,
     "resolution": 3
   },
-  "files": [
+  "exportedFiles": [
     "address-v20250707-ba454a38-lookup.json",
     "address-v20250707-ba454a38-metadata.json"
   ],
