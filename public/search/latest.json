@@ -1,15 +1,15 @@
 {
-  "version": "v20250707-ba454a38",
-  "timestamp": "2025-07-07T03:53:27.059Z",
-  "recordCount": 3,
+  "version": "v20250708-3773b0a8",
+  "timestamp": "2025-07-08T21:56:06.163Z",
+  "recordCount": 1994,
   "config": {
     "tokenize": "forward",
     "cache": 100,
     "resolution": 3
   },
   "files": [
-    "address-v20250707-ba454a38-lookup.json",
-    "address-v20250707-ba454a38-metadata.json"
+    "address-v20250708-3773b0a8-lookup.json",
+    "address-v20250708-3773b0a8-metadata.json"
   ],
   "source": "flexsearch_builder"
 }

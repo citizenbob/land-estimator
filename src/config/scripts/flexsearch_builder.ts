@@ -32,9 +32,20 @@ const STATIC_OUTPUT = args.includes('--static');
 
 const TEMP_DIR = path.join(__dirname, 'temp');
 const TEMP_RAW_DIR = path.join(TEMP_DIR, 'raw');
-const OUTPUT_DIR = STATIC_OUTPUT
-  ? path.join(__dirname, '..', '..', '..', 'public', 'search')
-  : TEMP_DIR;
+const PUBLIC_SEARCH_DIR = path.join(
+  __dirname,
+  '..',
+  '..',
+  '..',
+  'public',
+  'search'
+);
+
+// For address index, use public/search if static mode is enabled
+const ADDRESS_OUTPUT_DIR = STATIC_OUTPUT ? PUBLIC_SEARCH_DIR : TEMP_DIR;
+
+// For parcel metadata and geometry, always use temp dir (never in public/search)
+const PARCEL_OUTPUT_DIR = TEMP_DIR;
 
 const FLEXSEARCH_CONFIG = {
   tokenize: 'forward',
@@ -112,7 +123,8 @@ class FlexSearchBuilder {
     console.log('🔍 FlexSearch Index Builder initialized');
     console.log(`📂 Temp directory: ${TEMP_DIR}`);
     console.log(`📥 Input directory: ${TEMP_RAW_DIR}`);
-    console.log(`📤 Output directory: ${OUTPUT_DIR}`);
+    console.log(`� Address output directory: ${ADDRESS_OUTPUT_DIR}`);
+    console.log(`📂 Parcel output directory: ${PARCEL_OUTPUT_DIR}`);
 
     if (NUKE_AND_PAVE) {
       console.log(
@@ -339,8 +351,12 @@ class FlexSearchBuilder {
       const compressed = zlib.gzipSync(Buffer.from(jsonString));
 
       // Ensure output directory exists
-      if (!fs.existsSync(OUTPUT_DIR)) {
-        fs.mkdirSync(OUTPUT_DIR, { recursive: true });
+      // Ensure both output directories exist
+      if (!fs.existsSync(ADDRESS_OUTPUT_DIR)) {
+        fs.mkdirSync(ADDRESS_OUTPUT_DIR, { recursive: true });
+      }
+      if (!fs.existsSync(PARCEL_OUTPUT_DIR)) {
+        fs.mkdirSync(PARCEL_OUTPUT_DIR, { recursive: true });
       }
 
       if (STATIC_OUTPUT) {
@@ -369,7 +385,7 @@ class FlexSearchBuilder {
 
         const lookupFilename = `address-${version}-lookup.json`;
         fs.writeFileSync(
-          path.join(OUTPUT_DIR, lookupFilename),
+          path.join(ADDRESS_OUTPUT_DIR, lookupFilename),
           JSON.stringify(lookupData),
           'utf8'
         );
@@ -386,7 +402,7 @@ class FlexSearchBuilder {
         };
 
         fs.writeFileSync(
-          path.join(OUTPUT_DIR, metadataFilename),
+          path.join(ADDRESS_OUTPUT_DIR, metadataFilename),
           JSON.stringify(metadata, null, 2),
           'utf8'
         );
@@ -402,12 +418,14 @@ class FlexSearchBuilder {
         };
 
         fs.writeFileSync(
-          path.join(OUTPUT_DIR, 'latest.json'),
+          path.join(ADDRESS_OUTPUT_DIR, 'latest.json'),
           JSON.stringify(latestManifest, null, 2),
           'utf8'
         );
 
-        console.log(`✅ Static files created in ${OUTPUT_DIR}`);
+        console.log(
+          `✅ Static address index files created in ${ADDRESS_OUTPUT_DIR}`
+        );
         console.log(
           `📁 Files: ${lookupFilename}, ${metadataFilename}, latest.json`
         );
@@ -419,7 +437,10 @@ class FlexSearchBuilder {
         );
       } else {
         // For CDN deployment, create compressed file
-        const compressedPath = path.join(OUTPUT_DIR, 'address-index.json.gz');
+        const compressedPath = path.join(
+          ADDRESS_OUTPUT_DIR,
+          'address-index.json.gz'
+        );
         fs.writeFileSync(compressedPath, compressed);
         this.stats.indexesBuilt.push('address-index.json.gz');
       }
@@ -524,7 +545,10 @@ class FlexSearchBuilder {
 
       const jsonString = JSON.stringify(metadataIndex);
       const compressed = zlib.gzipSync(Buffer.from(jsonString));
-      const compressedPath = path.join(OUTPUT_DIR, 'parcel-metadata.json.gz');
+      const compressedPath = path.join(
+        PARCEL_OUTPUT_DIR,
+        'parcel-metadata.json.gz'
+      );
       fs.writeFileSync(compressedPath, compressed);
 
       console.log(
@@ -576,7 +600,10 @@ class FlexSearchBuilder {
 
       const jsonString = JSON.stringify(geometryIndex);
       const compressed = zlib.gzipSync(Buffer.from(jsonString));
-      const compressedPath = path.join(OUTPUT_DIR, 'parcel-geometry.json.gz');
+      const compressedPath = path.join(
+        PARCEL_OUTPUT_DIR,
+        'parcel-geometry.json.gz'
+      );
       fs.writeFileSync(compressedPath, compressed);
 
       console.log(
@@ -630,7 +657,11 @@ class FlexSearchBuilder {
 
     console.log('\n📁 Output Files:');
     this.stats.indexesBuilt.forEach((file) => {
-      const filePath = path.join(OUTPUT_DIR, file);
+      // Check if it's an address file or parcel file and use appropriate directory
+      const isAddressFile = file.startsWith('address-');
+      const outputDir = isAddressFile ? ADDRESS_OUTPUT_DIR : PARCEL_OUTPUT_DIR;
+      const filePath = path.join(outputDir, file);
+
       if (fs.existsSync(filePath)) {
         const size = fs.statSync(filePath).size;
         console.log(`   ${file} (${Math.round(size / 1024)}KB)`);
