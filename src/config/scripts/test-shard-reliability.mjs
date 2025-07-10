@@ -89,6 +89,8 @@ const LOOKUP_DATA_SCHEMA = {
  */
 function validateSchema(data, schema, context = 'data') {
   const errors = [];
+  // context is available for future use in error messages
+  void context;
 
   function validateProperty(value, prop, path = '') {
     const currentPath = path ? `${path}.${prop.key || ''}` : prop.key || '';
@@ -729,6 +731,7 @@ function testShardExportImport(shard) {
 /**
  * JSON Schema validation for shard output
  */
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 function validateShardSchema(data, filename) {
   console.log(`🔍 Validating schema: ${filename}`);
 
@@ -807,6 +810,7 @@ function persistShardExports(
 /**
  * Hard fail on guardrail violations
  */
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 function enforceGuardrails(
   results,
   maxShardSize = 5120,
