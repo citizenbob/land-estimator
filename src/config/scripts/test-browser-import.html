@@ -1,0 +1,399 @@
+<!doctype html>
+<html>
+  <head>
+    <title>FlexSearch Browser Import Test</title>
+    <style>
+      body {
+        font-family: monospace;
+        padding: 20px;
+      }
+      .success {
+        color: green;
+      }
+      .error {
+        color: red;
+      }
+      .log {
+        margin: 5px 0;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>🔍 FlexSearch Browser Import Test</h1>
+    <div id="output"></div>
+
+    <script type="module">
+      import FlexSearch from 'https://cdn.skypack.dev/flexsearch@0.8.205';
+
+      const output = document.getElementById('output');
+
+      function log(message, isError = false) {
+        const div = document.createElement('div');
+        div.className = `log ${isError ? 'error' : 'success'}`;
+        div.textContent = message;
+        output.appendChild(div);
+        console.log(message);
+      }
+
+      async function testBrowserImport() {
+        log('🚀 Testing FlexSearch Document import in browser...');
+        log(`📦 FlexSearch version: ${FlexSearch.version || 'v0.8.205'}`);
+
+        try {
+          // Test with your exact PRODUCTION_CONFIG
+          const config = {
+            document: {
+              id: 'id',
+              index: ['content', 'category']
+            },
+            tokenize: 'full',
+            cache: 100,
+            resolution: 3,
+            threshold: 1,
+            depth: 2,
+            bidirectional: true,
+            suggest: true,
+            fastupdate: true
+          };
+
+          const index = new FlexSearch.Document(config);
+          log('✅ FlexSearch Document created with production config');
+
+          // Add test data
+          const testDocs = [
+            {
+              id: '1',
+              content: '123 Main Street St Louis MO',
+              category: 'residential'
+            },
+            {
+              id: '2',
+              content: '456 Oak Avenue Clayton MO',
+              category: 'commercial'
+            },
+            {
+              id: '3',
+              content: '789 Pine Road Chesterfield MO',
+              category: 'residential'
+            }
+          ];
+
+          testDocs.forEach((doc) => index.add(doc));
+          log(`✅ Added ${testDocs.length} test documents`);
+
+          // Test export with callback (your exact pattern)
+          const exportedParts = {};
+          let partCount = 0;
+
+          index.export((key, data) => {
+            // FlexSearch Document export: keep raw data as-is (arrays/objects)
+            exportedParts[key] = data; // DO NOT stringify - keep as raw JSON
+            partCount++;
+            log(
+              `  📤 Exported part: ${key} (${typeof data}, ${Array.isArray(data) ? 'array' : 'object'})`
+            );
+            return data;
+          });
+
+          log(`✅ Export completed: ${partCount} parts exported`);
+          log(`📊 Parts: ${Object.keys(exportedParts).join(', ')}`);
+
+          // Debug: check the structure we're importing
+          log(
+            `🔍 Import structure: {${Object.keys(exportedParts)
+              .map(
+                (k) =>
+                  `"${k}": ${Array.isArray(exportedParts[k]) ? 'array' : typeof exportedParts[k]}`
+              )
+              .join(', ')}}`
+          );
+
+          // Test import into new index with proper structure
+          const importIndex = new FlexSearch.Document(config);
+
+          try {
+            importIndex.import(exportedParts);
+            log('✅ Import completed successfully');
+          } catch (importError) {
+            log(`❌ Import failed: ${importError.message}`, true);
+            log(
+              `📋 Exported keys: ${JSON.stringify(Object.keys(exportedParts))}`,
+              true
+            );
+            log(
+              `📋 First part type: ${typeof Object.values(exportedParts)[0]}`,
+              true
+            );
+            throw importError;
+          }
+
+          // Test search functionality
+          const searchResults = importIndex.search('Main Street');
+          log(
+            `✅ Search test: found ${searchResults.length} results for "Main Street"`
+          );
+
+          if (searchResults.length > 0) {
+            log(`   🎯 First result ID: ${searchResults[0].result[0]}`);
+          }
+
+          // Test another search
+          const cityResults = importIndex.search('Clayton');
+          log(
+            `✅ Search test: found ${cityResults.length} results for "Clayton"`
+          );
+
+          log('🎉 All synthetic data tests passed!');
+        } catch (error) {
+          log(`❌ Synthetic test failed: ${error.message}`, true);
+          console.error('Full error:', error);
+        }
+      }
+
+      async function testProductionData() {
+        log('');
+        log('🏭 Testing with REAL production data...');
+
+        try {
+          // Load the latest manifest to get current lookup files
+          const manifestResponse = await fetch('./public/search/latest.json');
+          if (!manifestResponse.ok) {
+            throw new Error(
+              `Failed to load manifest: ${manifestResponse.status}`
+            );
+          }
+
+          const manifest = await manifestResponse.json();
+          log(
+            `✅ Loaded manifest with ${Object.keys(manifest.regions || {}).length} regions`
+          );
+
+          // Test with first available region
+          const regionKey = Object.keys(manifest.regions || {})[0];
+          if (!regionKey) {
+            throw new Error('No regions found in manifest');
+          }
+
+          const regionData = manifest.regions[regionKey];
+          log(`🌍 Testing region: ${regionKey} (${regionData.lookupFile})`);
+
+          // Load the lookup file
+          const lookupResponse = await fetch(
+            `./public/search/${regionData.lookupFile}`
+          );
+          if (!lookupResponse.ok) {
+            throw new Error(`Failed to load lookup: ${lookupResponse.status}`);
+          }
+
+          const lookupData = await lookupResponse.json();
+          log(
+            `✅ Loaded lookup data: ${lookupData.addressData?.length || 0} addresses`
+          );
+
+          if (!lookupData.addressData || lookupData.addressData.length === 0) {
+            throw new Error('No address data found in lookup file');
+          }
+
+          // Create index with production config
+          const config = {
+            document: {
+              id: 'id',
+              index: ['content', 'category']
+            },
+            tokenize: 'full',
+            cache: 100,
+            resolution: 3,
+            threshold: 1,
+            depth: 2,
+            bidirectional: true,
+            suggest: true,
+            fastupdate: true
+          };
+
+          const prodIndex = new FlexSearch.Document(config);
+
+          // Add real address data (first 10 for testing)
+          const testAddresses = lookupData.addressData.slice(0, 10);
+          testAddresses.forEach((addr, i) => {
+            prodIndex.add({
+              id: i.toString(),
+              content:
+                addr.formatted ||
+                addr.address ||
+                `${addr.street || ''} ${addr.city || ''}`.trim(),
+              category: 'address'
+            });
+          });
+
+          log(`✅ Added ${testAddresses.length} real addresses to index`);
+
+          // Test export/import cycle with real data
+          const prodExportedParts = {};
+          let prodPartCount = 0;
+
+          prodIndex.export((key, data) => {
+            // Keep raw JSON arrays/objects for FlexSearch Document import
+            prodExportedParts[key] = data; // DO NOT stringify - FlexSearch expects raw data
+            prodPartCount++;
+            return data;
+          });
+
+          log(`✅ Production export: ${prodPartCount} parts`);
+          log(`🔍 Prod parts: ${Object.keys(prodExportedParts).join(', ')}`);
+
+          // Import into new index with proper error handling
+          const prodImportIndex = new FlexSearch.Document(config);
+
+          try {
+            prodImportIndex.import(prodExportedParts);
+            log('✅ Production import completed');
+          } catch (prodImportError) {
+            log(
+              `❌ Production import failed: ${prodImportError.message}`,
+              true
+            );
+            log(
+              `📋 Part keys: ${JSON.stringify(Object.keys(prodExportedParts))}`,
+              true
+            );
+            throw prodImportError;
+          }
+
+          // Test search with real address data
+          const firstAddr = testAddresses[0];
+          const searchTerm =
+            firstAddr.city ||
+            (firstAddr.formatted || '').split(' ')[0] ||
+            'street';
+
+          const prodResults = prodImportIndex.search(searchTerm);
+          log(
+            `✅ Production search "${searchTerm}": ${prodResults.length} results`
+          );
+
+          log('🎉 All production data tests passed!');
+        } catch (error) {
+          log(`❌ Production test failed: ${error.message}`, true);
+          console.error('Full error:', error);
+        }
+      }
+
+      async function runAllTests() {
+        await testBrowserImport();
+        await testProductionData();
+        await testFlexSearchStructure();
+        log('');
+        log('🏁 All browser validation tests completed!');
+      }
+
+      async function testFlexSearchStructure() {
+        log('');
+        log('🔬 Testing FlexSearch Document structure in detail...');
+
+        try {
+          const config = {
+            document: {
+              id: 'id',
+              index: ['content', 'category']
+            },
+            tokenize: 'full',
+            cache: 100,
+            resolution: 3,
+            threshold: 1,
+            depth: 2,
+            bidirectional: true,
+            suggest: true,
+            fastupdate: true
+          };
+
+          const structIndex = new FlexSearch.Document(config);
+
+          // Add a few documents
+          const docs = [
+            {
+              id: 'a',
+              content: 'First document about cats',
+              category: 'animals'
+            },
+            {
+              id: 'b',
+              content: 'Second document about dogs',
+              category: 'animals'
+            },
+            {
+              id: 'c',
+              content: 'Third document about cars',
+              category: 'vehicles'
+            }
+          ];
+
+          docs.forEach((doc) => structIndex.add(doc));
+          log(`✅ Added ${docs.length} structured test documents`);
+
+          // Export and examine structure
+          const parts = {};
+          const partDetails = [];
+
+          structIndex.export((key, data) => {
+            // Keep raw data for proper FlexSearch import
+            parts[key] = data; // Store raw arrays/objects, not strings
+            const dataStr = JSON.stringify(data); // Only stringify for preview
+            partDetails.push({
+              key,
+              type: Array.isArray(data) ? 'array' : typeof data,
+              length: dataStr.length,
+              preview:
+                dataStr.substring(0, 50) + (dataStr.length > 50 ? '...' : '')
+            });
+            return data;
+          });
+
+          log(`🔍 Export structure analysis:`);
+          partDetails.forEach((detail) => {
+            log(`  📋 ${detail.key}: ${detail.type}, ${detail.length} chars`);
+            log(`      Preview: ${detail.preview}`);
+          });
+
+          // Test proper import structure
+          const correctImportStructure = {};
+          Object.keys(parts).forEach((key) => {
+            correctImportStructure[key] = parts[key];
+          });
+
+          log(
+            `✅ Import object structure: {${Object.keys(correctImportStructure)
+              .map(
+                (k) =>
+                  `"${k}": ${Array.isArray(correctImportStructure[k]) ? 'array' : typeof correctImportStructure[k]}`
+              )
+              .join(', ')}}`
+          );
+
+          // Test import
+          const newIndex = new FlexSearch.Document(config);
+          newIndex.import(correctImportStructure);
+          log('✅ Structured import successful');
+
+          // Verify search works
+          const catResults = newIndex.search('cats');
+          const carResults = newIndex.search('cars');
+
+          log(
+            `✅ Search validation: "cats" → ${catResults.length} results, "cars" → ${carResults.length} results`
+          );
+
+          if (catResults.length > 0) {
+            log(`   🎯 Cat result ID: ${catResults[0].result[0]}`);
+          }
+
+          log('🎉 FlexSearch Document structure test passed!');
+        } catch (error) {
+          log(`❌ Structure test failed: ${error.message}`, true);
+          console.error('Structure test error:', error);
+        }
+      }
+
+      runAllTests();
+    </script>
+  </body>
+</html>

@@ -1,15 +1,1 @@
-{
-  "version": "v20250708-3773b0a8",
-  "timestamp": "2025-07-08T21:56:06.163Z",
-  "recordCount": 1994,
-  "config": {
-    "tokenize": "forward",
-    "cache": 100,
-    "resolution": 3
-  },
-  "files": [
-    "address-v20250708-3773b0a8-lookup.json",
-    "address-v20250708-3773b0a8-metadata.json"
-  ],
-  "source": "flexsearch_builder"
-}
+{"regions":[{"region":"stl_city","version":"20250709-47f90aa5","document_file":"stl_city-20250709-47f90aa5-document.json","lookup_file":"stl_city-20250709-47f90aa5-lookup.json"},{"region":"stl_county","version":"20250709-47f90aa5","document_file":"stl_county-20250709-47f90aa5-document.json","lookup_file":"stl_county-20250709-47f90aa5-lookup.json"}],"metadata":{"generated_at":"2025-07-09T20:25:40.309290","version":"20250709-47f90aa5","total_regions":2,"source":"ingest_pipeline_document_mode"}}

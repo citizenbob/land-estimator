@@ -29,9 +29,9 @@ import gzip
 import tempfile
 import shutil
 import subprocess
-import argparse
 import tarfile
 import io
+import argparse
 from pathlib import Path
 from datetime import datetime
 from typing import Dict, List, Any, Optional
@@ -40,6 +40,7 @@ from collections import defaultdict
 # Third-party imports
 import pandas as pd
 import geopandas as gpd
+from shapely.geometry import Point
 from dbfread import DBF
 from cryptography.fernet import Fernet
 from dotenv import load_dotenv
@@ -49,30 +50,94 @@ from dotenv import load_dotenv
 current_dir = Path(__file__).parent
 sys.path.insert(0, str(current_dir))
 
-from upload_blob import BlobClient
-from firebase_backup_cdn import FirebaseBackupCDN
+# Inline blob client functionality
+class BlobClient:
+    """Inline Vercel Blob Storage client using Node.js subprocess"""
+    
+    def __init__(self):
+        self.uploader_script = Path(__file__).parent / "upload_blob.js"
+        
+        if not self.uploader_script.exists():
+            print("⚠️ upload_blob.js not found - blob uploads will fail")
+    
+    def upload_file(self, local_file_path, blob_path, content_type="application/json"):
+        """Upload a file to Vercel Blob Storage"""
+        try:
+            result = subprocess.run(
+                ["node", str(self.uploader_script), str(local_file_path), blob_path],
+                capture_output=True,
+                text=True,
+                timeout=120
+            )
+            
+            if result.returncode == 0:
+                stdout_lines = result.stdout.strip().split('\n')
+                last_line = stdout_lines[-1] if stdout_lines else ""
+                
+                try:
+                    response = json.loads(last_line)
+                    return response
+                except json.JSONDecodeError:
+                    for line in stdout_lines:
+                        if "Upload successful:" in line:
+                            url = line.split("Upload successful: ")[-1]
+                            return {"success": True, "url": url}
+                    return {"success": True, "url": "unknown"}
+            else:
+                print(f"❌ Blob upload failed: {result.stderr}")
+                return None
+                
+        except Exception as e:
+            print(f"❌ Blob upload error: {e}")
+            return None
+    
+    def list_files(self, prefix=None):
+        """List files in blob storage"""
+        try:
+            cmd = ["node", str(self.uploader_script), "--list"]
+            if prefix:
+                cmd.extend(["--prefix", prefix])
+                
+            result = subprocess.run(cmd, capture_output=True, text=True, timeout=60)
+            
+            if result.returncode == 0:
+                stdout_lines = result.stdout.strip().split('\n')
+                last_line = stdout_lines[-1] if stdout_lines else ""
+                try:
+                    return json.loads(last_line)
+                except json.JSONDecodeError:
+                    return {"blobs": []}
+            return {"blobs": []}
+            
+        except Exception as e:
+            print(f"❌ Blob list error: {e}")
+            return {"blobs": []}
+    
+    def delete_file(self, blob_path):
+        """Delete a file from blob storage"""
+        try:
+            result = subprocess.run(
+                ["node", str(self.uploader_script), "--delete", blob_path],
+                capture_output=True, 
+                text=True,
+                timeout=60
+            )
+            return result.returncode == 0
+        except Exception as e:
+            print(f"❌ Blob delete error: {e}")
+            return False
 
-project_root = Path(__file__).parent.parent.parent.parent
-env_path = project_root / '.env.local'
-
-if env_path.exists():
-    load_dotenv(env_path)
-    print(f"✅ Loaded environment variables from {env_path}")
-else:
-    print(f"⚠️ .env.local file not found at {env_path}")
-
-encryption_key = os.getenv('SHAPEFILE_ENCRYPTION_KEY')
-if not encryption_key:
-    print("❌ SHAPEFILE_ENCRYPTION_KEY not found in environment")
-    print("📍 Make sure .env.local contains the encryption key")
-else:
-    print("✅ Encryption key loaded successfully")
-
-current_dir = Path(__file__).parent
-sys.path.append(str(current_dir))
-
-from upload_blob import BlobClient
-from firebase_backup_cdn import FirebaseBackupCDN
+# Stub Firebase backup class (optional)
+class FirebaseBackupCDN:
+    """Stub Firebase backup - implement if needed"""
+    def __init__(self):
+        self.available = False
+        
+    def initialize(self):
+        return False
+        
+    def upload_file(self, local_path, remote_path):
+        return False
 
 class CDNStatusChecker:
     """Check existing index availability on Vercel and Firebase CDNs before building"""
@@ -107,7 +172,8 @@ class CDNStatusChecker:
         
         # Check Vercel connection
         try:
-            vercel_files = self.blob_client.list_files(prefix="cdn/")
+            vercel_response = self.blob_client.list_files(prefix="cdn/")
+            vercel_files = vercel_response.get("blobs", []) if isinstance(vercel_response, dict) else []
             status["vercel_available"] = True
             if verbose:
                 print(f"   ✅ Vercel connected ({len(vercel_files)} files)")
@@ -193,7 +259,12 @@ class CDNStatusChecker:
         if verbose:
             print(f"🔍 Analyzing {len(files)} Vercel files:")
         for file_info in files:
-            pathname = file_info.get('pathname', '')
+            # Handle both string and dict formats
+            if isinstance(file_info, dict):
+                pathname = file_info.get('pathname', '')
+            else:
+                pathname = str(file_info)
+                
             if verbose:
                 print(f"   📄 {pathname}")
             filename = pathname.replace('cdn/', '')
@@ -898,13 +969,31 @@ class ShapefileProcessor:
             
             centroid = row.geometry.centroid
             
+            # Transform centroid to WGS84 lat/lng if needed
+            if hasattr(row.geometry, 'crs') and row.geometry.crs and row.geometry.crs.to_epsg() != 4326:
+                # Create a GeoSeries with the centroid and transform it
+                centroid_gdf = gpd.GeoSeries([centroid], crs=row.geometry.crs)
+                centroid_wgs84 = centroid_gdf.to_crs(epsg=4326).iloc[0]
+                lat, lng = centroid_wgs84.y, centroid_wgs84.x
+            else:
+                # If no CRS or already WGS84, assume it's in UTM Zone 15N (common for Missouri)
+                # This handles the case where coordinates are clearly projected but CRS is missing
+                if abs(centroid.x) > 180 or abs(centroid.y) > 90:
+                    # Coordinates are clearly projected, assume UTM Zone 15N
+                    centroid_gdf = gpd.GeoSeries([centroid], crs='EPSG:26915')  # UTM Zone 15N
+                    centroid_wgs84 = centroid_gdf.to_crs(epsg=4326).iloc[0]
+                    lat, lng = centroid_wgs84.y, centroid_wgs84.x
+                else:
+                    # Already in WGS84 decimal degrees
+                    lat, lng = centroid.y, centroid.x
+            
             results.append({
                 "id": parcel_id,
                 "original_parcel_id": parcel_id,
                 "full_address": standardized_address,
                 "region": "St. Louis City",
-                "latitude": round(centroid.y, 6) if centroid else 0,
-                "longitude": round(centroid.x, 6) if centroid else 0,
+                "latitude": round(lat, 6) if centroid else 0,
+                "longitude": round(lng, 6) if centroid else 0,
                 "calc": {
                     "landarea_sqft": land_area,
                     "building_sqft": round(building_sqft, 2),
@@ -1036,13 +1125,31 @@ class ShapefileProcessor:
             
             centroid = row.geometry.centroid
             
+            # Transform centroid to WGS84 lat/lng if needed
+            if hasattr(row.geometry, 'crs') and row.geometry.crs and row.geometry.crs.to_epsg() != 4326:
+                # Create a GeoSeries with the centroid and transform it
+                centroid_gdf = gpd.GeoSeries([centroid], crs=row.geometry.crs)
+                centroid_wgs84 = centroid_gdf.to_crs(epsg=4326).iloc[0]
+                lat, lng = centroid_wgs84.y, centroid_wgs84.x
+            else:
+                # If no CRS or already WGS84, assume it's in UTM Zone 15N (common for Missouri)
+                # This handles the case where coordinates are clearly projected but CRS is missing
+                if abs(centroid.x) > 180 or abs(centroid.y) > 90:
+                    # Coordinates are clearly projected, assume UTM Zone 15N
+                    centroid_gdf = gpd.GeoSeries([centroid], crs='EPSG:26915')  # UTM Zone 15N
+                    centroid_wgs84 = centroid_gdf.to_crs(epsg=4326).iloc[0]
+                    lat, lng = centroid_wgs84.y, centroid_wgs84.x
+                else:
+                    # Already in WGS84 decimal degrees
+                    lat, lng = centroid.y, centroid.x
+            
             results.append({
                 "id": parcel_id,
                 "original_parcel_id": parcel_id,
                 "full_address": standardized_address,
                 "region": raw_municipality.title() if raw_municipality else "St. Louis County",
-                "latitude": round(centroid.y, 6) if centroid else 0,
-                "longitude": round(centroid.x, 6) if centroid else 0,
+                "latitude": round(lat, 6) if centroid else 0,
+                "longitude": round(lng, 6) if centroid else 0,
                 "calc": {
                     "landarea_sqft": land_area,
                     "building_sqft": round(building_sqft, 2),
@@ -1239,7 +1346,8 @@ class IngestPipeline:
             "cleanup_completed": False,
             "local_shapefiles_used": False,
             "firebase_backup_success": False,
-            "version_manifest_created": False
+            "version_manifest_created": False,
+            "cold_storage_uploads": 0
         }
         
         print("🚀 IngestPipeline initialized with full CDN integration")
@@ -1513,204 +1621,263 @@ class IngestPipeline:
             self.stats["files_created"].append(str(county_file))
             print(f"✅ Created {county_file.name}: {len(county_data)} county parcels")
         
-        print("\n📋 Creating unified index files...")
-        index_files = self._create_unified_indexes(city_data, county_data, city_geometry, county_geometry)
+        print("\n📋 Creating regional index files...")
+        index_files = self._create_regional_indexes(city_data, county_data, city_geometry, county_geometry)
         
         return processed_files + index_files
     
-    def _create_unified_indexes(self, city_data: List[Dict], county_data: List[Dict], 
-                              city_geometry: Dict, county_geometry: Dict) -> List[Path]:
-        """Create unified search and metadata indexes"""
-        all_data = city_data + county_data
-        if not all_data:
+    def _create_regional_indexes(self, city_data: List[Dict], county_data: List[Dict], 
+                               city_geometry: Dict, county_geometry: Dict) -> List[Path]:
+        """Create FlexSearch Document Mode bundles: document.json and lookup.json for each region"""
+        if not city_data and not county_data:
             print("⚠️ No data to create indexes from")
             return []
         
-        search_addresses = []
-        metadata_records = {}
-        geometry_index = {}
-        
-        for record in all_data:
-            search_addresses.append({
-                "display_name": record["full_address"],
-                "parcel_id": record["id"],
-                "region": record["region"],
-                "latitude": record["latitude"],
-                "longitude": record["longitude"]
-            })
-            
-            original_id = record["original_parcel_id"]
-            if original_id not in metadata_records:
-                metadata_records[original_id] = {
-                    "id": original_id,
-                    "primary_full_address": record["full_address"],
-                    "latitude": record["latitude"],
-                    "longitude": record["longitude"],
-                    "region": record["region"],
-                    "calc": {
-                        "landarea": record["calc"]["landarea_sqft"],
-                        "building_sqft": record["calc"]["building_sqft"],
-                        "estimated_landscapable_area": record["calc"]["estimated_landscapable_area_sqft"],
-                        "property_type": record["calc"]["property_type"]
-                    },
-                    "owner": {
-                        "name": record.get("owner", {}).get("name", "")
-                    },
-                    "affluence_score": record.get("affluence_score", 0)
-                }
-        
-        all_geometry = {}
-        all_geometry.update(city_geometry)
-        all_geometry.update(county_geometry)
-        
-        for original_id in metadata_records.keys():
-            if original_id in all_geometry:
-                geometry_index[original_id] = all_geometry[original_id]
-        
-        metadata_list = list(metadata_records.values())
-        
+        print("\n📋 Creating FlexSearch Document Mode bundles with versioned naming...")
         index_files = []
         
-        address_index_data = {
-            "addresses": search_addresses,
+        # Create output directory in src/data/tmp (final destination)
+        data_tmp_dir = self.project_root / "src" / "data" / "tmp"
+        data_tmp_dir.mkdir(parents=True, exist_ok=True)
+        
+        # Generate version suffix for this run
+        timestamp = datetime.now().strftime("%Y%m%d")
+        version_hash = f"{hash(str(timestamp + self.current_version)) & 0xffffffff:08x}"[-8:]
+        version_suffix = f"{timestamp}-{version_hash}"
+        
+        # Process each region separately with FlexSearch Document Mode
+        regions = [
+            ("stl_city", city_data, city_geometry),
+            ("stl_county", county_data, county_geometry)
+        ]
+        
+        for region_name, region_data, region_geometry in regions:
+            if not region_data:
+                print(f"⚠️ No data for {region_name}, skipping...")
+                continue
+                
+            print(f"\n🏗️ Building {region_name} FlexSearch Document Mode bundles...")
+            
+            # Create FlexSearch Document Mode array: simple id + full_address pairs
+            documents = []
+            lookup_index = {}
+            
+            for record in region_data:
+                # FlexSearch Document Mode: each document is just id + searchable text
+                documents.append({
+                    "id": record["id"],
+                    "full_address": record["full_address"]
+                })
+                
+                # Lookup index: everything else mapped by ID
+                original_id = record["original_parcel_id"]
+                if original_id not in lookup_index:
+                    lookup_record = {
+                        "region": record["region"],
+                        "latitude": record["latitude"],
+                        "longitude": record["longitude"],
+                        "calc": {
+                            "landarea": record["calc"]["landarea_sqft"],
+                            "building_sqft": record["calc"]["building_sqft"],
+                            "estimated_landscapable_area": record["calc"]["estimated_landscapable_area_sqft"],
+                            "property_type": record["calc"]["property_type"]
+                        },
+                        "owner": {
+                            "name": record.get("owner", {}).get("name", "")
+                        },
+                        "affluence_score": record.get("affluence_score", 0)
+                    }
+                    
+                    # Include geometry directly in lookup if available
+                    if original_id in region_geometry:
+                        lookup_record["geometry"] = region_geometry[original_id]
+                    
+                    lookup_index[original_id] = lookup_record
+            
+            # Write FlexSearch Document Mode file: region-VERSION-document.json
+            document_file = data_tmp_dir / f"{region_name}-{version_suffix}-document.json"
+            with open(document_file, 'w', encoding='utf-8') as f:
+                json.dump(documents, f, separators=(',', ':'))
+            index_files.append(document_file)
+            self.stats["files_created"].append(str(document_file))
+            print(f"✅ Created {region_name}-{version_suffix}-document.json: {len(documents):,} documents")
+            
+            # Write lookup file: region-VERSION-lookup.json
+            lookup_file = data_tmp_dir / f"{region_name}-{version_suffix}-lookup.json"
+            with open(lookup_file, 'w', encoding='utf-8') as f:
+                json.dump(lookup_index, f, separators=(',', ':'))
+            index_files.append(lookup_file)
+            self.stats["files_created"].append(str(lookup_file))
+            print(f"✅ Created {region_name}-{version_suffix}-lookup.json: {len(lookup_index):,} lookups")
+        
+        # Create latest.json manifest 
+        regions_info = []
+        for region_name, region_data, _ in regions:
+            if region_data:
+                regions_info.append({
+                    "region": region_name,
+                    "version": version_suffix,
+                    "document_file": f"{region_name}-{version_suffix}-document.json",
+                    "lookup_file": f"{region_name}-{version_suffix}-lookup.json"
+                })
+        
+        latest_manifest = {
+            "regions": regions_info,
             "metadata": {
-                "total_addresses": len(search_addresses),
-                "build_time": datetime.now().isoformat(),
-                "source": "ingest_pipeline_unified",
-                "version": "1.0"
+                "generated_at": datetime.now().isoformat(),
+                "version": version_suffix,
+                "total_regions": len(regions_info),
+                "source": "ingest_pipeline_document_mode"
             }
         }
         
-        address_index_file = self.temp_raw_dir / "address_index.json"
-        with open(address_index_file, 'w', encoding='utf-8') as f:
-            json.dump(address_index_data, f, separators=(',', ':'))
-        index_files.append(address_index_file)
-        self.stats["files_created"].append(str(address_index_file))
-        print(f"✅ Created address_index.json: {len(search_addresses):,} addresses")
+        latest_file = data_tmp_dir / "latest.json"
+        with open(latest_file, 'w', encoding='utf-8') as f:
+            json.dump(latest_manifest, f, separators=(',', ':'))
+        index_files.append(latest_file)
+        self.stats["files_created"].append(str(latest_file))
+        print(f"✅ Created latest.json manifest: {len(regions_info)} regions")
         
-        metadata_file = self.temp_raw_dir / "parcel_metadata_index.json"
-        parcel_data = {
-            "parcels": metadata_list,
-            "metadata": {
-                "total_parcels": len(metadata_list),
-                "build_time": datetime.now().isoformat(),
-                "source": "ingest_pipeline_unified",
-                "version": "1.0"
-            }
-        }
-        with open(metadata_file, 'w', encoding='utf-8') as f:
-            json.dump(parcel_data, f, separators=(',', ':'))
-        index_files.append(metadata_file)
-        self.stats["files_created"].append(str(metadata_file))
-        print(f"✅ Created parcel_metadata_index.json: {len(metadata_list):,} parcels")
-        
-        if geometry_index:
-            geometry_file = self.temp_raw_dir / "parcel_geometry_index.json"
-            with open(geometry_file, 'w', encoding='utf-8') as f:
-                json.dump(geometry_index, f, separators=(',', ':'))
-            index_files.append(geometry_file)
-            self.stats["files_created"].append(str(geometry_file))
-            print(f"✅ Created parcel_geometry_index.json: {len(geometry_index):,} geometries")
-        
-        self.stats["total_addresses"] = len(search_addresses)
-        self.stats["total_parcels"] = len(metadata_list)
+        # Update stats with total counts
+        self.stats["total_addresses"] = len(city_data) + len(county_data)
+        self.stats["total_parcels"] = len(city_data) + len(county_data)
         
         return index_files
     
-    def step_2_upload_integration_data(self, processed_files: List[Path]):
-        """Step 2: Upload regional processed files to integration bucket"""
+    def step_2_upload_integration_data_DEPRECATED(self, processed_files: List[Path]):
+        """Step 2: Upload regional processed files to integration bucket (DEPRECATED - replaced by cold storage)"""
         print("\n" + "="*60)
         print("2️⃣ SKIPPING INTEGRATION UPLOAD (EPHEMERAL PROCESSING)")
         print("="*60)
         
         print("✅ Keeping all intermediate files local per Claude.md contract")
         
-        # Copy files to data/tmp directory for next step
-        data_tmp_dir = self.project_root / "data" / "tmp"
+        # Copy files to src/data/tmp directory for next step
+        data_tmp_dir = self.project_root / "src" / "data" / "tmp"
         data_tmp_dir.mkdir(parents=True, exist_ok=True)
         
         for file_path in processed_files:
             if file_path.name.endswith("_index.json"):
-                # Copy only index files to data/tmp
+                # Copy only index files to src/data/tmp
                 dest_path = data_tmp_dir / file_path.name
                 shutil.copy2(file_path, dest_path)
                 print(f"✅ Copied {file_path.name} to {dest_path}")
                 self.stats["files_created"].append(str(dest_path))
     
-    def step_3_build_flexsearch_indexes(self):
-        """Step 3: Build FlexSearch indexes using TypeScript"""
+    def step_2_upload_cold_storage(self) -> bool:
+        """Step 2: Upload regional document and lookup files to CDN storage"""
         print("\n" + "="*60)
-        print("3️⃣ BUILDING FLEXSEARCH INDEXES")
+        print("2️⃣ UPLOADING REGIONAL DOCUMENT & LOOKUP FILES")
         print("="*60)
         
-        builder_script = self.scripts_dir / "flexsearch_builder.ts"
+        # Define regional files to upload from src/data/tmp directory
+        data_tmp_dir = self.project_root / "src" / "data" / "tmp"
+        cold_storage_files = []
         
-        if not builder_script.exists():
-            self.stats["errors"].append("FlexSearch builder script not found")
+        # Find all document and lookup files
+        document_files = list(data_tmp_dir.glob("*-document.json"))
+        lookup_files = list(data_tmp_dir.glob("*-lookup.json"))
+        manifest_files = list(data_tmp_dir.glob("latest.json"))
+        
+        for file_path in document_files:
+            cold_storage_files.append((file_path, "document"))
+        for file_path in lookup_files:
+            cold_storage_files.append((file_path, "lookup"))
+        for file_path in manifest_files:
+            cold_storage_files.append((file_path, "manifest"))
+        
+        if not cold_storage_files:
+            print("⚠️ No FlexSearch document/lookup files found to upload")
             return False
+        
+        print(f"📋 Found {len(cold_storage_files)} FlexSearch files to upload")
+        
+        upload_success = True
+        uploaded_files = []
         
         try:
-            print("🔍 Running FlexSearch builder (TypeScript)...")
-            print(f"📂 Working directory: {self.scripts_dir}")
-            print(f"📂 Expected input dir: {self.temp_raw_dir}")
-            print(f"📂 Expected output dir: {self.temp_dir}")
-            
-            result = subprocess.run(
-                ["npx", "tsx", str(builder_script), "--static"],
-                cwd=str(self.scripts_dir),
-                capture_output=True,
-                text=True,
-                timeout=600
-            )
-            
-            if result.returncode == 0:
-                print("✅ FlexSearch indexes built successfully")
-                print("📋 Builder output:")
-                print(result.stdout)
+            for file_path, file_type in cold_storage_files:
+                print(f"\n🔄 Processing {file_path.name}...")
                 
-                expected_files = [
-                    "address-index.json.gz",
-                    "parcel-metadata.json.gz",
-                    "parcel-geometry.json.gz"
-                ]
+                # For FlexSearch files, serve raw JSON (not compressed) for browser compatibility
+                cdn_filename = f"search/{file_path.name}"
                 
-                for filename in expected_files:
-                    file_path = self.temp_dir / filename
-                    if file_path.exists():
-                        self.stats["files_created"].append(str(file_path))
-                        print(f"✅ Created {filename} at {file_path}")
+                # Upload to Vercel Blob Storage (CDN)
+                try:
+                    blob_result = self.blob_client.upload_file(
+                        str(file_path),
+                        cdn_filename,
+                        "application/json"
+                    )
+
+                    if blob_result and blob_result.get('success'):
+                        print(f"✅ Uploaded to Vercel Blob: {cdn_filename}")
+                        uploaded_files.append({
+                            "type": file_type,
+                            "filename": cdn_filename,
+                            "url": blob_result.get('url'),
+                            "size": file_path.stat().st_size
+                        })
                     else:
-                        print(f"⚠️  Missing {filename} at {file_path}")
-                
-                # Also check if files were created in unexpected locations
-                print("🔍 Checking for files in other locations...")
-                check_locations = [
-                    self.scripts_dir,
-                    self.project_root / "src",
-                    Path.cwd()
-                ]
-                
-                for location in check_locations:
-                    for filename in expected_files:
-                        unexpected_file = location / filename
-                        if unexpected_file.exists() and unexpected_file != self.temp_dir / filename:
-                            print(f"⚠️  Found {filename} in unexpected location: {unexpected_file}")
-                
-                return True
-            else:
-                print("❌ FlexSearch builder failed")
-                print("Error output:", result.stderr)
-                self.stats["errors"].append(f"FlexSearch build failed: {result.stderr}")
-                return False
-                
-        except subprocess.TimeoutExpired:
-            print("❌ FlexSearch builder timed out")
-            self.stats["errors"].append("FlexSearch builder timed out")
-            return False
+                        print(f"⚠️ Failed to upload {file_path.name} to Vercel Blob")
+                        upload_success = False
+
+                except Exception as e:
+                    print(f"❌ Error uploading {file_path.name} to Vercel Blob: {e}")
+                    upload_success = False
+
+                # Upload to Firebase (backup)
+                try:
+                    firebase_path = f"search/{file_path.name}"
+                    firebase_result = self.firebase_backup.upload_file(
+                        str(file_path),
+                        firebase_path
+                    )
+
+                    if firebase_result:
+                        print(f"✅ Uploaded to Firebase: {firebase_path}")
+                    else:
+                        print(f"⚠️ Failed to upload {file_path.name} to Firebase")
+
+                except Exception as e:
+                    print(f"❌ Error uploading {file_path.name} to Firebase: {e}")
+            
+            print(f"\n✅ FlexSearch upload completed - {len(uploaded_files)} files uploaded")
+            self.stats["cold_storage_uploads"] = len(uploaded_files)
+            
+            return upload_success
+            
         except Exception as e:
-            print(f"❌ Error running FlexSearch builder: {e}")
-            self.stats["errors"].append(f"FlexSearch builder error: {e}")
+            print(f"❌ Critical error during FlexSearch upload: {e}")
+            self.stats["errors"].append(f"FlexSearch upload failed: {e}")
             return False
+    
+    def step_3_build_flexsearch_indexes(self):
+        """Step 3: FlexSearch indexes are now built directly in Python during step 1"""
+        print("\n" + "="*60)
+        print("3️⃣ FLEXSEARCH INDEXES BUILT IN PYTHON")
+        print("="*60)
+        
+        print("✅ FlexSearch Document Mode bundles already created in step 1")
+        print("� Files created:")
+        
+        # List the document and lookup files created
+        data_tmp_dir = self.project_root / "src" / "data" / "tmp"
+        document_files = list(data_tmp_dir.glob("*-document.json"))
+        lookup_files = list(data_tmp_dir.glob("*-lookup.json"))
+        manifest_files = list(data_tmp_dir.glob("latest.json"))
+        
+        for file_path in document_files:
+            print(f"   ✅ {file_path.name}")
+        for file_path in lookup_files:
+            print(f"   ✅ {file_path.name}")
+        for file_path in manifest_files:
+            print(f"   ✅ {file_path.name}")
+        
+        total_files = len(document_files) + len(lookup_files) + len(manifest_files)
+        print(f"\n📊 Total FlexSearch files ready: {total_files}")
+        
+        return total_files > 0
     
     def get_package_version(self) -> str:
         """Get version from package.json"""
@@ -1742,53 +1909,106 @@ class IngestPipeline:
             print(f"⚠️  Error listing existing CDN versions: {e}")
             return []
     
-    def cleanup_old_cdn_versions(self, current_version: str):
-        """Keep only current and previous CDN versions"""
-        print("\n🧹 Cleaning up old CDN versions...")
+    def cleanup_old_cdn_versions(self, keep_versions: int = 3):
+        """Clean up old CDN versions, keeping only the latest N versions"""
+        print(f"\n🧹 Cleaning up old CDN versions (keeping latest {keep_versions})...")
         
         try:
-            existing_versions = self.list_existing_cdn_versions()
-            print(f"📋 Found existing versions: {existing_versions}")
+            # Get all files in CDN directory
+            vercel_response = self.blob_client.list_files(prefix="cdn/")
+            vercel_files = vercel_response.get("blobs", []) if isinstance(vercel_response, dict) else []
+            firebase_files = []
             
-            if len(existing_versions) <= 2:
-                print("✅ Only current and/or previous version exist, no cleanup needed")
+            # Try to get Firebase files if the method exists
+            if hasattr(self.firebase_backup, 'list_files'):
+                firebase_files = self.firebase_backup.list_files(prefix="cdn/")
+            else:
+                print("   ℹ️  Firebase list_files method not available, skipping Firebase cleanup")
+            
+            # Extract version information from filenames
+            version_files = {}
+            
+            for file_info in vercel_files:
+                # Handle both string and dict formats
+                if isinstance(file_info, dict):
+                    filename = file_info.get('pathname', '')
+                else:
+                    filename = str(file_info)
+                    
+                # Look for versioned files like stl_city-parcel_metadata-20250708-abc123.json.gz
+                match = re.search(r'-(\d{8}-\w{6,8})\.json\.gz$', filename)
+                if match:
+                    version = match.group(1)
+                    if version not in version_files:
+                        version_files[version] = {'vercel': [], 'firebase': []}
+                    version_files[version]['vercel'].append(filename)
+            
+            for file_info in firebase_files:
+                filename = file_info.get('name', '')
+                match = re.search(r'-(\d{8}-\w{6,8})\.json\.gz$', filename)
+                if match:
+                    version = match.group(1)
+                    if version not in version_files:
+                        version_files[version] = {'vercel': [], 'firebase': []}
+                    version_files[version]['firebase'].append(filename)
+            
+            # Sort versions by date (newest first)
+            sorted_versions = sorted(version_files.keys(), reverse=True)
+            
+            print(f"📋 Found {len(sorted_versions)} versions: {sorted_versions}")
+            
+            if len(sorted_versions) <= keep_versions:
+                print(f"✅ Only {len(sorted_versions)} versions found, no cleanup needed")
                 return
             
-            versions_to_delete = existing_versions[:-2] if current_version in existing_versions else existing_versions[:-1]
+            # Delete old versions
+            versions_to_delete = sorted_versions[keep_versions:]
+            print(f"🗑️  Deleting {len(versions_to_delete)} old versions: {versions_to_delete}")
             
-            if not versions_to_delete:
-                print("✅ No old versions to clean up")
-                return
-            
-            print(f"🗑️  Deleting old versions: {versions_to_delete}")
-            
+            deleted_count = 0
             for version in versions_to_delete:
-                filenames = [
-                    f"cdn/address-index-v{version}.json.gz",
-                    f"cdn/parcel-metadata-v{version}.json.gz",
-                    f"cdn/parcel-geometry-v{version}.json.gz"
-                ]
+                print(f"\n🗑️  Cleaning up version: {version}")
                 
-                for filename in filenames:
+                # Delete from Vercel Blob
+                for filename in version_files[version]['vercel']:
                     try:
                         result = self.blob_client.delete_file(filename)
                         if result:
-                            print(f"🗑️  Deleted {filename}")
+                            print(f"   ✅ Deleted from Vercel: {filename}")
+                            deleted_count += 1
                         else:
-                            print(f"⚠️  Could not delete {filename} (may not exist)")
+                            print(f"   ⚠️ Failed to delete from Vercel: {filename}")
                     except Exception as e:
-                        print(f"⚠️  Error deleting {filename}: {e}")
+                        print(f"   ❌ Error deleting from Vercel {filename}: {e}")
+                
+                # Delete from Firebase
+                for filename in version_files[version]['firebase']:
+                    try:
+                        if hasattr(self.firebase_backup, 'delete_file'):
+                            result = self.firebase_backup.delete_file(filename)
+                            if result:
+                                print(f"   ✅ Deleted from Firebase: {filename}")
+                                deleted_count += 1
+                            else:
+                                print(f"   ⚠️ Failed to delete from Firebase: {filename}")
+                        else:
+                            print(f"   ℹ️  Firebase delete_file method not available")
+                    except Exception as e:
+                        print(f"   ❌ Error deleting from Firebase {filename}: {e}")
+            
+            print(f"\n✅ Cleanup completed - deleted {deleted_count} files from {len(versions_to_delete)} old versions")
             
         except Exception as e:
             print(f"❌ Error during CDN cleanup: {e}")
             self.stats["errors"].append(f"CDN cleanup error: {e}")
-    
+
     def cleanup_non_versioned_cdn_files(self):
         """Remove any non-versioned files from CDN directory to ensure only versioned files exist"""
         print("\n🧹 Cleaning up non-versioned CDN files...")
         
         try:
-            files = self.blob_client.list_files(prefix="cdn/")
+            files_response = self.blob_client.list_files(prefix="cdn/")
+            files = files_response.get("blobs", []) if isinstance(files_response, dict) else []
             
             non_versioned_files = []
             versioned_files = []
@@ -1796,7 +2016,12 @@ class IngestPipeline:
             legacy_files = []
             
             for file_info in files:
-                filename = file_info['pathname']
+                # Handle both string and dict formats
+                if isinstance(file_info, dict):
+                    filename = file_info.get('pathname', '')
+                else:
+                    filename = str(file_info)
+                    
                 base_name = filename.replace('cdn/', '')
                 
                 if not base_name or base_name == '':
@@ -1916,74 +2141,89 @@ class IngestPipeline:
             self.stats["errors"].append(f"Version manifest error: {e}")
     
     def step_4_upload_cdn_files(self):
-        """Step 4: Upload versioned files to CDN with Firebase backup and manifest generation"""
+        """Step 4: Upload versioned regional parcel files to CDN with Firebase backup"""
         print("\n" + "="*60)
         print("4️⃣ UPLOADING VERSIONED FILES TO CDN WITH BACKUP")
         print("="*60)
         
-        # Address index files are already in /public/search directly from the FlexSearch builder (--static flag)
-        # We don't need to copy them separately
+        # Address index files are already in /public/search from the FlexSearch builder
+        # Now upload regional parcel metadata and geometry files to CDN
+        print("\n📤 Uploading regional parcel metadata and geometry files to CDN (with Firebase backup)...")
         
-        # Now upload only parcel metadata and geometry files to cold storage (CDN/Firebase) for backup/production
-        print("\n📤 Uploading parcel metadata and geometry files to cold storage (CDN/Firebase)...")
+        # Find all regional parcel metadata and geometry files
+        data_tmp_dir = self.project_root / "src" / "data" / "tmp"
+        regional_files = []
         
-        # Files to upload to CDN (only parcel metadata and geometry)
-        files_to_upload = [
-            self.temp_dir / "parcel-metadata.json.gz",
-            self.temp_dir / "parcel-geometry.json.gz"
-        ]
+        for pattern in ["*-parcel_metadata.json", "*-parcel_geometry.json"]:
+            for file_path in data_tmp_dir.glob(pattern):
+                regional_files.append(file_path)
         
-        # Make sure we're not uploading the address index
-        address_index_path = self.temp_dir / "address-index.json.gz"
+        if not regional_files:
+            print("⚠️ No regional parcel files found to upload")
+            return True
         
-        # Upload to Blob Storage (CDN) with versioning
+        # Create compressed versions and upload
         uploaded_count = 0
         timestamp = datetime.now().strftime("%Y%m%d")
         version_hash = f"{hash(str(timestamp)) & 0xffffffff:08x}"[-8:]
-        
-        # Track uploaded files for manifest
         uploaded_files = {}
         
-        for source_file in files_to_upload:
-            if not source_file.exists():
-                print(f"⚠️ Missing file: {source_file.name}")
-                continue
+        for source_file in regional_files:
+            print(f"📦 Compressing {source_file.name}...")
+            
+            # Create compressed version
+            compressed_file = self.temp_dir / f"{source_file.name}.gz"
+            try:
+                with open(source_file, 'rb') as f_in:
+                    with gzip.open(compressed_file, 'wb') as f_out:
+                        f_out.write(f_in.read())
                 
-            # Create versioned remote path
-            base_name = source_file.stem.split('.')[0]  # Get name without .json.gz
-            remote_name = f"{base_name}-v{timestamp}-{version_hash}.json.gz"
-            remote_path = f"cdn/{remote_name}"
-            
-            # Upload to primary CDN
-            if hasattr(self, 'blob_client') and self.blob_client:
-                try:
-                    result = self.blob_client.upload_file(source_file, remote_path)
-                    if result and 'url' in result:
-                        print(f"✅ Uploaded to CDN: {remote_path}")
-                        self.stats["files_uploaded"].append(remote_path)
-                        self.stats["upload_urls"][remote_path] = result['url']
-                        uploaded_files[base_name] = {
-                            "url": result['url'],
-                            "filename": remote_name,
-                            "size": source_file.stat().st_size,
-                            "timestamp": datetime.now().isoformat()
-                        }
-                        uploaded_count += 1
-                    else:
-                        print(f"❌ Failed to upload to CDN: {remote_path}")
-                except Exception as e:
-                    print(f"❌ CDN upload error for {remote_path}: {e}")
-            
-            # Backup to Firebase Storage
-            if hasattr(self, 'firebase_backup') and self.firebase_backup:
-                try:
-                    result = self.firebase_backup.upload_file(source_file, remote_path)
-                    if result:
-                        print(f"✅ Backed up to Firebase: {remote_path}")
-                    else:
-                        print(f"⚠️ Firebase backup failed for {remote_path}")
-                except Exception as e:
-                    print(f"❌ Firebase backup error for {remote_path}: {e}")
+                print(f"✅ Compressed {source_file.name} → {compressed_file.name}")
+                
+                # Create versioned remote path
+                base_name = source_file.stem  # e.g., "stl_city-parcel_metadata"
+                remote_name = f"{base_name}-v{timestamp}-{version_hash}.json.gz"
+                remote_path = f"cdn/{remote_name}"
+                
+                # Upload to primary CDN
+                if hasattr(self, 'blob_client') and self.blob_client:
+                    try:
+                        result = self.blob_client.upload_file(compressed_file, remote_path)
+                        if result and 'url' in result:
+                            print(f"✅ Uploaded to CDN: {remote_path}")
+                            self.stats["files_uploaded"].append(remote_path)
+                            self.stats["upload_urls"][remote_path] = result['url']
+                            uploaded_files[base_name] = {
+                                "url": result['url'],
+                                "filename": remote_name,
+                                "size": compressed_file.stat().st_size,
+                                "timestamp": datetime.now().isoformat(),
+                                "original_size": source_file.stat().st_size,
+                                "compression_ratio": f"{compressed_file.stat().st_size / source_file.stat().st_size:.2%}"
+                            }
+                            uploaded_count += 1
+                        else:
+                            print(f"❌ Failed to upload to CDN: {remote_path}")
+                    except Exception as e:
+                        print(f"❌ CDN upload error for {remote_path}: {e}")
+                
+                # Backup to Firebase Storage
+                if hasattr(self, 'firebase_backup') and self.firebase_backup:
+                    try:
+                        result = self.firebase_backup.upload_file(compressed_file, remote_path)
+                        if result:
+                            print(f"✅ Backed up to Firebase: {remote_path}")
+                        else:
+                            print(f"⚠️ Firebase backup failed for {remote_path}")
+                    except Exception as e:
+                        print(f"❌ Firebase backup error for {remote_path}: {e}")
+                
+                # Clean up compressed file
+                compressed_file.unlink()
+                
+            except Exception as e:
+                print(f"❌ Error compressing {source_file.name}: {e}")
+                continue
         
         # Generate and upload manifest if files were uploaded
         if uploaded_files:
@@ -2023,343 +2263,13 @@ class IngestPipeline:
                 except Exception as e:
                     print(f"❌ Firebase manifest backup error: {e}")
         
-        print(f"\n📊 Uploaded {uploaded_count}/{len(files_to_upload)} parcel files to cold storage")
+        print(f"\n📊 Uploaded {uploaded_count}/{len(regional_files)} parcel files to CDN")
+        
+        # Clean up old versions after successful uploads
+        if uploaded_count > 0:
+            self.cleanup_old_cdn_versions(keep_versions=3)
         
         return uploaded_count > 0
-        
-        print("🔍 Verifying file sizes for large dataset...")
-        size_check_passed = True
-        
-        for filename in expected_files:
-            file_path = self.temp_dir / filename
-            
-            if not file_path.exists():
-                print(f"⚠️  Missing file: {filename}")
-                size_check_passed = False
-                continue
-                
-            file_size = file_path.stat().st_size
-            min_size = min_file_sizes.get(filename, 0)
-            
-            print(f"📊 {filename}: {file_size:,} bytes (min: {min_size:,})")
-            
-            if file_size < min_size:
-                print(f"❌ File {filename} is too small ({file_size:,} < {min_size:,} bytes)")
-                print(f"   This suggests incomplete data processing")
-                size_check_passed = False
-            else:
-                print(f"✅ {filename} size verification passed")
-        
-        if not size_check_passed:
-            print("❌ File size verification failed - not uploading to CDN")
-            print("📍 This prevents uploading incomplete indexes to production")
-            self.stats["errors"].append("File size verification failed for CDN upload")
-            return False
-        
-        # Test Vercel connection first before attempting uploads
-        print(f"\n🔍 Testing Vercel Blob Storage connection...")
-        vercel_available = False
-        try:
-            # Test with a simple list operation
-            test_files = self.blob_client.list_files(prefix="cdn/")
-            vercel_available = True
-            print(f"✅ Vercel connection successful ({len(test_files)} files in cdn/)")
-        except Exception as e:
-            error_message = str(e)
-            if "suspended" in error_message.lower():
-                print(f"⚠️ Vercel Blob Storage is suspended - skipping Vercel uploads")
-                print(f"📍 Will rely on Firebase backup CDN instead")
-                vercel_available = False
-            else:
-                print(f"⚠️ Vercel connection failed: {e}")
-                vercel_available = False
-        
-        # Upload versioned files to Vercel Blob Storage (only if available)
-        vercel_success = True
-        if vercel_available:
-            print(f"\n📤 Uploading files to Vercel Blob Storage (version: {self.current_version})")
-            
-            for filename in expected_files:
-                file_path = self.temp_dir / filename
-                
-                if not file_path.exists():
-                    print(f"⚠️  Skipping missing file: {filename}")
-                    continue
-                
-                base_name = filename.replace('.json.gz', '')
-                versioned_filename = f"{base_name}-{self.current_version}.json.gz"
-                blob_path = f"cdn/{versioned_filename}"
-                
-                print(f"📤 Uploading {filename} to {blob_path}")
-                
-                result = self.blob_client.upload_file(file_path, blob_path)
-                if result:
-                    self.stats["files_uploaded"].append(blob_path)
-                    self.stats["upload_urls"][blob_path] = result.get('url', '')
-                    print(f"✅ Uploaded {blob_path}")
-                    print(f"🌐 CDN URL: {result.get('url', 'No URL returned')}")
-                else:
-                    self.stats["errors"].append(f"Failed to upload {blob_path}")
-                    print(f"❌ Failed to upload {blob_path}")
-                    vercel_success = False
-        else:
-            print(f"\n⚠️ Skipping Vercel uploads - service unavailable")
-            print(f"📍 Proceeding with Firebase backup only")
-            vercel_success = False  # Mark as failed since we couldn't upload
-        
-        # Upload to Firebase backup CDN (if available)
-        firebase_success = self._upload_to_firebase_backup(expected_files)
-        
-        # Generate and upload version manifest
-        manifest_success = self._generate_and_upload_version_manifest()
-        
-        # Clean up old versions
-        self._cleanup_old_cdn_versions()
-        
-        overall_success = vercel_success and manifest_success
-        if firebase_success:
-            self.stats["firebase_backup_success"] = True
-            print("✅ Firebase backup completed successfully")
-        else:
-            print("⚠️ Firebase backup failed or unavailable")
-            
-        if overall_success:
-            print(f"✅ CDN upload completed successfully for version {self.current_version}")
-        else:
-            print(f"❌ CDN upload had errors for version {self.current_version}")
-            
-        return overall_success
-    
-    def _upload_to_firebase_backup(self, expected_files: List[str]) -> bool:
-        """Upload files to Firebase Storage as backup CDN"""
-        if not self.firebase_initialized:
-            print("⚠️ Firebase backup unavailable - skipping backup upload")
-            return False
-            
-        print(f"\n🔥 Uploading files to Firebase backup CDN (version: {self.current_version})")
-        backup_success = True
-        
-        for filename in expected_files:
-            file_path = self.temp_dir / filename
-            
-            if not file_path.exists():
-                continue
-                
-            base_name = filename.replace('.json.gz', '')
-            versioned_filename = f"{base_name}-{self.current_version}.json.gz"
-            firebase_path = f"cdn/{versioned_filename}"
-            
-            print(f"🔥 Uploading {filename} to Firebase: {firebase_path}")
-            
-            try:
-                result = self.firebase_backup.upload_file(str(file_path), firebase_path)
-                if result:
-                    self.stats["backup_urls"][firebase_path] = result.get('download_url', '')
-                    print(f"✅ Firebase backup: {firebase_path}")
-                else:
-                    print(f"❌ Firebase backup failed: {firebase_path}")
-                    backup_success = False
-            except Exception as e:
-                print(f"❌ Firebase backup error for {firebase_path}: {e}")
-                backup_success = False
-                
-        return backup_success
-    
-    def _generate_and_upload_version_manifest(self) -> bool:
-        """Generate and upload version manifest to both CDNs"""
-        print(f"\n📋 Generating version manifest for {self.current_version}")
-        
-        try:
-            # Create version manifest
-            manifest = {
-                "generated_at": datetime.now().isoformat(),
-                "current": {
-                    "version": self.current_version,
-                    "files": {
-                        "parcel_metadata": f"cdn/parcel-metadata-{self.current_version}.json.gz",
-                        "parcel_geometry": f"cdn/parcel-geometry-{self.current_version}.json.gz"
-                    },
-                    "note": "Address index is client-side only and not stored in cold storage"
-                },
-                "previous": None,  # Will be populated by the app when it detects version changes
-                "available_versions": [self.current_version],
-                "dataset_info": {
-                    "size": self.dataset_size,
-                    "total_addresses": self.stats.get("total_addresses", 0),
-                    "total_parcels": self.stats.get("total_parcels", 0),
-                    "local_shapefiles_used": self.stats.get("local_shapefiles_used", False)
-                }
-            }
-            
-            # Write manifest to temp file
-            manifest_path = self.temp_dir / "version-manifest.json"
-            with open(manifest_path, 'w') as f:
-                json.dump(manifest, f, indent=2)
-            
-            print(f"📝 Created version manifest: {manifest_path}")
-            
-            # Upload to Vercel Blob Storage
-            vercel_result = self.blob_client.upload_file(manifest_path, "cdn/version-manifest.json")
-            vercel_success = bool(vercel_result)
-            
-            if vercel_success:
-                print("✅ Uploaded version manifest to Vercel Blob Storage")
-                self.stats["upload_urls"]["version-manifest"] = vercel_result.get('url', '')
-            else:
-                print("❌ Failed to upload version manifest to Vercel")
-                
-            # Upload to Firebase backup (if available)
-            firebase_success = True
-            if self.firebase_initialized:
-                try:
-                    firebase_result = self.firebase_backup.upload_file(str(manifest_path), "cdn/version-manifest.json")
-                    if firebase_result:
-                        print("✅ Uploaded version manifest to Firebase backup")
-                        self.stats["backup_urls"]["version-manifest"] = firebase_result.get('download_url', '')
-                    else:
-                        print("❌ Failed to upload version manifest to Firebase")
-                        firebase_success = False
-                except Exception as e:
-                    print(f"❌ Firebase manifest upload error: {e}")
-                    firebase_success = False
-            
-            self.stats["version_manifest_created"] = vercel_success
-            return vercel_success
-            
-        except Exception as e:
-            print(f"❌ Error generating version manifest: {e}")
-            self.stats["errors"].append(f"Version manifest error: {e}")
-            return False
-    
-    def _cleanup_old_cdn_versions(self):
-        """Clean up old versions from CDN (keep last 3 versions)"""
-        print(f"\n🧹 Cleaning up old CDN versions")
-        
-        try:
-            # This would need to be implemented based on your blob storage capabilities
-            # For now, just log that cleanup would happen
-            print("📍 Old version cleanup would happen here (keeping last 3 versions)")
-            print("📍 Implementation depends on blob storage list/delete capabilities")
-            
-        except Exception as e:
-            print(f"⚠️ Error during version cleanup: {e}")
-            self.stats["errors"].append(f"Version cleanup error: {e}")
-    
-    def step_5_cleanup(self):
-        """Step 5: Clean up temporary files"""
-        print("\n" + "="*60)
-        print("5️⃣ CLEANING UP TEMPORARY FILES")
-        print("="*60)
-        
-        cleanup_success = True
-        
-        try:
-            if self.temp_dir.exists():
-                print(f"🗑️  Removing temp directory: {self.temp_dir}")
-                print(f"📊 Directory size before cleanup: {self._get_directory_size(self.temp_dir)}")
-                
-                # List what's being removed
-                files_to_remove = list(self.temp_dir.rglob('*'))
-                print(f"📁 Files to remove: {len(files_to_remove)}")
-                
-                shutil.rmtree(self.temp_dir)
-                
-                # Verify removal
-                if not self.temp_dir.exists():
-                    self.stats["cleanup_completed"] = True
-                    print(f"✅ Successfully cleaned up temp directory")
-                else:
-                    print(f"⚠️  Temp directory still exists after cleanup attempt")
-                    cleanup_success = False
-            else:
-                print("⚠️  Temp directory does not exist - nothing to clean up")
-                self.stats["cleanup_completed"] = True
-                
-        except PermissionError as e:
-            print(f"❌ Permission error during cleanup: {e}")
-            print(f"💡 You may need to manually remove: {self.temp_dir}")
-            self.stats["errors"].append(f"Cleanup permission error: {e}")
-            cleanup_success = False
-        except Exception as e:
-            print(f"❌ Unexpected error during cleanup: {e}")
-            self.stats["errors"].append(f"Cleanup error: {e}")
-            cleanup_success = False
-        
-        if not cleanup_success:
-            print(f"\n💡 To manually clean up temp files, run:")
-            print(f"   rm -rf {self.temp_dir}")
-    
-    def _get_directory_size(self, path: Path) -> str:
-        """Get human-readable directory size"""
-        try:
-            total_size = sum(f.stat().st_size for f in path.rglob('*') if f.is_file())
-            if total_size < 1024:
-                return f"{total_size} B"
-            elif total_size < 1024 * 1024:
-                return f"{total_size / 1024:.1f} KB"
-            else:
-                return f"{total_size / (1024 * 1024):.1f} MB"
-        except Exception:
-            return "unknown"
-    
-    def generate_report(self):
-        """Generate final pipeline report"""
-        print("\n" + "="*60)
-        print("📊 PIPELINE EXECUTION REPORT")
-        print("="*60)
-        
-        end_time = datetime.now()
-        duration = end_time - self.stats["start_time"]
-        
-        print(f"⏱️  Total runtime: {duration}")
-        print(f"📊 Dataset size: {self.stats['dataset_size']}")
-        print(f"🏷️  Version: {self.stats['version_suffix'] or 'default'}")
-        print(f"📍 Total addresses processed: {self.stats['total_addresses']:,}")
-        print(f"🏠 Total parcels processed: {self.stats['total_parcels']:,}")
-        print(f"📁 Files created: {len(self.stats['files_created'])}")
-        print(f"📤 Files uploaded: {len(self.stats['files_uploaded'])}")
-        print(f"🧹 Cleanup completed: {self.stats['cleanup_completed']}")
-        
-        if hasattr(self, 'shapefile_processor'):
-            stats = self.shapefile_processor.address_stats
-            print(f"\n📋 Address Processing Details:")
-            print(f"   City records processed: {stats['city_records_processed']:,}")
-            print(f"   City records valid: {stats['city_records_valid']:,}")
-            print(f"   County records processed: {stats['county_records_processed']:,}")
-            print(f"   County records valid: {stats['county_records_valid']:,}")
-            print(f"   Total valid addresses: {stats['valid_addresses']:,}")
-            print(f"   Standardization failures: {stats['standardization_failure']:,}")
-            print(f"   Invalid ZIP codes: {stats['invalid_zip']:,}")
-            print(f"   PO boxes skipped: {stats['po_box']:,}")
-        
-        if self.stats["errors"]:
-            print(f"\n❌ Errors encountered: {len(self.stats['errors'])}")
-            for error in self.stats["errors"]:
-                print(f"   • {error}")
-        
-        print(f"\n🌐 Uploaded URLs:")
-        for path, url in self.stats["upload_urls"].items():
-            print(f"   {path}: {url}")
-        
-        print("\n✅ Pipeline completed successfully!" if not self.stats["errors"] else "\n⚠️ Pipeline completed with errors")
-        
-        # Always print CDN status summary at the end
-        print("\n" + "="*60)
-        print("📡 FINAL CDN STATUS SUMMARY")
-        print("="*60)
-        
-        # Get current CDN status and print the status lights
-        try:
-            final_cdn_status = self.cdn_checker.check_cdn_status()
-            
-            # Add transfer status information from this pipeline run
-            final_cdn_status["vercel_transfer_attempted"] = len([url for url in self.stats["upload_urls"] if "vercel" in url.lower()]) > 0
-            final_cdn_status["firebase_transfer_attempted"] = self.stats.get("firebase_backup_success", False)
-            
-            self.cdn_checker.print_status_lights(final_cdn_status)
-        except Exception as e:
-            print(f"⚠️ Could not check CDN status: {e}")
-            print("📡 CDN status check failed - manual verification recommended")
     
     def run_intelligent_pipeline(self):
         """Run the complete ingestion pipeline with local-only processing"""
@@ -2381,73 +2291,6 @@ class IngestPipeline:
             # Generate report
             self.generate_report()
     
-    def _verify_existing_indexes(self, source: str, version: str):
-        """Verify that existing indexes are accessible and properly formatted"""
-        print(f"\n🔍 Verifying existing {source} indexes (version: {version})")
-        
-        index_files = [
-            f"address-index-{version}.json.gz",
-            f"parcel-metadata-{version}.json.gz",
-            f"parcel-geometry-{version}.json.gz"
-        ]
-        
-        verification_passed = True
-        for filename in index_files:
-            try:
-                if source == "vercel":
-                    # Test download from Vercel
-                    url = f"https://lchevt1wkhcax7cz.public.blob.vercel-storage.com/cdn/{filename}"
-                    # You could add actual verification here
-                    print(f"✅ {filename} accessible at {url}")
-                elif source == "firebase":
-                    # Test download from Firebase
-                    print(f"✅ {filename} accessible in Firebase")
-                    
-            except Exception as e:
-                print(f"❌ {filename} verification failed: {e}")
-                verification_passed = False
-                
-        if verification_passed:
-            print("✅ All indexes verified successfully")
-            self.stats["verification_completed"] = True
-        else:
-            print("⚠️ Index verification failed - consider rebuild")
-            self.stats["errors"].append("Index verification failed")
-    
-    def _sync_firebase_to_vercel(self, version: str):
-        """Download indexes from Firebase and upload to Vercel primary CDN"""
-        print(f"\n🔄 Syncing Firebase backup to Vercel primary (version: {version})")
-        
-        index_files = [
-            f"address-index-{version}.json.gz",
-            f"parcel-metadata-{version}.json.gz", 
-            f"parcel-geometry-{version}.json.gz"
-        ]
-        
-        sync_success = True
-        for filename in index_files:
-            try:
-                # Download from Firebase
-                print(f"📥 Downloading {filename} from Firebase backup...")
-                # Implementation would go here
-                
-                # Upload to Vercel
-                print(f"📤 Uploading {filename} to Vercel primary...")
-                # Implementation would go here
-                
-                print(f"✅ Synced {filename}")
-                
-            except Exception as e:
-                print(f"❌ Failed to sync {filename}: {e}")
-                sync_success = False
-                
-        if sync_success:
-            print("✅ Firebase → Vercel sync completed successfully")
-            self.stats["sync_completed"] = True
-        else:
-            print("⚠️ Sync failed - falling back to full rebuild")
-            self._execute_full_rebuild()
-    
     def _execute_full_rebuild(self):
         """Execute the full rebuild pipeline when no usable indexes exist"""
         print("\n🏗️ Executing full rebuild from local shapefiles")
@@ -2463,11 +2306,10 @@ class IngestPipeline:
         # Step 1: Process regional data (keep local only)
         processed_files = self.step_1_process_regional_data()
         
-        # Step 2: Skip integration upload - keep everything ephemeral
-        print("\n" + "="*60)
-        print("2️⃣ SKIPPING INTEGRATION UPLOAD (EPHEMERAL PROCESSING)")
-        print("="*60)
-        print("✅ Keeping all intermediate files local per Claude.md contract")
+        # Step 2: Upload regional cold storage files (metadata and geometry)
+        cold_storage_success = self.step_2_upload_cold_storage()
+        if not cold_storage_success:
+            print("⚠️ Cold storage upload had issues, but continuing with pipeline")
         
         # Step 3: Build FlexSearch indexes
         flexsearch_success = self.step_3_build_flexsearch_indexes()
@@ -2542,46 +2384,42 @@ class IngestPipeline:
         self.run_intelligent_pipeline()
 
     def _copy_to_public_search(self):
-        """Copy only the address index FlexSearch file to public/search directory for client-side use"""
+        """Copy regional address index files to public/search directory for client-side use"""
         public_search_dir = self.project_root / "public" / "search"
         public_search_dir.mkdir(parents=True, exist_ok=True)
         
-        # Files to copy - only the address index should go to public/search
+        # Regional files to copy - only the address index files should go to public/search
         # Parcel metadata and geometry should only be in cold storage
-        source_files = [
-            self.temp_dir / "address-index.json.gz"
+        regional_files = [
+            "saint_louis_city-address_index.json",
+            "saint_louis_county-address_index.json"
         ]
         
-        print(f"\n📋 Copying address index to public/search for client-side use...")
+        print(f"\n📋 Copying regional address index files to public/search for client-side use...")
         
         copied_count = 0
-        for source_file in source_files:
+        for filename in regional_files:
+            source_file = self.temp_raw_dir / filename
             if source_file.exists():
-                # Generate a timestamp-based name (without .gz)
-                timestamp = datetime.now().strftime("%Y%m%d")
-                filename_hash = hash(str(source_file) + str(datetime.now()))
-                short_hash = f"{filename_hash & 0xffffffff:08x}"[-8:]
+                # Copy directly with the same name (no timestamp/hash needed for regional files)
+                dest_path = public_search_dir / filename
                 
-                base_name = source_file.stem.split('.')[0]  # Get name without .json.gz
-                dest_filename = f"{base_name}-v{timestamp}-{short_hash}.json"
-                dest_path = public_search_dir / dest_filename
-                
-                # Copy and decompress
                 try:
-                    with gzip.open(source_file, 'rb') as f_in:
-                        content = f_in.read()
-                        with open(dest_path, 'wb') as f_out:
-                            f_out.write(content)
-                    
+                    shutil.copy2(source_file, dest_path)
                     copied_count += 1
-                    print(f"✅ Copied and decompressed {source_file.name} to {dest_path}")
+                    print(f"✅ Copied {filename} to {dest_path}")
                 except Exception as e:
-                    print(f"❌ Error copying {source_file.name}: {e}")
+                    print(f"❌ Error copying {filename}: {e}")
+            else:
+                print(f"⚠️ Source file not found: {source_file}")
                     
-        # Create a basic version manifest
+        # Create a basic version manifest for regional files
         version_manifest = {
             "timestamp": datetime.now().isoformat(),
-            "version": f"v{datetime.now().strftime('%Y%m%d')}"
+            "version": f"v{datetime.now().strftime('%Y%m%d')}",
+            "type": "regional_sharded",
+            "regions": ["saint_louis_city", "saint_louis_county"],
+            "files_copied": copied_count
         }
         
         manifest_path = public_search_dir / "version-manifest-dev.json"
@@ -2592,38 +2430,87 @@ class IngestPipeline:
         except Exception as e:
             print(f"❌ Error creating version manifest: {e}")
         
-        print(f"📊 Copied {copied_count}/{len(source_files)} files to {public_search_dir}")
+        print(f"📊 Copied {copied_count}/{len(regional_files)} files to {public_search_dir}")
         return copied_count > 0
-def main():
-    """Main entry point"""
-    # Load environment variables from .env.local
-    load_dotenv('.env.local')
     
-    parser = argparse.ArgumentParser(description="Land Estimator Data Ingest Pipeline")
-    parser.add_argument(
-        "--dataset-size",
-        choices=["small", "medium", "large"],
-        default="small",
-        help="Dataset size: small (100), medium (1000), large (all records)"
-    )
-    parser.add_argument(
-        "--version",
-        default="",
-        help="Version suffix for uploaded files (e.g., '_v2', '_test')"
-    )
+    def step_5_cleanup(self):
+        """Clean up temp directories"""
+        try:
+            if self.temp_dir.exists():
+                shutil.rmtree(self.temp_dir)
+                print(f"🧹 Cleaned up {self.temp_dir}")
+            if self.temp_raw_dir.exists():
+                shutil.rmtree(self.temp_raw_dir)
+                print(f"🧹 Cleaned up {self.temp_raw_dir}")
+            self.stats["cleanup_completed"] = True
+        except Exception as e:
+            print(f"⚠️ Cleanup failed: {e}")
+            self.stats["cleanup_completed"] = False
+
+    def generate_report(self):
+        """Generate and print a summary report of the pipeline execution"""
+        print("\n============================================================")
+        print("📊 PIPELINE EXECUTION SUMMARY")
+        print("============================================================")
+        
+        # Execution time
+        end_time = datetime.now()
+        execution_time = end_time - self.stats.get("start_time", end_time)
+        print(f"⏱️  Execution Time: {execution_time}")
+        
+        # Basic stats
+        print(f"📊 Dataset Size: {self.stats.get('dataset_size', 'unknown')}")
+        print(f"🏷️  Version: {self.stats.get('current_version', 'unknown')}")
+        print(f"📍 Total Addresses: {self.stats.get('total_addresses', 0)}")
+        print(f"📦 Total Parcels: {self.stats.get('total_parcels', 0)}")
+        
+        # File statistics
+        files_created = self.stats.get('files_created', [])
+        files_uploaded = self.stats.get('files_uploaded', [])
+        print(f"📄 Files Created: {len(files_created)}")
+        print(f"☁️  Files Uploaded: {len(files_uploaded)}")
+        print(f"❄️  Cold Storage Uploads: {self.stats.get('cold_storage_uploads', 0)}")
+        
+        # Processing flags
+        print(f"🏠 Local Shapefiles Used: {self.stats.get('local_shapefiles_used', False)}")
+        print(f"🔥 Firebase Backup Success: {self.stats.get('firebase_backup_success', False)}")
+        print(f"📝 Version Manifest Created: {self.stats.get('version_manifest_created', False)}")
+        print(f"🧹 Cleanup Completed: {self.stats.get('cleanup_completed', False)}")
+        
+        # Address processing stats (if available from processor)
+        if hasattr(self, 'shapefile_processor') and hasattr(self.shapefile_processor, 'address_stats'):
+            print("\n🏠 Address Processing Statistics:")
+            for key, value in self.shapefile_processor.address_stats.items():
+                formatted_key = key.replace('_', ' ').title()
+                print(f"   {formatted_key}: {value}")
+        
+        # Errors (if any)
+        errors = self.stats.get('errors', [])
+        if errors:
+            print(f"\n⚠️  Errors Encountered ({len(errors)}):")
+            for i, error in enumerate(errors, 1):
+                print(f"   {i}. {error}")
+        else:
+            print("\n✅ No errors encountered")
+        
+        print("\n✅ Pipeline execution summary complete")
+        
+if __name__ == "__main__":
+    # Parse command line arguments
+    parser = argparse.ArgumentParser(description='Ingest shapefile data and build search indexes')
+    parser.add_argument('--dataset-size', choices=['small', 'medium', 'large'], 
+                        default='small', help='Size of dataset to process')
+    parser.add_argument('--version', type=str, default='', 
+                        help='Version suffix for output files')
     
     args = parser.parse_args()
     
-    print("🌟 Land Estimator Data Ingest Pipeline - INTELLIGENT MODE")
-    print("="*50)
+    print("🚀 Starting Regional Ingest Pipeline")
     print(f"📊 Dataset size: {args.dataset_size}")
-    print(f"📦 Version: {args.version or 'default'}")
-    print("🧠 CDN-aware execution - checking existing indexes first")
-    print("="*50)
+    print(f"🏷️  Version suffix: {args.version or 'auto-generated'}")
     
-    pipeline = IngestPipeline(dataset_size=args.dataset_size, version=args.version)
-    pipeline.run_intelligent_pipeline()
-
-
-if __name__ == "__main__":
-    main()
+    try:
+        pipeline = IngestPipeline(dataset_size=args.dataset_size, version=args.version)
+        pipeline.run_full_pipeline()
+    except Exception as e:
+        print(f"❌ Pipeline failed with error: {e}")

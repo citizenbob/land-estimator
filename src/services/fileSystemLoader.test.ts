@@ -46,11 +46,6 @@ describe('fileSystemLoader', () => {
 
   const mockLookupData: AddressLookupData = {
     parcelIds: ['12345', '67890', '11111'],
-    searchStrings: [
-      '123 Main St 12345',
-      '456 Oak Ave 67890',
-      '789 Pine Rd 11111'
-    ],
     addressData: {
       '12345': '123 Main St',
       '67890': '456 Oak Ave',

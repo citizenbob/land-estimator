@@ -92,7 +92,6 @@ declare module 'flexsearch' {
 
     interface AddressLookupData {
       parcelIds: string[];
-      searchStrings: string[];
       addressData: Record<string, string>;
     }
 

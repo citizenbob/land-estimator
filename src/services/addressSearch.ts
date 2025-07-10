@@ -1,6 +1,20 @@
-import { loadAddressIndex } from '@services/loadAddressIndex';
-import { createNetworkError, logError } from '@lib/errorUtils';
-import type { FlexSearchIndexBundle } from '@app-types';
+/**
+ * Client-Only Address Search - Static FlexSearch Implementation
+ *
+ * Following canonical instructions:
+ * - Load static FlexSearch index once
+ * - Pure client-side typeahead search
+ * - Zero runtime rebuilds, instant results
+ * - No SSR complexity
+ *
+ * See refactor.instructions.md for pipeline rules
+ */
+
+import {
+  loadAddressIndex,
+  type FlexSearchIndexBundle
+} from '@services/loadAddressIndex';
+import { logError } from '@lib/errorUtils';
 
 export interface AddressLookupRecord {
   id: string;
@@ -9,19 +23,18 @@ export interface AddressLookupRecord {
   normalized: string;
 }
 
+// Global cache for client-only operation
 let addressSearchBundle: FlexSearchIndexBundle | null = null;
 
 /**
- * Resets the cached address search bundle (for testing purposes)
+ * Reset cached search bundle (for testing)
  */
 export function resetAddressSearchCache(): void {
   addressSearchBundle = null;
 }
 
 /**
- * Normalizes search query by removing punctuation and converting to lowercase.
- * @param {string} query - Raw search query
- * @returns {string} Normalized query string
+ * Normalize search query for optimal FlexSearch results
  */
 function normalizeQuery(query: string): string {
   return query
@@ -32,21 +45,15 @@ function normalizeQuery(query: string): string {
 }
 
 /**
- * Extracts region from display name using common Missouri patterns.
- * @param {string} displayName - Full address display name
- * @returns {string} Extracted region or 'Unknown'
+ * Extract region from address (Missouri-specific patterns)
  */
 function extractRegion(displayName: string): string {
   const regionMatch = displayName.match(/, ([^,]+), MO/);
-  return regionMatch ? regionMatch[1] : 'Unknown';
+  return regionMatch ? regionMatch[1] : 'Missouri';
 }
 
 /**
- * Converts search results to standardized address lookup records.
- * @param {number[]} searchResults - Array of search result indices
- * @param {FlexSearchIndexBundle} bundle - Search bundle with lookup data
- * @param {number} limit - Maximum number of results to return
- * @returns {AddressLookupRecord[]} Array of formatted address records
+ * Convert FlexSearch results to standardized address records
  */
 function formatSearchResults(
   searchResults: number[],
@@ -69,63 +76,66 @@ function formatSearchResults(
 }
 
 /**
- * Searches addresses using precomputed search index.
- * In browser: Calls /api/lookup endpoint
- * On server: Uses in-memory search index
+ * Client-Only Address Search with Static FlexSearch Index
  *
- * @param {string} query - Search query string (minimum 2 characters)
- * @param {number} [limit=10] - Maximum number of results to return
- * @returns {Promise<AddressLookupRecord[]>} Array of matching address records
+ * Following canonical instructions:
+ * - Load static index once on first search
+ * - Pure client-side operation (no API calls)
+ * - Instant typeahead results
+ * - Zero rebuilds at runtime
+ *
+ * @param query - Search query string (minimum 2 characters)
+ * @param limit - Maximum number of results to return (default: 10)
+ * @returns Promise<AddressLookupRecord[]> - Array of matching address records
  */
 export async function searchAddresses(
   query: string,
   limit: number = 10
 ): Promise<AddressLookupRecord[]> {
+  // Quick validation
   if (!query || query.trim().length < 2) {
     return [];
   }
 
   try {
+    // Load static index on first search (cached thereafter)
     if (!addressSearchBundle) {
-      console.log('🔍 Loading address index for local search...');
+      console.log('🔍 Loading static FlexSearch index...');
+      const loadStart = performance.now();
+
       addressSearchBundle = await loadAddressIndex();
-    }
 
-    if (addressSearchBundle) {
-      console.log('⚡ Using local FlexSearch index for instant search');
-      const normalizedQuery = normalizeQuery(query);
-      const searchResults = addressSearchBundle.index.search(normalizedQuery, {
-        bool: 'and',
-        limit
-      }) as number[];
-
-      return formatSearchResults(searchResults, addressSearchBundle, limit);
-    }
-
-    if (typeof window !== 'undefined') {
-      console.log('🌐 Falling back to API lookup...');
-      const response = await fetch(
-        `/api/lookup?query=${encodeURIComponent(query.trim())}`
+      const loadTime = performance.now() - loadStart;
+      console.log(`✅ Static index loaded in ${loadTime.toFixed(2)}ms`);
+      console.log(
+        `📊 Ready to search ${addressSearchBundle.parcelIds.length.toLocaleString()} addresses`
       );
-      if (!response.ok) {
-        throw createNetworkError(
-          `Failed to fetch address suggestions: ${response.status} ${response.statusText}`,
-          { status: response.status, statusText: response.statusText }
-        );
-      }
-      const { results } = await response.json();
-      return results;
     }
 
-    throw new Error(
-      'Failed to load address search bundle - no fallback available'
+    // Perform instant client-side search
+    console.log('⚡ Performing instant client-side search');
+    const searchStart = performance.now();
+
+    const normalizedQuery = normalizeQuery(query);
+    const searchResults = addressSearchBundle.index.search(normalizedQuery, {
+      bool: 'and',
+      limit
+    }) as number[];
+
+    const searchTime = performance.now() - searchStart;
+    console.log(
+      `� Found ${searchResults.length} results in ${searchTime.toFixed(2)}ms`
     );
+
+    return formatSearchResults(searchResults, addressSearchBundle, limit);
   } catch (error) {
     logError(error, {
-      operation: 'address_search',
+      operation: 'client_address_search',
       query,
       limit
     });
+
+    console.error('❌ Client-side address search failed:', error);
     return [];
   }
 }
