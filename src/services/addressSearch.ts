@@ -54,14 +54,16 @@ function extractRegion(displayName: string): string {
 
 /**
  * Convert FlexSearch results to standardized address records
+ * Updated for Document Mode: searchResults are document IDs, not array indices
  */
 function formatSearchResults(
-  searchResults: number[],
+  searchResults: string[],
   bundle: FlexSearchIndexBundle,
   limit: number
 ): AddressLookupRecord[] {
-  return searchResults.slice(0, limit).map((index) => {
-    const parcelId = bundle.parcelIds[index];
+  return searchResults.slice(0, limit).map((docId) => {
+    // In Document Mode, results are already parcel IDs
+    const parcelId = docId;
     const displayName = bundle.addressData[parcelId] || 'Unknown Address';
     const region = extractRegion(displayName);
     const normalized = normalizeQuery(displayName);
@@ -117,14 +119,15 @@ export async function searchAddresses(
     const searchStart = performance.now();
 
     const normalizedQuery = normalizeQuery(query);
+    // Document Mode returns document IDs (strings), not indices
     const searchResults = addressSearchBundle.index.search(normalizedQuery, {
       bool: 'and',
       limit
-    }) as number[];
+    }) as unknown as string[];
 
     const searchTime = performance.now() - searchStart;
     console.log(
-      `� Found ${searchResults.length} results in ${searchTime.toFixed(2)}ms`
+      `🔍 Found ${searchResults.length} results in ${searchTime.toFixed(2)}ms`
     );
 
     return formatSearchResults(searchResults, addressSearchBundle, limit);

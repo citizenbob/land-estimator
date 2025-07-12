@@ -2,7 +2,7 @@
  * @fileoverview Mock data and test fixtures for testing address lookup and estimation functionality
  */
 
-import type { FlexSearchIndexBundle } from '@app-types';
+import type { FlexSearchIndexBundle as LoadAddressIndexBundle } from '@services/loadAddressIndex';
 import { vi } from 'vitest';
 import type { LocalAddressRecord, AddressSuggestion } from '@app-types';
 import type { VersionManifest } from '@services/versionManifest';
@@ -446,15 +446,17 @@ export const EXPECTED_TEST_BUNDLE: TestBundle = {
 /**
  * Mock FlexSearch index bundle for testing
  */
-export const MOCK_FLEXSEARCH_BUNDLE: FlexSearchIndexBundle = {
+export const MOCK_FLEXSEARCH_BUNDLE: LoadAddressIndexBundle = {
   index: {
     add: vi.fn(),
-    search: vi.fn().mockReturnValue([0, 1, 2]),
+    search: vi.fn().mockReturnValue([]),
     remove: vi.fn(),
     update: vi.fn(),
     clear: vi.fn(),
-    length: 3
-  } as unknown as NonNullable<FlexSearchIndexBundle['index']>,
+    length: 3,
+    export: vi.fn(),
+    import: vi.fn()
+  } as unknown as LoadAddressIndexBundle['index'],
   parcelIds: MOCK_ADDRESS_INDEX_INDEX_DATA.parcelIds,
   addressData: MOCK_ADDRESS_INDEX_ADDRESS_DATA
 };

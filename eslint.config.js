@@ -34,7 +34,11 @@ const config = [
       '**/saint_louis_city/**',
       '**/saint_louis_county/**',
       '**/data/**',
-      'validate_zip_codes.js'
+      'validate_zip_codes.js',
+
+      // Third-party libraries
+      '**/public/flexsearch.bundle.js',
+      '**/flexsearch.bundle.js'
     ]
   },
   js.configs.recommended,

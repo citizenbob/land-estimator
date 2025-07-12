@@ -1,0 +1,341 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>FlexSearch Document Mode Loader</title>
+    <script src="/flexsearch.bundle.js"></script>
+    <script>
+      // Debug: Check if FlexSearch loaded
+      window.addEventListener('load', function () {
+        console.log('FlexSearch available:', typeof FlexSearch);
+        if (typeof FlexSearch === 'undefined') {
+          console.error('FlexSearch failed to load from local file');
+          alert('FlexSearch library failed to load. Please refresh the page.');
+        } else {
+          console.log('FlexSearch loaded successfully from local file');
+          if (window.initApp) window.initApp();
+        }
+      });
+    </script>
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        max-width: 800px;
+        margin: 0 auto;
+        padding: 20px;
+        background-color: #f5f5f5;
+      }
+      .container {
+        background: white;
+        padding: 20px;
+        border-radius: 8px;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+      }
+      .status {
+        margin: 10px 0;
+        padding: 10px;
+        border-radius: 4px;
+      }
+      .status.loading {
+        background-color: #e3f2fd;
+        border-left: 4px solid #2196f3;
+      }
+      .status.success {
+        background-color: #e8f5e8;
+        border-left: 4px solid #4caf50;
+      }
+      .status.error {
+        background-color: #ffebee;
+        border-left: 4px solid #f44336;
+      }
+      .search-container {
+        margin-top: 20px;
+      }
+      .search-input {
+        width: 100%;
+        padding: 10px;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+        font-size: 16px;
+      }
+      .results {
+        margin-top: 20px;
+        max-height: 400px;
+        overflow-y: auto;
+      }
+      .result-item {
+        padding: 10px;
+        border-bottom: 1px solid #eee;
+        cursor: pointer;
+      }
+      .result-item:hover {
+        background-color: #f9f9f9;
+      }
+      .result-address {
+        font-weight: bold;
+        color: #1976d2;
+      }
+      .result-details {
+        font-size: 14px;
+        color: #666;
+        margin-top: 5px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <h1>FlexSearch Document Mode Loader</h1>
+      <p>Testing FlexSearch Document Mode with St. Louis City/County parcels</p>
+
+      <div id="status" class="status loading">
+        <strong>Status:</strong> <span id="status-text">Initializing...</span>
+      </div>
+
+      <div class="search-container" style="display: none" id="search-container">
+        <input
+          type="text"
+          id="search-input"
+          class="search-input"
+          placeholder="Search addresses..."
+        />
+        <div id="results" class="results"></div>
+      </div>
+
+      <div
+        id="debug-info"
+        style="
+          margin-top: 20px;
+          padding: 10px;
+          background: #f0f0f0;
+          border-radius: 4px;
+          font-family: monospace;
+          font-size: 12px;
+          display: none;
+        "
+      >
+        <strong>Debug Info:</strong><br />
+        <div id="debug-content"></div>
+      </div>
+    </div>
+
+    <script>
+      let searchIndex = null;
+      let documents = [];
+      let debugInfo = [];
+
+      function updateStatus(message, type = 'loading') {
+        const statusEl = document.getElementById('status');
+        const statusTextEl = document.getElementById('status-text');
+
+        statusEl.className = `status ${type}`;
+        statusTextEl.textContent = message;
+
+        debugInfo.push(`${new Date().toISOString()}: ${message}`);
+        updateDebugInfo();
+      }
+
+      function updateDebugInfo() {
+        const debugEl = document.getElementById('debug-content');
+        debugEl.innerHTML = debugInfo.join('<br>');
+      }
+
+      function showDebugInfo() {
+        document.getElementById('debug-info').style.display = 'block';
+      }
+
+      async function loadManifest() {
+        try {
+          updateStatus('Loading manifest...');
+          const response = await fetch('/search/latest.json');
+
+          if (!response.ok) {
+            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+          }
+
+          const manifest = await response.json();
+          updateStatus(
+            `Manifest loaded: ${manifest.regions.length} regions, ${manifest.metadata.total_regions} total regions`
+          );
+
+          return manifest;
+        } catch (error) {
+          updateStatus(`Error loading manifest: ${error.message}`, 'error');
+          showDebugInfo();
+          throw error;
+        }
+      }
+
+      async function loadDocuments(manifest) {
+        try {
+          updateStatus('Loading document files...');
+          const loadPromises = manifest.regions.map(async (region) => {
+            const response = await fetch(`/search/${region.document_file}`);
+            if (!response.ok) {
+              throw new Error(
+                `Failed to load ${region.document_file}: ${response.status}`
+              );
+            }
+            const data = await response.json();
+            return {
+              region: region.region,
+              version: region.version,
+              documents: data
+            };
+          });
+
+          const results = await Promise.all(loadPromises);
+
+          // Combine all documents
+          documents = [];
+          results.forEach((result) => {
+            result.documents.forEach((doc) => {
+              documents.push({
+                ...doc,
+                region: result.region,
+                regionVersion: result.version
+              });
+            });
+          });
+
+          updateStatus(
+            `Loaded ${documents.length} documents from ${results.length} regions`
+          );
+          return documents;
+        } catch (error) {
+          updateStatus(`Error loading documents: ${error.message}`, 'error');
+          showDebugInfo();
+          throw error;
+        }
+      }
+
+      function createSearchIndex(documents) {
+        try {
+          updateStatus('Creating FlexSearch index...');
+
+          // Create FlexSearch Document index with proper configuration
+          searchIndex = new FlexSearch.Document({
+            id: 'id',
+            index: ['full_address', 'region'],
+            store: ['id', 'full_address', 'latitude', 'longitude', 'region']
+          });
+
+          // Add all documents to the index
+          documents.forEach((doc) => {
+            searchIndex.add(doc);
+          });
+
+          updateStatus(
+            `Search index created with ${documents.length} documents`,
+            'success'
+          );
+
+          // Show search interface
+          document.getElementById('search-container').style.display = 'block';
+
+          return searchIndex;
+        } catch (error) {
+          updateStatus(
+            `Error creating search index: ${error.message}`,
+            'error'
+          );
+          showDebugInfo();
+          throw error;
+        }
+      }
+
+      function setupSearch() {
+        const searchInput = document.getElementById('search-input');
+        const resultsEl = document.getElementById('results');
+
+        searchInput.addEventListener('input', (e) => {
+          const query = e.target.value.trim();
+
+          if (query.length < 2) {
+            resultsEl.innerHTML = '';
+            return;
+          }
+
+          try {
+            const results = searchIndex.search(query, { limit: 10 });
+
+            if (!results || results.length === 0) {
+              resultsEl.innerHTML =
+                '<div class="result-item">No results found</div>';
+              return;
+            }
+
+            // FlexSearch Document mode returns results as array of objects with field results
+            // Each result contains field-specific matches
+            let matchedDocs = [];
+
+            results.forEach((fieldResult) => {
+              if (fieldResult && fieldResult.result) {
+                // fieldResult.result contains the document IDs for this field
+                fieldResult.result.forEach((docId) => {
+                  // Get the actual document using the stored data
+                  const doc = searchIndex.get(docId);
+                  if (doc && !matchedDocs.find((d) => d.id === doc.id)) {
+                    matchedDocs.push(doc);
+                  }
+                });
+              }
+            });
+
+            if (matchedDocs.length === 0) {
+              resultsEl.innerHTML =
+                '<div class="result-item">No results found</div>';
+              return;
+            }
+
+            resultsEl.innerHTML = matchedDocs
+              .slice(0, 10)
+              .map((doc) => {
+                return `
+                            <div class="result-item">
+                                <div class="result-address">${doc.full_address}</div>
+                                <div class="result-details">
+                                    ${doc.region} • Lat: ${doc.latitude}, Lng: ${doc.longitude}
+                                </div>
+                            </div>
+                        `;
+              })
+              .join('');
+          } catch (error) {
+            resultsEl.innerHTML = `<div class="result-item">Search error: ${error.message}</div>`;
+          }
+        });
+      }
+
+      // Initialize the application
+      async function init() {
+        try {
+          // Check if FlexSearch is available
+          if (typeof FlexSearch === 'undefined') {
+            throw new Error('FlexSearch library not loaded');
+          }
+
+          const manifest = await loadManifest();
+          const documents = await loadDocuments(manifest);
+          const index = createSearchIndex(documents);
+          setupSearch();
+
+          updateStatus('Ready! Search functionality is now active.', 'success');
+          document.getElementById('search-input').focus();
+        } catch (error) {
+          console.error('Initialization failed:', error);
+          updateStatus(`Initialization failed: ${error.message}`, 'error');
+          showDebugInfo();
+        }
+      }
+
+      // Make init function available globally for the load handler
+      window.initApp = init;
+
+      // Start the application (will be called after FlexSearch loads)
+      if (typeof FlexSearch !== 'undefined') {
+        init();
+      }
+    </script>
+  </body>
+</html>

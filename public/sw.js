@@ -154,21 +154,41 @@ async function preloadStaticFiles() {
 
     const manifest = await manifestResponse.json();
     console.log('[SW] Static manifest loaded:', {
-      version: manifest.version,
-      recordCount: manifest.recordCount
+      version: manifest.version || manifest.metadata?.version,
+      format: manifest.regions ? 'Document Mode' : 'Legacy'
     });
-
-    if (!manifest.files) {
-      throw new Error('Invalid static manifest: missing files array');
-    }
 
     const staticBaseUrl = '/search/';
     const urlsToPreload = ['/search/latest.json'];
 
-    // Add all files from manifest (these have the correct names)
-    urlsToPreload.push(
-      ...manifest.files.map((file) => `${staticBaseUrl}${file}`)
-    );
+    // Handle both Document Mode and Legacy manifest formats
+    if (manifest.regions && Array.isArray(manifest.regions)) {
+      // Document Mode format
+      console.log(
+        '[SW] Processing Document Mode manifest with',
+        manifest.regions.length,
+        'regions'
+      );
+
+      for (const region of manifest.regions) {
+        urlsToPreload.push(`${staticBaseUrl}${region.document_file}`);
+        urlsToPreload.push(`${staticBaseUrl}${region.lookup_file}`);
+      }
+    } else if (manifest.files) {
+      // Legacy format
+      console.log(
+        '[SW] Processing Legacy manifest with',
+        manifest.files.length,
+        'files'
+      );
+      urlsToPreload.push(
+        ...manifest.files.map((file) => `${staticBaseUrl}${file}`)
+      );
+    } else {
+      throw new Error(
+        'Invalid static manifest: missing regions array or files array'
+      );
+    }
 
     console.log('[SW] Static URLs to preload:', urlsToPreload.length, 'files');
 

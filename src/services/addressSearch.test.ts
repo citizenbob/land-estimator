@@ -37,7 +37,9 @@ describe('addressSearch - Client-Only Fast Rebuild Strategy', () => {
   describe('FlexSearch Index Operations', () => {
     it('should use FlexSearch index for client-side search', async () => {
       const mockIndex = {
-        search: vi.fn().mockReturnValue([0, 1])
+        search: vi
+          .fn()
+          .mockReturnValue([mockAddressData[0].id, mockAddressData[1].id])
       };
 
       mockLoadAddressIndex.mockResolvedValue({
@@ -76,7 +78,7 @@ describe('addressSearch - Client-Only Fast Rebuild Strategy', () => {
 
     it('should normalize queries before searching', async () => {
       const mockIndex = {
-        search: vi.fn().mockReturnValue([0])
+        search: vi.fn().mockReturnValue([mockAddressData[0].id])
       };
 
       mockLoadAddressIndex.mockResolvedValue({
@@ -97,7 +99,14 @@ describe('addressSearch - Client-Only Fast Rebuild Strategy', () => {
 
     it('should respect limit parameter', async () => {
       const mockIndex = {
-        search: vi.fn().mockReturnValue([0, 1, 2, 3])
+        search: vi
+          .fn()
+          .mockReturnValue([
+            mockAddressData[0].id,
+            mockAddressData[1].id,
+            mockAddressData[2].id,
+            mockAddressData[0].id
+          ])
       };
 
       mockLoadAddressIndex.mockResolvedValue({
@@ -118,8 +127,9 @@ describe('addressSearch - Client-Only Fast Rebuild Strategy', () => {
     });
 
     it('should format search results correctly', async () => {
+      // Return document ID, not array index for Document Mode
       const mockIndex = {
-        search: vi.fn().mockReturnValue([0])
+        search: vi.fn().mockReturnValue([mockAddressData[0].id])
       };
 
       mockLoadAddressIndex.mockResolvedValue({
@@ -142,7 +152,7 @@ describe('addressSearch - Client-Only Fast Rebuild Strategy', () => {
 
     it('should cache the address index bundle', async () => {
       const mockIndex = {
-        search: vi.fn().mockReturnValue([0])
+        search: vi.fn().mockReturnValue([mockAddressData[0].id])
       };
 
       mockLoadAddressIndex.mockResolvedValue({
@@ -178,7 +188,7 @@ describe('addressSearch - Client-Only Fast Rebuild Strategy', () => {
 
     it('should trim whitespace from queries', async () => {
       const mockIndex = {
-        search: vi.fn().mockReturnValue([0])
+        search: vi.fn().mockReturnValue([mockAddressData[0].id])
       };
 
       mockLoadAddressIndex.mockResolvedValue({
@@ -206,7 +216,7 @@ describe('addressSearch - Client-Only Fast Rebuild Strategy', () => {
 
     it('should normalize Missouri-specific queries', async () => {
       const mockIndex = {
-        search: vi.fn().mockReturnValue([0])
+        search: vi.fn().mockReturnValue([mockAddressData[0].id])
       };
 
       mockLoadAddressIndex.mockResolvedValue({
