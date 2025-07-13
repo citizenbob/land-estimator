@@ -1,23 +1,19 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import type { AddressLookupData } from '@app-types';
 
-// Regional Shard Manifest type matching our build output
-interface RegionalShardManifest {
-  version: string;
-  buildTime: string;
-  regions: Record<
-    string,
-    {
-      region: string;
-      version: string;
-      hash: string;
-      files: string[];
-      lookup: string;
-      addressCount: number;
-      buildTime: string;
-    }
-  >;
-  totalAddresses: number;
+// New Shard Manifest type matching our simplified structure
+interface ShardManifest {
+  regions: Array<{
+    region: string;
+    version: string;
+    document_file: string;
+    lookup_file: string;
+  }>;
+  metadata: {
+    generated_at: string;
+    version: string;
+    total_regions: number;
+    source: string;
+  };
 }
 
 /**
@@ -84,38 +80,27 @@ describe('loadAddressIndex', () => {
     it('loads successfully from static files', async () => {
       document.cookie = 'regionShard=stl-city';
 
-      const mockManifest: RegionalShardManifest = {
-        version: '20250109',
-        buildTime: '2025-07-09T05:26:32.946Z',
-        regions: {
-          stl_city: {
+      const mockManifest: ShardManifest = {
+        regions: [
+          {
             region: 'stl_city',
-            version: '20250109',
-            hash: 'ab0e5e98',
-            files: [
-              'stl_city-20250109-ab0e5e98-1.reg.json',
-              'stl_city-20250109-ab0e5e98-1.map.json',
-              'stl_city-20250109-ab0e5e98-lookup.json'
-            ],
-            lookup: 'stl_city-20250109-ab0e5e98-lookup.json',
-            addressCount: 500,
-            buildTime: '2025-07-09T05:26:32.946Z'
+            version: '1.0.0',
+            document_file: 'stl_city-document.json',
+            lookup_file: 'stl_city-document.json'
           },
-          stl_county: {
+          {
             region: 'stl_county',
-            version: '20250109',
-            hash: 'cd1f6f89',
-            files: [
-              'stl_county-20250109-cd1f6f89-1.reg.json',
-              'stl_county-20250109-cd1f6f89-1.map.json',
-              'stl_county-20250109-cd1f6f89-lookup.json'
-            ],
-            lookup: 'stl_county-20250109-cd1f6f89-lookup.json',
-            addressCount: 494,
-            buildTime: '2025-07-09T05:26:32.946Z'
+            version: '1.0.0',
+            document_file: 'stl_county-document.json',
+            lookup_file: 'stl_county-document.json'
           }
-        },
-        totalAddresses: 994
+        ],
+        metadata: {
+          generated_at: '2025-07-12T11:37:03.373280',
+          version: '1.0.0',
+          total_regions: 2,
+          source: 'Document Mode Pipeline'
+        }
       };
 
       mockFetch.mockResolvedValueOnce({
@@ -123,28 +108,27 @@ describe('loadAddressIndex', () => {
         json: () => Promise.resolve(mockManifest)
       });
 
-      // Mock the FlexSearch export files (.reg and .map)
-      mockFetch.mockResolvedValueOnce({
-        ok: true,
-        text: () => Promise.resolve('{}')
-      });
-
-      mockFetch.mockResolvedValueOnce({
-        ok: true,
-        text: () => Promise.resolve('{}')
-      });
-
-      const mockLookupData: AddressLookupData = {
-        parcelIds: ['P001', 'P002'],
-        addressData: {
-          P001: '123 Main St, City, State',
-          P002: '456 Oak Ave, City, State'
+      // Mock the document file with raw address data
+      const mockAddresses = [
+        {
+          id: 'P001',
+          full_address: '123 Main St, City, State',
+          latitude: 38.627,
+          longitude: -90.1994,
+          region: 'St. Louis City'
+        },
+        {
+          id: 'P002',
+          full_address: '456 Oak Ave, City, State',
+          latitude: 38.6271,
+          longitude: -90.1995,
+          region: 'St. Louis City'
         }
-      };
+      ];
 
       mockFetch.mockResolvedValueOnce({
         ok: true,
-        json: () => Promise.resolve(mockLookupData)
+        json: () => Promise.resolve(mockAddresses)
       });
 
       const result = await loadAddressIndex();
@@ -153,7 +137,10 @@ describe('loadAddressIndex', () => {
       expect(result).toHaveProperty('parcelIds');
       expect(result).toHaveProperty('addressData');
       expect(result.parcelIds).toEqual(['P001', 'P002']);
-      expect(result.addressData).toEqual(mockLookupData.addressData);
+      expect(result.addressData).toEqual({
+        P001: '123 Main St, City, State',
+        P002: '456 Oak Ave, City, State'
+      });
       expect(mockFetch).toHaveBeenCalledWith('/search/latest.json');
     });
 
@@ -175,40 +162,24 @@ describe('loadAddressIndex', () => {
         ok: true,
         json: () =>
           Promise.resolve({
-            version: '20250109',
-            buildTime: '2025-07-09T05:26:32.946Z',
-            regions: {
-              stl_city: {
+            regions: [
+              {
                 region: 'stl_city',
-                version: '20250109',
-                hash: 'ab0e5e98',
-                files: [
-                  'stl_city-20250109-ab0e5e98-1.reg.json',
-                  'stl_city-20250109-ab0e5e98-1.map.json',
-                  'stl_city-20250109-ab0e5e98-lookup.json'
-                ],
-                lookup: 'stl_city-20250109-ab0e5e98-lookup.json',
-                addressCount: 500,
-                buildTime: '2025-07-09T05:26:32.946Z'
-              },
-              stl_county: {
-                region: 'stl_county',
-                version: '20250109',
-                hash: 'cd1f6f89',
-                files: [
-                  'stl_county-20250109-cd1f6f89-1.reg.json',
-                  'stl_county-20250109-cd1f6f89-1.map.json',
-                  'stl_county-20250109-cd1f6f89-lookup.json'
-                ],
-                lookup: 'stl_county-20250109-cd1f6f89-lookup.json',
-                addressCount: 494,
-                buildTime: '2025-07-09T05:26:32.946Z'
+                version: '1.0.0',
+                document_file: 'stl_city-document.json',
+                lookup_file: 'stl_city-document.json'
               }
-            },
-            totalAddresses: 994
+            ],
+            metadata: {
+              generated_at: '2025-07-12T11:37:03.373280',
+              version: '1.0.0',
+              total_regions: 1,
+              source: 'Document Mode Pipeline'
+            }
           })
       });
-      // Region index file fetch fails
+
+      // Document file fetch fails
       mockFetch.mockResolvedValueOnce({ ok: false, status: 404 });
 
       await expect(loadAddressIndex()).rejects.toThrow(
@@ -225,39 +196,35 @@ describe('loadAddressIndex', () => {
         ok: true,
         json: () =>
           Promise.resolve({
-            version: '20250109',
-            buildTime: '2025-07-09T05:26:32.946Z',
-            regions: {
-              stl_city: {
+            regions: [
+              {
                 region: 'stl_city',
-                version: '20250109',
-                hash: 'ab0e5e98',
-                files: ['stl_city-20250109-ab0e5e98-lookup.json'],
-                lookup: 'stl_city-20250109-ab0e5e98-lookup.json',
-                addressCount: 1,
-                buildTime: '2025-07-09T05:26:32.946Z'
-              },
-              stl_county: {
-                region: 'stl_county',
-                version: '20250109',
-                hash: 'def456',
-                files: [],
-                lookup: '',
-                addressCount: 1,
-                buildTime: '2025-07-09T05:26:32.946Z'
+                version: '1.0.0',
+                document_file: 'stl_city-document.json',
+                lookup_file: 'stl_city-document.json'
               }
-            },
-            totalAddresses: 2
+            ],
+            metadata: {
+              generated_at: '2025-07-12T11:37:03.373280',
+              version: '1.0.0',
+              total_regions: 1,
+              source: 'Document Mode Pipeline'
+            }
           })
       });
 
       mockFetch.mockResolvedValueOnce({
         ok: true,
         json: () =>
-          Promise.resolve({
-            parcelIds: ['P001'],
-            addressData: { P001: 'Test' }
-          })
+          Promise.resolve([
+            {
+              id: 'P001',
+              full_address: 'Test Address',
+              latitude: 38.627,
+              longitude: -90.1994,
+              region: 'St. Louis City'
+            }
+          ])
       });
 
       const result1 = await loadAddressIndex();
@@ -274,38 +241,34 @@ describe('loadAddressIndex', () => {
         ok: true,
         json: () =>
           Promise.resolve({
-            version: '20250109-v1',
-            buildTime: '2025-07-09T05:26:32.946Z',
-            regions: {
-              stl_city: {
+            regions: [
+              {
                 region: 'stl_city',
-                version: '20250109-v1',
-                hash: 'hash1',
-                files: ['lookup.json'],
-                lookup: 'lookup.json',
-                addressCount: 1,
-                buildTime: '2025-07-09T05:26:32.946Z'
-              },
-              stl_county: {
-                region: 'stl_county',
-                version: '20250109-v1',
-                hash: 'hash1',
-                files: ['lookup.json'],
-                lookup: 'lookup.json',
-                addressCount: 1,
-                buildTime: '2025-07-09T05:26:32.946Z'
+                version: '1.0.0',
+                document_file: 'stl_city-document.json',
+                lookup_file: 'stl_city-document.json'
               }
-            },
-            totalAddresses: 2
+            ],
+            metadata: {
+              generated_at: '2025-07-12T11:37:03.373280',
+              version: '1.0.0',
+              total_regions: 1,
+              source: 'Document Mode Pipeline'
+            }
           })
       });
       mockFetch.mockResolvedValueOnce({
         ok: true,
         json: () =>
-          Promise.resolve({
-            parcelIds: ['P1'],
-            addressData: {}
-          })
+          Promise.resolve([
+            {
+              id: 'P1',
+              full_address: 'Test Address 1',
+              latitude: 38.627,
+              longitude: -90.1994,
+              region: 'St. Louis City'
+            }
+          ])
       });
 
       const result1 = await loadAddressIndex();
@@ -316,38 +279,34 @@ describe('loadAddressIndex', () => {
         ok: true,
         json: () =>
           Promise.resolve({
-            version: '20250109-v2',
-            buildTime: '2025-07-09T05:26:32.946Z',
-            regions: {
-              stl_city: {
+            regions: [
+              {
                 region: 'stl_city',
-                version: '20250109-v2',
-                hash: 'hash2',
-                files: ['lookup.json'],
-                lookup: 'lookup.json',
-                addressCount: 1,
-                buildTime: '2025-07-09T05:26:32.946Z'
-              },
-              stl_county: {
-                region: 'stl_county',
-                version: '20250109-v2',
-                hash: 'hash2',
-                files: ['lookup.json'],
-                lookup: 'lookup.json',
-                addressCount: 1,
-                buildTime: '2025-07-09T05:26:32.946Z'
+                version: '1.0.0',
+                document_file: 'stl_city-document.json',
+                lookup_file: 'stl_city-document.json'
               }
-            },
-            totalAddresses: 2
+            ],
+            metadata: {
+              generated_at: '2025-07-12T11:37:03.373280',
+              version: '1.0.0',
+              total_regions: 1,
+              source: 'Document Mode Pipeline'
+            }
           })
       });
       mockFetch.mockResolvedValueOnce({
         ok: true,
         json: () =>
-          Promise.resolve({
-            parcelIds: ['P2'],
-            addressData: {}
-          })
+          Promise.resolve([
+            {
+              id: 'P2',
+              full_address: 'Test Address 2',
+              latitude: 38.627,
+              longitude: -90.1994,
+              region: 'St. Louis City'
+            }
+          ])
       });
 
       const result2 = await loadAddressIndex();
@@ -398,47 +357,41 @@ describe('loadAddressIndex', () => {
         ok: true,
         json: () =>
           Promise.resolve({
-            version: '20250704-787dd7fd',
-            buildTime: '2025-07-04T10:00:00.000Z',
-            regions: {
-              stl_city: {
+            regions: [
+              {
                 region: 'stl_city',
-                version: '20250704-787dd7fd',
-                hash: '787dd7fd',
-                files: ['address-v20250704-787dd7fd-lookup.json'],
-                lookup: 'address-v20250704-787dd7fd-lookup.json',
-                addressCount: 1,
-                buildTime: '2025-07-04T10:00:00.000Z'
-              },
-              stl_county: {
-                region: 'stl_county',
-                version: '20250704-787dd7fd',
-                hash: '787dd7fd',
-                files: ['address-v20250704-787dd7fd-lookup.json'],
-                lookup: 'address-v20250704-787dd7fd-lookup.json',
-                addressCount: 1,
-                buildTime: '2025-07-04T10:00:00.000Z'
+                version: '1.0.0',
+                document_file: 'stl_city-document.json',
+                lookup_file: 'stl_city-document.json'
               }
-            },
-            totalAddresses: 2
+            ],
+            metadata: {
+              generated_at: '2025-07-12T11:37:03.373280',
+              version: '1.0.0',
+              total_regions: 1,
+              source: 'Document Mode Pipeline'
+            }
           })
       });
 
       mockFetch.mockResolvedValueOnce({
         ok: true,
         json: () =>
-          Promise.resolve({
-            parcelIds: ['P001'],
-            addressData: { P001: 'Test' }
-          })
+          Promise.resolve([
+            {
+              id: 'P001',
+              full_address: 'Test Address',
+              latitude: 38.627,
+              longitude: -90.1994,
+              region: 'St. Louis City'
+            }
+          ])
       });
 
       await loadAddressIndex();
 
       expect(mockFetch).toHaveBeenCalledWith('/search/latest.json');
-      expect(mockFetch).toHaveBeenCalledWith(
-        '/search/address-v20250704-787dd7fd-lookup.json'
-      );
+      expect(mockFetch).toHaveBeenCalledWith('/search/stl_city-document.json');
 
       delete (global as unknown as { window?: Window }).window;
     });

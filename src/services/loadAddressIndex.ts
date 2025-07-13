@@ -19,21 +19,18 @@ export interface FlexSearchIndexBundle {
 }
 
 export interface ShardManifest {
-  version: string;
-  buildTime: string;
-  regions: Record<
-    string,
-    {
-      region: string;
-      version: string;
-      hash: string;
-      files: string[];
-      lookup: string;
-      addressCount: number;
-      buildTime: string;
-    }
-  >;
-  totalAddresses: number;
+  regions: Array<{
+    region: string;
+    version: string;
+    document_file: string;
+    lookup_file: string;
+  }>;
+  metadata: {
+    generated_at: string;
+    version: string;
+    total_regions: number;
+    source: string;
+  };
 }
 
 export interface AddressLookupData {
@@ -102,13 +99,14 @@ class ClientOnlyAddressIndexLoader {
 
       const manifest: ShardManifest = await manifestResponse.json();
       devLog(
-        `📊 Found manifest v${manifest.version} with ${manifest.totalAddresses} addresses`
+        `📊 Found manifest v${manifest.metadata.version} with ${manifest.metadata.total_regions} regions`
       );
 
       // Get region shard from cookie
       const regionShard = this._getRegionShardFromCookie();
       const regionData =
-        manifest.regions[regionShard] || manifest.regions['stl_county'];
+        manifest.regions.find((r) => r.region === regionShard) ||
+        manifest.regions.find((r) => r.region === 'stl_county');
 
       if (!regionData) {
         throw new Error(`No region data for ${regionShard}`);
@@ -116,7 +114,7 @@ class ClientOnlyAddressIndexLoader {
 
       devLog(`🌎 Using region shard: ${regionShard}`);
 
-      const indexResult = await this._loadFromExportedFiles(regionData);
+      const indexResult = await this._loadFromDocumentFile(regionData);
       if (indexResult) {
         devLog(`✅ Loaded ${regionShard} shard from static files`);
         return indexResult;
@@ -130,58 +128,53 @@ class ClientOnlyAddressIndexLoader {
     }
   }
 
-  private async _loadFromExportedFiles(
-    region: ShardManifest['regions'][string]
+  private async _loadFromDocumentFile(
+    region: ShardManifest['regions'][0]
   ): Promise<FlexSearchIndexBundle | null> {
     try {
-      devLog(
-        `📤 Loading ${region.files.length} files for region ${region.region}...`
-      );
+      devLog(`📤 Loading document file for region ${region.region}...`);
+
+      // Load the document file which contains raw address data
+      const response = await fetch(`/search/${region.document_file}`);
+      if (!response.ok) {
+        throw new Error(
+          `Failed to load ${region.document_file}: ${response.status}`
+        );
+      }
+
+      const addresses = await response.json();
+
+      // Create new FlexSearch index
       const searchIndex = new Index(FLEXSEARCH_CONFIG);
 
-      // Load all .reg/.map parts except lookup and import them individually
-      const indexFiles = region.files.filter((f) => !f.includes('lookup'));
-      for (const filename of indexFiles) {
-        const response = await fetch(`/search/${filename}`);
-        if (!response.ok) {
-          throw new Error(`Failed to load ${filename}: ${response.status}`);
+      // Process the raw address data
+      const parcelIds: string[] = [];
+      const addressData: Record<string, string> = {};
+
+      addresses.forEach(
+        (addr: { id: string; full_address: string }, index: number) => {
+          const parcelId = addr.id;
+          const fullAddress = addr.full_address;
+
+          parcelIds.push(parcelId);
+          addressData[parcelId] = fullAddress;
+
+          // Add to FlexSearch index
+          searchIndex.add(index, fullAddress);
         }
+      );
 
-        const text = await response.text();
-        let data = text ? JSON.parse(text) : null;
-
-        // ✅ CRITICAL: Ensure we have actual arrays/objects, not JSON strings
-        // If the data is a string, parse it to get the actual array/object
-        if (typeof data === 'string') {
-          try {
-            data = JSON.parse(data);
-            devLog(`  🔧 Parsed stringified JSON for ${filename}`);
-          } catch (parseError) {
-            devLog(
-              `  ⚠️ Failed to parse string data for ${filename}: ${parseError}`
-            );
-          }
-        }
-
-        // ✅ CRITICAL FIX: For FlexSearch.Index, import each part individually
-        searchIndex.import(data);
-        devLog(`  ✅ Imported ${filename}`);
-      }
-
-      // Load lookup
-      const lookupResponse = await fetch(`/search/${region.lookup}`);
-      if (!lookupResponse.ok) {
-        throw new Error(`Failed to load lookup: ${lookupResponse.status}`);
-      }
-      const lookupData: AddressLookupData = await lookupResponse.json();
+      devLog(
+        `  ✅ Built FlexSearch index with ${parcelIds.length} addresses for ${region.region}`
+      );
 
       return {
         index: searchIndex,
-        parcelIds: lookupData.parcelIds,
-        addressData: lookupData.addressData
+        parcelIds,
+        addressData
       };
     } catch (error) {
-      devLog(`⚠️ Export loading failed: ${error}`);
+      devLog(`⚠️ Document loading failed: ${error}`);
       return null;
     }
   }
