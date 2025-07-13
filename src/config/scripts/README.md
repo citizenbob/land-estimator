@@ -111,8 +111,8 @@ This pipeline processes raw parcel shapefiles for St. Louis City and County and 
 python3 ingest_shapes.py --dataset-size=small --version=mytag
 
 # Dataset sizes:
-# --dataset-size=small   # 1,000 parcels (testing)
-# --dataset-size=medium  # 10,000 parcels (development)
+# --dataset-size=small   # 5,000 parcels (testing)
+# --dataset-size=medium  # 25,000 parcels (development)
 # --dataset-size=large   # Full dataset (production)
 
 # Validate geometries (optional)

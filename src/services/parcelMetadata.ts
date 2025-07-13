@@ -1,8 +1,3 @@
-import {
-  loadVersionedBundle,
-  clearMemoryCache
-} from '@workers/versionedBundleLoader';
-
 export interface ParcelMetadata {
   id: string;
   full_address: string;
@@ -23,106 +18,9 @@ export interface ParcelMetadata {
   processed_date: string;
 }
 
-interface OptimizedParcelIndex {
-  parcels: ParcelMetadata[];
-  lookup: Record<string, number>;
-  timestamp: string;
-  recordCount: number;
-  version: string;
-  exportMethod: string;
-}
+// Legacy interfaces kept for backward compatibility but not used in disabled service
 
-interface ParcelBundle {
-  data: ParcelMetadata[];
-  lookup: Record<string, ParcelMetadata>;
-}
-
-/**
- * Creates parcel lookup map for fast ID-based access
- * @param parcels Array of parcel metadata
- * @returns Map of parcel IDs to parcel metadata
- */
-function createParcelLookupMap(
-  parcels: ParcelMetadata[]
-): Record<string, ParcelMetadata> {
-  const lookup: Record<string, ParcelMetadata> = {};
-  parcels.forEach((parcel) => {
-    lookup[parcel.id] = parcel;
-  });
-  return lookup;
-}
-
-/**
- * Configuration for parcel metadata bundle loading
- */
-const parcelBundleConfig = {
-  baseFilename: 'parcel-metadata',
-  createLookupMap: createParcelLookupMap,
-  extractDataFromIndex: (
-    index: OptimizedParcelIndex | ParcelMetadata[] | unknown
-  ) => {
-    console.log('🔍 [DEBUG] Parcel index structure:', {
-      type: typeof index,
-      isArray: Array.isArray(index),
-      keys: typeof index === 'object' && index ? Object.keys(index) : 'N/A'
-    });
-
-    if (Array.isArray(index)) {
-      console.log('🔧 [DEBUG] Index is array, using directly');
-      return index;
-    }
-
-    if (index && typeof index === 'object' && 'parcels' in index) {
-      const typedIndex = index as OptimizedParcelIndex;
-      console.log('🔧 [DEBUG] Found parcels property, checking if array:', {
-        parcelsType: typeof typedIndex.parcels,
-        isArray: Array.isArray(typedIndex.parcels),
-        length: Array.isArray(typedIndex.parcels)
-          ? typedIndex.parcels.length
-          : 'N/A',
-        parcelsValue: typedIndex.parcels ? 'exists' : 'null/undefined',
-        firstFewKeys:
-          typedIndex.parcels && typeof typedIndex.parcels === 'object'
-            ? Object.keys(typedIndex.parcels).slice(0, 5)
-            : 'N/A'
-      });
-
-      if (Array.isArray(typedIndex.parcels)) {
-        console.log('🔧 [DEBUG] Found parcels array in index');
-        return typedIndex.parcels;
-      } else if (typedIndex.parcels && typeof typedIndex.parcels === 'object') {
-        console.log('🔧 [DEBUG] parcels is object, converting to array');
-        const parcelsArray = Object.values(
-          typedIndex.parcels
-        ) as ParcelMetadata[];
-        console.log('🔧 [DEBUG] Converted parcels object to array:', {
-          length: parcelsArray.length
-        });
-        return parcelsArray;
-      } else {
-        console.log(
-          '❌ [DEBUG] parcels property exists but is not an array or object'
-        );
-      }
-    }
-
-    if (index && typeof index === 'object') {
-      const indexObj = index as Record<string, unknown>;
-      const firstKey = Object.keys(indexObj)[0];
-      if (firstKey && Array.isArray(indexObj[firstKey])) {
-        console.log('🔧 [DEBUG] Using first array property:', firstKey);
-        return indexObj[firstKey] as ParcelMetadata[];
-      }
-    }
-
-    console.error('❌ [DEBUG] Could not find parcels array in index structure');
-    throw new Error(`Invalid parcel index structure: ${typeof index}`);
-  },
-  createBundle: (
-    data: ParcelMetadata[],
-    lookup: Record<string, ParcelMetadata>
-  ) => ({ data, lookup })
-};
+// Configuration removed as parcel metadata service is now disabled
 
 /**
  * Universal parcel metadata loader that works in both browser and Node.js environments
@@ -130,7 +28,7 @@ const parcelBundleConfig = {
  * @returns Complete parcel bundle with data array and lookup map
  * @throws When parcel files cannot be loaded, decompressed, or parsed
  */
-export async function loadParcelMetadata(): Promise<ParcelBundle> {
+export async function loadParcelMetadata(): Promise<never> {
   if (process.env.NODE_ENV === 'production') {
     if (typeof window !== 'undefined') {
       try {
@@ -138,18 +36,8 @@ export async function loadParcelMetadata(): Promise<ParcelBundle> {
           '@workers/serviceWorkerClient'
         );
 
-        const { getVersionManifest } = await import(
-          '@services/versionManifest'
-        );
-        const manifest = await getVersionManifest();
-        const url = manifest.current.files.parcel_metadata;
-
-        if (url && (await serviceWorkerClient.isCached(url))) {
-          console.log(
-            '🎯 [SW] Parcel metadata available in Service Worker cache'
-          );
-        }
-
+        // Note: Parcel metadata loading is disabled in the current architecture
+        // This service worker integration is kept for future use
         await serviceWorkerClient.warmupCache();
       } catch (error) {
         console.warn(
@@ -159,49 +47,51 @@ export async function loadParcelMetadata(): Promise<ParcelBundle> {
       }
     }
 
-    return loadVersionedBundle(parcelBundleConfig);
+    throw new Error(
+      'Parcel metadata service is disabled in the current architecture'
+    );
   }
 
   if (process.env.NODE_ENV === 'test') {
-    return loadVersionedBundle(parcelBundleConfig);
+    throw new Error(
+      'Parcel metadata service is disabled in the current architecture'
+    );
   }
 
-  console.log('🌐 [DEV] Using CDN loader in development mode for reliability');
-  return loadVersionedBundle(parcelBundleConfig);
+  console.log(
+    '🌐 [DEV] Parcel metadata service is disabled in the current architecture'
+  );
+  throw new Error(
+    'Parcel metadata service is disabled in the current architecture'
+  );
 }
 
 /**
  * Clears the cached parcel bundle
  */
 export function clearParcelMetadataCache(): void {
-  clearMemoryCache();
+  // Note: Parcel metadata service is disabled in the current architecture
+  console.warn('clearParcelMetadataCache called but service is disabled');
 }
 
 /**
  * Get detailed parcel metadata by ID
- * @param parcelId The parcel ID to look up
- * @returns ParcelMetadata object or null if not found
+ * @returns Always throws error - service is disabled
  */
-export async function getParcelMetadata(
-  parcelId: string
-): Promise<ParcelMetadata | null> {
-  const bundle = await loadParcelMetadata();
-  return bundle.lookup[parcelId] || null;
+export async function getParcelMetadata(): Promise<ParcelMetadata | null> {
+  throw new Error(
+    'Parcel metadata service is disabled. Use the simplified address lookup instead.'
+  );
 }
 
 /**
  * Get parcel metadata for multiple IDs
- * @param parcelIds Array of parcel IDs to look up
- * @returns Array of ParcelMetadata objects (excludes not found)
+ * @returns Always throws error - service is disabled
  */
-export async function getBulkParcelMetadata(
-  parcelIds: string[]
-): Promise<ParcelMetadata[]> {
-  const bundle = await loadParcelMetadata();
-
-  return parcelIds
-    .map((id) => bundle.lookup[id])
-    .filter((parcel): parcel is ParcelMetadata => parcel !== undefined);
+export async function getBulkParcelMetadata(): Promise<ParcelMetadata[]> {
+  throw new Error(
+    'Parcel metadata service is disabled. Use the simplified address lookup instead.'
+  );
 }
 
 /**

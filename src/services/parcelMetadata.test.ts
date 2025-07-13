@@ -23,22 +23,16 @@ describe('parcelMetadata service', () => {
     vi.clearAllMocks();
   });
 
-  it('getParcelMetadata returns correct metadata or null', async () => {
-    const firstParcel = await getParcelMetadata('p1');
-    expect(firstParcel).not.toBeNull();
-    expect(firstParcel?.id).toBe('p1');
-
-    const missingParcel = await getParcelMetadata('unknown');
-    expect(missingParcel).toBeNull();
+  it('getParcelMetadata throws error when service is disabled', async () => {
+    await expect(getParcelMetadata()).rejects.toThrow(
+      'Parcel metadata service is disabled. Use the simplified address lookup instead.'
+    );
   });
 
-  it('getBulkParcelMetadata returns only found items', async () => {
-    const bulk = await getBulkParcelMetadata(['p1', 'p2', 'p3']);
-    expect(bulk).toHaveLength(2);
-    expect(bulk.map((p) => p.id)).toEqual(['p1', 'p2']);
-
-    const none = await getBulkParcelMetadata(['x']);
-    expect(none).toEqual([]);
+  it('getBulkParcelMetadata throws error when service is disabled', async () => {
+    await expect(getBulkParcelMetadata()).rejects.toThrow(
+      'Parcel metadata service is disabled. Use the simplified address lookup instead.'
+    );
   });
 
   it('createBoundingBoxFromParcel returns correct bounds as strings', () => {

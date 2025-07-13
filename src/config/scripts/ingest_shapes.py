@@ -100,11 +100,11 @@ class ShapefileProcessor:
     def _get_record_limit(self) -> Optional[int]:
         """Get the record limit based on dataset size"""
         limits = {
-            "small": 1000,
-            "medium": 10000,
-            "large": None
+            "small": 5000,     # 5K records for testing
+            "medium": 25000,   # 25K records for development
+            "large": None      # Full dataset (no limit)
         }
-        return limits.get(self.dataset_size, 1000)
+        return limits.get(self.dataset_size, None)  # Default: no limit
     
     def safe_to_numeric(self, value, default=0):
         """Safely convert value to numeric"""
@@ -240,26 +240,19 @@ class ShapefileProcessor:
         
         return "unknown"
     
-    def extract_parcel_geometry(self, geometry, source_crs=None):
+    def extract_parcel_geometry(self, geometry, already_transformed=False):
         """Extract parcel geometry as simplified GeoJSON
         
         Args:
-            geometry: Shapely geometry object
-            source_crs: Source CRS for coordinate transformation
+            geometry: Shapely geometry object (should already be in WGS84)
+            already_transformed: True if geometry is already in WGS84
         """
         if geometry is None or geometry.is_empty:
             return None
             
         try:
-            # Convert shapely geometry to GeoSeries for CRS transformation
-            if source_crs and source_crs.to_epsg() != 4326:
-                # Create GeoSeries with source CRS and transform to WGS84
-                geom_series = gpd.GeoSeries([geometry], crs=source_crs)
-                geom_wgs84_series = geom_series.to_crs(epsg=4326)
-                geom = geom_wgs84_series.iloc[0]
-            else:
-                # Already in WGS84 or no CRS provided
-                geom = geometry
+            # Assume geometry is already transformed to WGS84 by batch processing
+            geom = geometry
                 
             def round_coords(coords):
                 if isinstance(coords[0], (list, tuple)):
@@ -373,45 +366,47 @@ class ShapefileProcessor:
         # Apply record limit
         if self.limit_records:
             gdf = gdf.head(self.limit_records)
+            gdf_original = gdf_original.head(self.limit_records)
             print(f"📊 Limited to {len(gdf)} records for {self.dataset_size} dataset")
         
+        # PERFORMANCE OPTIMIZATION: Batch transform all geometries to WGS84 at once
+        print("🔄 Batch transforming city geometries to WGS84...")
+        if gdf_original.crs and gdf_original.crs.to_epsg() != 4326:
+            gdf_wgs84 = gdf_original.to_crs(epsg=4326)
+        else:
+            gdf_wgs84 = gdf_original.copy()
+        
+        # Batch calculate centroids in projected CRS for accuracy, then transform to WGS84
+        print("🎯 Calculating centroids...")
+        if gdf.crs and gdf.crs.to_epsg() != 4326:
+            # Use UTM projection for accurate centroid calculation
+            centroids_utm = gdf.geometry.centroid
+            centroids_gdf = gpd.GeoDataFrame({'geometry': centroids_utm}, crs=gdf.crs)
+            centroids_wgs84 = centroids_gdf.to_crs(epsg=4326)
+            centroids = centroids_wgs84.geometry
+        else:
+            # Already in WGS84, but warn about accuracy
+            centroids = gdf_wgs84.geometry.centroid
+        
+        print(f"⚙️ Processing {len(gdf)} city parcels...")
         results = []
         geometry_data = {}
         
         for idx, (_, row) in enumerate(gdf.iterrows()):
-            if idx % 1000 == 0 and idx > 0:
+            if idx % 5000 == 0 and idx > 0:
                 print(f"   ⚙️ Processed {idx:,}/{len(gdf):,} city parcels...")
                 
             parcel_id = str(row.get(parcel_id_field, "")).strip()
             if not parcel_id:
                 continue
                 
-            # Get original geometry for centroid and geometry extraction (before UTM transformation)
-            original_row = gdf_original.iloc[idx]
+            # Use pre-transformed geometry (much faster)
+            wgs84_geom = gdf_wgs84.iloc[idx].geometry
+            geometry_data[parcel_id] = self.extract_parcel_geometry(wgs84_geom, already_transformed=True)
             
-            # Extract geometry from original (preserves coordinate precision)
-            geometry_data[parcel_id] = self.extract_parcel_geometry(
-                original_row.geometry, 
-                source_crs=gdf_original.crs
-            )
-            
-            # Calculate centroid in WGS84
-            if gdf_original.crs and gdf_original.crs.to_epsg() != 4326:
-                try:
-                    # Transform original geometry to WGS84 for centroid
-                    centroid_geom = original_row.geometry.centroid
-                    centroid_gdf = gpd.GeoSeries([centroid_geom], crs=gdf_original.crs)
-                    centroid_wgs84 = centroid_gdf.to_crs(epsg=4326).iloc[0]
-                    lat, lng = centroid_wgs84.y, centroid_wgs84.x
-                except Exception as e:
-                    print(f"⚠️ CRS transformation failed for parcel {parcel_id}, using fallback: {e}")
-                    # Fallback: use UTM centroid (will be inaccurate but better than crashing)
-                    centroid = row.geometry.centroid
-                    lat, lng = centroid.y, centroid.x
-            else:
-                # Already in WGS84
-                centroid = original_row.geometry.centroid
-                lat, lng = centroid.y, centroid.x
+            # Use pre-calculated centroid (much faster)
+            centroid = centroids.iloc[idx]
+            lat, lng = centroid.y, centroid.x
             
             # Get address data
             raw_street_address = self.get_field_value(row, "city", "address", "street_primary", "")
@@ -505,28 +500,44 @@ class ShapefileProcessor:
         
         if self.limit_records:
             gdf = gdf.head(self.limit_records)
+            gdf_original = gdf_original.head(self.limit_records)
             print(f"📊 Limited to {len(gdf)} records for {self.dataset_size} dataset")
         
+        # PERFORMANCE OPTIMIZATION: Batch transform all geometries to WGS84 at once
+        print("🔄 Batch transforming county geometries to WGS84...")
+        if gdf_original.crs and gdf_original.crs.to_epsg() != 4326:
+            gdf_wgs84 = gdf_original.to_crs(epsg=4326)
+        else:
+            gdf_wgs84 = gdf_original.copy()
+        
+        # Batch calculate centroids in projected CRS for accuracy, then transform to WGS84
+        print("🎯 Calculating centroids...")
+        if gdf.crs and gdf.crs.to_epsg() != 4326:
+            # Use UTM projection for accurate centroid calculation
+            centroids_utm = gdf.geometry.centroid
+            centroids_gdf = gpd.GeoDataFrame({'geometry': centroids_utm}, crs=gdf.crs)
+            centroids_wgs84 = centroids_gdf.to_crs(epsg=4326)
+            centroids = centroids_wgs84.geometry
+        else:
+            # Already in WGS84, but warn about accuracy
+            centroids = gdf_wgs84.geometry.centroid
+        
+        print(f"⚙️ Processing {len(gdf)} county parcels...")
         results = []
         geometry_data = {}
         parcel_id_field = self.field_mappings["county"]["parcel_id"]
         
         for idx, (_, row) in enumerate(gdf.iterrows()):
-            if idx % 1000 == 0 and idx > 0:
+            if idx % 5000 == 0 and idx > 0:
                 print(f"   ⚙️ Processed {idx:,}/{len(gdf):,} county parcels...")
                 
             parcel_id = str(row.get(parcel_id_field, "")).strip()
             if not parcel_id:
                 continue
                 
-            # Get original geometry for centroid and geometry extraction (before UTM transformation)
-            original_row = gdf_original.iloc[idx]
-            
-            # Extract geometry from original (preserves coordinate precision)
-            geometry_data[parcel_id] = self.extract_parcel_geometry(
-                original_row.geometry, 
-                source_crs=gdf_original.crs
-            )
+            # Use pre-transformed geometry (much faster)
+            wgs84_geom = gdf_wgs84.iloc[idx].geometry
+            geometry_data[parcel_id] = self.extract_parcel_geometry(wgs84_geom, already_transformed=True)
             
             # Get address data
             raw_address = str(self.get_field_value(row, "county", "address", "full", "")).strip()
@@ -553,23 +564,9 @@ class ShapefileProcessor:
             if not standardized_address:
                 continue
                 
-            # Calculate centroid in WGS84
-            if gdf_original.crs and gdf_original.crs.to_epsg() != 4326:
-                try:
-                    # Transform original geometry to WGS84 for centroid
-                    centroid_geom = original_row.geometry.centroid
-                    centroid_gdf = gpd.GeoSeries([centroid_geom], crs=gdf_original.crs)
-                    centroid_wgs84 = centroid_gdf.to_crs(epsg=4326).iloc[0]
-                    lat, lng = centroid_wgs84.y, centroid_wgs84.x
-                except Exception as e:
-                    print(f"⚠️ CRS transformation failed for parcel {parcel_id}, using fallback: {e}")
-                    # Fallback: use UTM centroid (will be inaccurate but better than crashing)
-                    centroid = row.geometry.centroid
-                    lat, lng = centroid.y, centroid.x
-            else:
-                # Already in WGS84
-                centroid = original_row.geometry.centroid
-                lat, lng = centroid.y, centroid.x
+            # Use pre-calculated centroid (much faster)
+            centroid = centroids.iloc[idx]
+            lat, lng = centroid.y, centroid.x
             
             # Calculate property metrics
             land_area = self.safe_to_numeric(row.get("landarea"), 0)
@@ -867,10 +864,10 @@ class DocumentModePipeline:
             print(f"📤 Uploading {file_path.name} to {blob_path}")
             
             try:
-                # Use upload_blob.js script from project root
+                # Use upload_blob.js script, run from project root
                 result = subprocess.run([
                     "node", 
-                    str(self.scripts_dir / "upload_blob.js"), 
+                    str(Path("src/config/scripts/upload_blob.js")), 
                     str(file_path), 
                     blob_path
                 ], capture_output=True, text=True, check=True, cwd=str(self.project_root))
@@ -999,7 +996,7 @@ class DocumentModePipeline:
                 try:
                     result = subprocess.run([
                         "node", 
-                        str(self.scripts_dir / "upload_firebase.js"), 
+                        str(Path("src/config/scripts/upload_firebase.js")), 
                         "upload",
                         str(file_path), 
                         f"search/{file_path.name}"
@@ -1135,8 +1132,8 @@ def main():
     parser.add_argument(
         "--dataset-size",
         choices=["small", "medium", "large"],
-        default="small",
-        help="Dataset size: small (1000), medium (10000), large (all records)"
+        default="large",
+        help="Dataset size: small (5000), medium (25000), large (all records)"
     )
     parser.add_argument(
         "--version",

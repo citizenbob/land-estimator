@@ -2,7 +2,6 @@ import { GET } from './route';
 import { getParcelMetadata } from '@services/parcelMetadata';
 import { NextRequest } from 'next/server';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { MOCK_PARCEL_METADATA } from '@lib/testData';
 
 vi.mock('@services/parcelMetadata', () => ({
   getParcelMetadata: vi.fn()
@@ -21,39 +20,29 @@ describe('/api/parcel-metadata/[id] route', () => {
     return new NextRequest(url);
   };
 
-  const mockParcelData = MOCK_PARCEL_METADATA[0];
-
   describe('GET', () => {
-    it('should return parcel data when parcel exists', async () => {
-      mockGetParcelMetadata.mockResolvedValue(mockParcelData);
+    it('should return 500 when service is disabled', async () => {
+      const consoleErrorSpy = vi
+        .spyOn(console, 'error')
+        .mockImplementation(() => {});
 
-      const request = createMockRequest();
-      const params = { params: Promise.resolve({ id: mockParcelData.id }) };
-
-      const response = await GET(request, params);
-      const data = await response.json();
-
-      expect(response.status).toBe(200);
-      expect(data).toEqual(mockParcelData);
-      expect(mockGetParcelMetadata).toHaveBeenCalledWith(mockParcelData.id);
-
-      expect(response.headers.get('Cache-Control')).toBe(
-        'public, max-age=3600'
+      mockGetParcelMetadata.mockRejectedValue(
+        new Error(
+          'Parcel metadata service is disabled. Use the simplified address lookup instead.'
+        )
       );
-    });
-
-    it('should return 404 when parcel not found', async () => {
-      mockGetParcelMetadata.mockResolvedValue(null);
 
       const request = createMockRequest();
-      const params = { params: Promise.resolve({ id: 'nonexistent' }) };
+      const params = { params: Promise.resolve({ id: 'test-id' }) };
 
       const response = await GET(request, params);
       const data = await response.json();
 
-      expect(response.status).toBe(404);
-      expect(data).toEqual({ error: 'Not found' });
-      expect(mockGetParcelMetadata).toHaveBeenCalledWith('nonexistent');
+      expect(response.status).toBe(500);
+      expect(data).toEqual({ error: 'Internal error' });
+      expect(mockGetParcelMetadata).toHaveBeenCalledWith();
+
+      consoleErrorSpy.mockRestore();
     });
 
     it('should return 400 when parcel id is missing', async () => {
@@ -72,8 +61,11 @@ describe('/api/parcel-metadata/[id] route', () => {
       const consoleErrorSpy = vi
         .spyOn(console, 'error')
         .mockImplementation(() => {});
+
       mockGetParcelMetadata.mockRejectedValue(
-        new Error('Database connection failed')
+        new Error(
+          'Parcel metadata service is disabled. Use the simplified address lookup instead.'
+        )
       );
 
       const request = createMockRequest();
@@ -84,10 +76,12 @@ describe('/api/parcel-metadata/[id] route', () => {
 
       expect(response.status).toBe(500);
       expect(data).toEqual({ error: 'Internal error' });
+      expect(mockGetParcelMetadata).toHaveBeenCalledWith();
       expect(consoleErrorSpy).toHaveBeenCalledWith(
         '[Error]',
         expect.objectContaining({
-          message: 'Database connection failed',
+          message:
+            'Parcel metadata service is disabled. Use the simplified address lookup instead.',
           context: expect.objectContaining({
             operation: 'parcel_metadata_lookup',
             parcelId: '123'

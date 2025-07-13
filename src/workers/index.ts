@@ -6,9 +6,3 @@
 export { default as backgroundPreloader } from './backgroundPreloader';
 
 export { default as serviceWorkerClient } from './serviceWorkerClient';
-
-export {
-  clearMemoryCache,
-  getCacheStats,
-  decompressVersionedJsonData
-} from './versionedBundleLoader';

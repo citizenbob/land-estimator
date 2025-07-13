@@ -1,37 +1,39 @@
 /**
- * Static FlexSearch Index Loader - Document Mode Only
+ * Static FlexSearch Index Loader - Regional Shard + Fast Rebuild Strategy
  *
  * Works with Vercel Edge Middleware:
  * - Detects user's region shard via cookie (set by middleware)
- * - Loads only that region's Document Mode files from local static files
+ * - Loads only that region's index files + lookup table
  * - Rebuilds index once on first use, then caches forever
  * - Client-only operation (no SSR)
- * - NO CDN fallback - static files only
  */
 
-import { Document } from 'flexsearch';
+import { Index } from 'flexsearch';
 import { devLog, logError } from '@lib/logger';
 
 // Types
 export interface FlexSearchIndexBundle {
-  index: Document<Record<string, unknown>>;
+  index: Index;
   parcelIds: string[];
   addressData: Record<string, string>;
 }
 
-export interface DocumentModeManifest {
-  regions: Array<{
-    region: string;
-    version: string;
-    document_file: string;
-    lookup_file: string;
-  }>;
-  metadata: {
-    generated_at: string;
-    version: string;
-    total_regions: number;
-    source: string;
-  };
+export interface ShardManifest {
+  version: string;
+  buildTime: string;
+  regions: Record<
+    string,
+    {
+      region: string;
+      version: string;
+      hash: string;
+      files: string[];
+      lookup: string;
+      addressCount: number;
+      buildTime: string;
+    }
+  >;
+  totalAddresses: number;
 }
 
 export interface AddressLookupData {
@@ -39,16 +41,16 @@ export interface AddressLookupData {
   addressData: Record<string, string>;
 }
 
-// FlexSearch Document Mode configuration
-const FLEXSEARCH_DOCUMENT_CONFIG = {
+// Should match your build config
+const FLEXSEARCH_CONFIG = {
   tokenize: 'forward',
-  threshold: 0,
-  resolution: 1,
-  document: {
-    id: 'id',
-    index: ['full_address']
-  }
-};
+  cache: 100,
+  resolution: 3,
+  threshold: 1,
+  depth: 2,
+  bidirectional: true,
+  suggest: true
+} as const;
 
 class ClientOnlyAddressIndexLoader {
   private static instance: ClientOnlyAddressIndexLoader | null = null;
@@ -57,7 +59,7 @@ class ClientOnlyAddressIndexLoader {
 
   private constructor() {
     if (typeof window !== 'undefined') {
-      devLog('🌐 Client-only Document Mode address index loader initialized');
+      devLog('🌐 Client-only address index loader initialized');
     }
   }
 
@@ -71,147 +73,107 @@ class ClientOnlyAddressIndexLoader {
 
   async loadAddressIndex(): Promise<FlexSearchIndexBundle> {
     if (this.bundle) {
-      devLog('⚡ Using cached Document Mode address index');
+      devLog('⚡ Using cached static address index');
       return this.bundle;
     }
     if (this.loadingPromise) {
-      devLog('⏳ Waiting for Document Mode index load...');
+      devLog('⏳ Waiting for static index load...');
       return this.loadingPromise;
     }
 
-    devLog('🚀 Loading Document Mode FlexSearch index from static files...');
-    this.loadingPromise = this._loadDocumentModeIndex();
+    devLog('🚀 Loading static FlexSearch index...');
+    this.loadingPromise = this._loadStaticIndex();
 
     try {
       this.bundle = await this.loadingPromise;
-      devLog('✅ Document Mode FlexSearch index loaded and cached');
+      devLog('✅ Static FlexSearch index loaded and cached');
       return this.bundle;
     } finally {
       this.loadingPromise = null;
     }
   }
 
-  private async _loadDocumentModeIndex(): Promise<FlexSearchIndexBundle> {
+  private async _loadStaticIndex(): Promise<FlexSearchIndexBundle> {
     try {
-      // Handle both browser and Node.js environments
-      const baseUrl =
-        typeof window !== 'undefined' ? '' : 'http://localhost:3000';
-
-      devLog('📄 Loading Document Mode manifest from static files...');
-      const manifestResponse = await fetch(`${baseUrl}/search/latest.json`);
+      const manifestResponse = await fetch('/search/latest.json');
       if (!manifestResponse.ok) {
-        throw new Error(
-          `Document Mode manifest not found at /search/latest.json: ${manifestResponse.status}`
-        );
+        throw new Error(`Manifest not found: ${manifestResponse.status}`);
       }
 
-      const manifest = (await manifestResponse.json()) as DocumentModeManifest;
-
-      // Validate manifest structure
-      if (!manifest.regions || !Array.isArray(manifest.regions)) {
-        throw new Error(
-          'Invalid Document Mode manifest: missing or invalid regions array'
-        );
-      }
-
+      const manifest: ShardManifest = await manifestResponse.json();
       devLog(
-        `📊 Found Document Mode manifest v${manifest.metadata.version} with ${manifest.regions.length} regions`
+        `📊 Found manifest v${manifest.version} with ${manifest.totalAddresses} addresses`
       );
 
       // Get region shard from cookie
       const regionShard = this._getRegionShardFromCookie();
-      let regionData = manifest.regions.find((r) => r.region === regionShard);
-
-      // Fallback to stl_county if original region not found
-      let finalRegion = regionShard;
-      if (!regionData) {
-        finalRegion = 'stl_county';
-        regionData = manifest.regions.find((r) => r.region === finalRegion);
-      }
+      const regionData =
+        manifest.regions[regionShard] || manifest.regions['stl_county'];
 
       if (!regionData) {
-        throw new Error(
-          `No region data found for ${finalRegion}. Available regions: ${manifest.regions.map((r) => r.region).join(', ')}`
-        );
+        throw new Error(`No region data for ${regionShard}`);
       }
 
-      devLog(`🌎 Using region shard: ${regionData.region}`);
+      devLog(`🌎 Using region shard: ${regionShard}`);
 
-      return await this._loadDocumentModeFiles(regionData, baseUrl);
+      const indexResult = await this._loadFromExportedFiles(regionData);
+      if (indexResult) {
+        devLog(`✅ Loaded ${regionShard} shard from static files`);
+        return indexResult;
+      }
+
+      throw new Error(`No valid index files for region ${regionShard}`);
     } catch (error) {
-      logError('❌ Document Mode index loading failed:', error);
+      logError('❌ Static index loading failed:', error);
+      // Re-throw to maintain the Promise<FlexSearchIndexBundle> return type
       throw error;
     }
   }
 
-  private async _loadDocumentModeFiles(
-    regionData: DocumentModeManifest['regions'][0],
-    baseUrl: string
-  ): Promise<FlexSearchIndexBundle> {
+  private async _loadFromExportedFiles(
+    region: ShardManifest['regions'][string]
+  ): Promise<FlexSearchIndexBundle | null> {
     try {
       devLog(
-        `📄 Loading Document Mode files for region ${regionData.region}...`
+        `📤 Loading ${region.files.length} files for region ${region.region}...`
       );
+      const searchIndex = new Index(FLEXSEARCH_CONFIG);
 
-      // Create FlexSearch Document index
-      const searchIndex = new Document(FLEXSEARCH_DOCUMENT_CONFIG);
-
-      // Load document.json file (contains the addresses for FlexSearch Document Mode)
-      devLog(`  📄 Loading document file: ${regionData.document_file}`);
-      const documentResponse = await fetch(
-        `${baseUrl}/search/${regionData.document_file}`
-      );
-      if (!documentResponse.ok) {
-        throw new Error(
-          `Failed to load document file ${regionData.document_file}: ${documentResponse.status}`
-        );
-      }
-
-      const documents = await documentResponse.json();
-      if (!Array.isArray(documents)) {
-        throw new Error(
-          `Invalid document file format: expected array, got ${typeof documents}`
-        );
-      }
-
-      devLog(`  📊 Found ${documents.length} documents to index`);
-
-      // Add all documents to the FlexSearch Document index
-      let validDocuments = 0;
-      for (const doc of documents) {
-        if (
-          !doc.id ||
-          !doc.full_address ||
-          typeof doc.full_address !== 'string'
-        ) {
-          logError('⚠️ Skipping invalid document:', doc);
-          continue;
+      // Load all .reg/.map parts except lookup and import them individually
+      const indexFiles = region.files.filter((f) => !f.includes('lookup'));
+      for (const filename of indexFiles) {
+        const response = await fetch(`/search/${filename}`);
+        if (!response.ok) {
+          throw new Error(`Failed to load ${filename}: ${response.status}`);
         }
-        searchIndex.add(doc);
-        validDocuments++;
+
+        const text = await response.text();
+        let data = text ? JSON.parse(text) : null;
+
+        // ✅ CRITICAL: Ensure we have actual arrays/objects, not JSON strings
+        // If the data is a string, parse it to get the actual array/object
+        if (typeof data === 'string') {
+          try {
+            data = JSON.parse(data);
+            devLog(`  🔧 Parsed stringified JSON for ${filename}`);
+          } catch (parseError) {
+            devLog(
+              `  ⚠️ Failed to parse string data for ${filename}: ${parseError}`
+            );
+          }
+        }
+
+        // ✅ CRITICAL FIX: For FlexSearch.Index, import each part individually
+        searchIndex.import(data);
+        devLog(`  ✅ Imported ${filename}`);
       }
 
-      devLog(`  ✅ Indexed ${validDocuments} addresses in Document Mode`);
-
-      // Load lookup data
-      devLog(`  📄 Loading lookup file: ${regionData.lookup_file}`);
-      const lookupResponse = await fetch(
-        `${baseUrl}/search/${regionData.lookup_file}`
-      );
+      // Load lookup
+      const lookupResponse = await fetch(`/search/${region.lookup}`);
       if (!lookupResponse.ok) {
-        throw new Error(
-          `Failed to load lookup file ${regionData.lookup_file}: ${lookupResponse.status}`
-        );
+        throw new Error(`Failed to load lookup: ${lookupResponse.status}`);
       }
-
       const lookupData: AddressLookupData = await lookupResponse.json();
-      if (!lookupData.parcelIds || !lookupData.addressData) {
-        throw new Error(
-          'Invalid lookup file format: missing parcelIds or addressData'
-        );
-      }
-
-      devLog(`✅ Loaded ${regionData.region} shard from Document Mode files`);
 
       return {
         index: searchIndex,
@@ -219,8 +181,8 @@ class ClientOnlyAddressIndexLoader {
         addressData: lookupData.addressData
       };
     } catch (error) {
-      logError(`❌ Document Mode file loading failed: ${error}`);
-      throw error;
+      devLog(`⚠️ Export loading failed: ${error}`);
+      return null;
     }
   }
 
@@ -241,7 +203,7 @@ class ClientOnlyAddressIndexLoader {
   clearCache(): void {
     this.bundle = null;
     this.loadingPromise = null;
-    devLog('🗑️ Document Mode address index cache cleared');
+    devLog('🗑️ Static address index cache cleared');
   }
 }
 

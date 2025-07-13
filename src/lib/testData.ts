@@ -2,10 +2,9 @@
  * @fileoverview Mock data and test fixtures for testing address lookup and estimation functionality
  */
 
-import type { FlexSearchIndexBundle as LoadAddressIndexBundle } from '@services/loadAddressIndex';
+import type { FlexSearchIndexBundle } from '@app-types';
 import { vi } from 'vitest';
 import type { LocalAddressRecord, AddressSuggestion } from '@app-types';
-import type { VersionManifest } from '@services/versionManifest';
 
 /**
  * Mock local address records for testing address lookup functionality
@@ -404,27 +403,6 @@ export interface TestBundle {
   count: number;
 }
 
-export const MOCK_VERSION_MANIFEST: VersionManifest = {
-  generated_at: '2024-01-15T10:30:00.000Z',
-  current: {
-    version: '1.2.3',
-    files: {
-      address_index: 'cdn/address-index-v1.2.3.json.gz',
-      parcel_metadata: 'cdn/parcel-metadata-v1.2.3.json.gz',
-      parcel_geometry: 'cdn/parcel-geometry-v1.2.3.json.gz'
-    }
-  },
-  previous: {
-    version: '1.2.2',
-    files: {
-      address_index: 'cdn/address-index-v1.2.2.json.gz',
-      parcel_metadata: 'cdn/parcel-metadata-v1.2.2.json.gz',
-      parcel_geometry: 'cdn/parcel-geometry-v1.2.2.json.gz'
-    }
-  },
-  available_versions: ['1.2.3', '1.2.2']
-};
-
 export const MOCK_TEST_ITEMS: TestItem[] = [
   { id: '1', name: 'Item 1' },
   { id: '2', name: 'Item 2' }
@@ -446,17 +424,15 @@ export const EXPECTED_TEST_BUNDLE: TestBundle = {
 /**
  * Mock FlexSearch index bundle for testing
  */
-export const MOCK_FLEXSEARCH_BUNDLE: LoadAddressIndexBundle = {
+export const MOCK_FLEXSEARCH_BUNDLE: FlexSearchIndexBundle = {
   index: {
     add: vi.fn(),
-    search: vi.fn().mockReturnValue([]),
+    search: vi.fn().mockReturnValue([0, 1, 2]),
     remove: vi.fn(),
     update: vi.fn(),
     clear: vi.fn(),
-    length: 3,
-    export: vi.fn(),
-    import: vi.fn()
-  } as unknown as LoadAddressIndexBundle['index'],
+    length: 3
+  } as unknown as NonNullable<FlexSearchIndexBundle['index']>,
   parcelIds: MOCK_ADDRESS_INDEX_INDEX_DATA.parcelIds,
   addressData: MOCK_ADDRESS_INDEX_ADDRESS_DATA
 };

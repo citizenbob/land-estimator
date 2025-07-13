@@ -18,7 +18,7 @@ export async function GET(
   }
 
   try {
-    const data = await getParcelMetadata(id);
+    const data = await getParcelMetadata();
     if (!data) {
       return NextResponse.json({ error: 'Not found' }, { status: 404 });
     }
