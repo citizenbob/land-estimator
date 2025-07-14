@@ -40,7 +40,7 @@ describe('/api/parcel-metadata/[id] route', () => {
 
       expect(response.status).toBe(500);
       expect(data).toEqual({ error: 'Internal error' });
-      expect(mockGetParcelMetadata).toHaveBeenCalledWith();
+      expect(mockGetParcelMetadata).toHaveBeenCalledWith('test-id');
 
       consoleErrorSpy.mockRestore();
     });
@@ -76,7 +76,7 @@ describe('/api/parcel-metadata/[id] route', () => {
 
       expect(response.status).toBe(500);
       expect(data).toEqual({ error: 'Internal error' });
-      expect(mockGetParcelMetadata).toHaveBeenCalledWith();
+      expect(mockGetParcelMetadata).toHaveBeenCalledWith('123');
       expect(consoleErrorSpy).toHaveBeenCalledWith(
         '[Error]',
         expect.objectContaining({

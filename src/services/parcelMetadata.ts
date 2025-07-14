@@ -18,9 +18,8 @@ export interface ParcelMetadata {
   processed_date: string;
 }
 
-// Legacy interfaces kept for backward compatibility but not used in disabled service
-
-// Configuration removed as parcel metadata service is now disabled
+// Parcel metadata cache
+let parcelMetadataCache: Map<string, ParcelMetadata> | null = null;
 
 /**
  * Universal parcel metadata loader that works in both browser and Node.js environments
@@ -28,70 +27,132 @@ export interface ParcelMetadata {
  * @returns Complete parcel bundle with data array and lookup map
  * @throws When parcel files cannot be loaded, decompressed, or parsed
  */
-export async function loadParcelMetadata(): Promise<never> {
-  if (process.env.NODE_ENV === 'production') {
-    if (typeof window !== 'undefined') {
-      try {
-        const { default: serviceWorkerClient } = await import(
-          '@workers/serviceWorkerClient'
-        );
+export async function loadParcelMetadata(): Promise<
+  Map<string, ParcelMetadata>
+> {
+  if (parcelMetadataCache) {
+    console.log('⚡ Using cached parcel metadata');
+    return parcelMetadataCache;
+  }
 
-        // Note: Parcel metadata loading is disabled in the current architecture
-        // This service worker integration is kept for future use
-        await serviceWorkerClient.warmupCache();
+  console.log('🚀 Loading parcel metadata from cold storage...');
+
+  try {
+    // Load from CDN/cold storage - check multiple possible endpoints
+    let response: Response;
+    const endpoints = [
+      'https://storage.googleapis.com/land-estimator-29ee9.firebasestorage.app/cdn/parcel/latest.json',
+      '/parcel/latest.json',
+      '/data/parcel/latest.json',
+      '/public/parcel/latest.json'
+    ];
+
+    let lastError: Error | null = null;
+    for (const endpoint of endpoints) {
+      try {
+        response = await fetch(endpoint);
+        if (response.ok) break;
       } catch (error) {
-        console.warn(
-          '[Parcel Metadata] Service Worker integration failed:',
-          error
-        );
+        lastError = error as Error;
+        continue;
       }
     }
 
-    throw new Error(
-      'Parcel metadata service is disabled in the current architecture'
-    );
-  }
+    if (!response! || !response.ok) {
+      throw new Error(
+        `Failed to load parcel metadata from any endpoint. Last error: ${lastError?.message}`
+      );
+    }
 
-  if (process.env.NODE_ENV === 'test') {
-    throw new Error(
-      'Parcel metadata service is disabled in the current architecture'
-    );
-  }
+    const parcelData: ParcelMetadata[] = await response.json();
 
-  console.log(
-    '🌐 [DEV] Parcel metadata service is disabled in the current architecture'
-  );
-  throw new Error(
-    'Parcel metadata service is disabled in the current architecture'
-  );
+    // Create lookup map
+    parcelMetadataCache = new Map();
+    for (const parcel of parcelData) {
+      parcelMetadataCache.set(parcel.id, parcel);
+    }
+
+    console.log(
+      `✅ Loaded ${parcelData.length} parcel records from cold storage`
+    );
+    return parcelMetadataCache;
+  } catch (error) {
+    console.error('❌ Failed to load parcel metadata:', error);
+    throw error;
+  }
 }
 
 /**
  * Clears the cached parcel bundle
  */
 export function clearParcelMetadataCache(): void {
-  // Note: Parcel metadata service is disabled in the current architecture
-  console.warn('clearParcelMetadataCache called but service is disabled');
+  parcelMetadataCache = null;
+  console.log('🗑️ Parcel metadata cache cleared');
 }
 
 /**
  * Get detailed parcel metadata by ID
- * @returns Always throws error - service is disabled
+ * @param parcelId - The parcel ID to lookup
+ * @returns Parcel metadata or null if not found
  */
-export async function getParcelMetadata(): Promise<ParcelMetadata | null> {
-  throw new Error(
-    'Parcel metadata service is disabled. Use the simplified address lookup instead.'
-  );
+export async function getParcelMetadata(
+  parcelId: string
+): Promise<ParcelMetadata | null> {
+  if (!parcelId) {
+    return null;
+  }
+
+  try {
+    const parcelMap = await loadParcelMetadata();
+    const parcel = parcelMap.get(parcelId);
+
+    if (parcel) {
+      console.log(`📦 Found parcel metadata for ID: ${parcelId}`);
+    } else {
+      console.warn(`⚠️ No parcel metadata found for ID: ${parcelId}`);
+    }
+
+    return parcel || null;
+  } catch (error) {
+    console.error(
+      `❌ Failed to get parcel metadata for ID ${parcelId}:`,
+      error
+    );
+    return null;
+  }
 }
 
 /**
  * Get parcel metadata for multiple IDs
- * @returns Always throws error - service is disabled
+ * @param parcelIds - Array of parcel IDs to lookup
+ * @returns Array of parcel metadata (excluding not found)
  */
-export async function getBulkParcelMetadata(): Promise<ParcelMetadata[]> {
-  throw new Error(
-    'Parcel metadata service is disabled. Use the simplified address lookup instead.'
-  );
+export async function getBulkParcelMetadata(
+  parcelIds: string[]
+): Promise<ParcelMetadata[]> {
+  if (!parcelIds || parcelIds.length === 0) {
+    return [];
+  }
+
+  try {
+    const parcelMap = await loadParcelMetadata();
+    const results: ParcelMetadata[] = [];
+
+    for (const id of parcelIds) {
+      const parcel = parcelMap.get(id);
+      if (parcel) {
+        results.push(parcel);
+      }
+    }
+
+    console.log(
+      `📦 Found ${results.length}/${parcelIds.length} parcel records`
+    );
+    return results;
+  } catch (error) {
+    console.error('❌ Failed to get bulk parcel metadata:', error);
+    return [];
+  }
 }
 
 /**

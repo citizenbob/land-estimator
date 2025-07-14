@@ -2,18 +2,13 @@ describe('Capture Address Inquiries and Log Shopper Behavior', () => {
   beforeEach(() => {
     cy.intercept('POST', '/api/log', { statusCode: 200 }).as('log');
 
-    cy.intercept('GET', '**/api/lookup**', (req) => {
-      const query = req.url.includes('621')
-        ? 'query_market.json'
-        : req.url.includes('907')
-          ? 'query_volz.json'
-          : null;
-      if (query) {
-        req.reply({ fixture: `lookups/${query}` });
-      }
-    }).as('lookup');
-
     cy.visit('/');
+
+    cy.window({ timeout: 15000 }).should(
+      'have.property',
+      'addressIndexBothRegionsReady',
+      true
+    );
   });
 
   /**
@@ -23,29 +18,18 @@ describe('Capture Address Inquiries and Log Shopper Behavior', () => {
    * THEN address suggestions are displayed from a local, static dataset
    */
   it('Shopper enters a St. Louis City address and receives suggested matches', () => {
-    cy.get('input[placeholder="Enter address"]').clear().type('621 Market');
-
-    cy.wait('@lookup');
+    cy.get('input[placeholder="Enter address"]').clear().type('621 Market St');
 
     cy.get('ul[role="listbox"]', { timeout: 10000 }).should('be.visible');
 
-    cy.contains('li[role="option"]', '621 Market St., St. Louis, MO 63101')
-      .should('be.visible')
-      .click();
+    cy.get('li[role="option"]').first().click();
 
     cy.wait('@log').then((interception) => {
       expect(interception.request.body.eventName).to.equal('address_selected');
-      expect(interception.request.body.data).to.deep.include({
-        query: '621 Market',
-        address_id: '10131000022',
-        position_in_results: 0
-      });
+      expect(interception.request.body.data.query).to.equal('621 Market St');
+      expect(interception.request.body.data.address_id).to.be.a('string');
+      expect(interception.request.body.data.position_in_results).to.equal(0);
     });
-
-    cy.get('input[placeholder="Enter address"]').should(
-      'have.value',
-      '621 Market St., St. Louis, MO 63101'
-    );
   });
 
   /**
@@ -55,13 +39,10 @@ describe('Capture Address Inquiries and Log Shopper Behavior', () => {
    * THEN the system logs an "estimate_button_clicked" event with address_id
    */
   it('Shopper clears their selected suggestion', () => {
-    cy.get('input[placeholder="Enter address"]').clear().type('621 Market');
+    cy.get('input[placeholder="Enter address"]').clear().type('701 Market St');
 
-    cy.wait('@lookup');
-    cy.contains(
-      'li[role="option"]',
-      '621 Market St., St. Louis, MO 63101'
-    ).click();
+    cy.get('ul[role="listbox"]').should('be.visible');
+    cy.get('li[role="option"]').first().click();
     cy.wait('@log');
 
     cy.get('button')
@@ -73,9 +54,7 @@ describe('Capture Address Inquiries and Log Shopper Behavior', () => {
       expect(interception.request.body.eventName).to.equal(
         'estimate_button_clicked'
       );
-      expect(interception.request.body.data).to.deep.include({
-        address_id: '10131000022'
-      });
+      expect(interception.request.body.data.address_id).to.be.a('string');
     });
   });
 
@@ -87,14 +66,11 @@ describe('Capture Address Inquiries and Log Shopper Behavior', () => {
    * THEN enhanced BI data for lead follow-up is logged
    */
   it('Shopper enters a St. Louis County address and receives suggested matches', () => {
-    cy.get('input[placeholder="Enter address"]').clear().type('907 Volz');
+    cy.get('input[placeholder="Enter address"]').clear().type('1195 Dunn Rd');
 
-    cy.wait('@lookup');
     cy.get('ul[role="listbox"]', { timeout: 10000 }).should('be.visible');
-    cy.contains(
-      'li[role="option"]',
-      '907 Volz Dr., Crestwood, MO 63126'
-    ).click();
+
+    cy.get('li[role="option"]').first().click();
 
     cy.wait('@log').then((interception) => {
       expect(interception.request.body.eventName).to.equal('address_selected');

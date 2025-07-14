@@ -16,6 +16,7 @@ export interface FlexSearchIndexBundle {
   index: Index;
   parcelIds: string[];
   addressData: Record<string, string>;
+  regions?: string[];
 }
 
 // Geographic sharding configuration
@@ -59,15 +60,15 @@ export interface AddressLookupData {
   addressData: Record<string, string>;
 }
 
-// Should match your build config
+// Should match your build config - optimized for speed
 const FLEXSEARCH_CONFIG = {
   tokenize: 'forward',
   cache: 100,
-  resolution: 3,
+  resolution: 9,
   threshold: 1,
-  depth: 2,
-  bidirectional: true,
-  suggest: true
+  depth: 1,
+  bidirectional: false,
+  suggest: false
 } as const;
 
 class ClientOnlyAddressIndexLoader {
@@ -145,28 +146,10 @@ class ClientOnlyAddressIndexLoader {
         `📊 Found manifest v${manifest.metadata.version} with ${manifest.metadata.total_regions} regions`
       );
 
-      // Get region shard from cookie
-      const regionShard = this._getRegionShardFromCookie();
-      const regionData =
-        manifest.regions.find((r) => r.region === regionShard) ||
-        manifest.regions.find((r) => r.region === 'stl_county');
-
-      if (!regionData) {
-        throw new Error(`No region data for ${regionShard}`);
-      }
-
-      devLog(`🌎 Using region shard: ${regionShard}`);
-
-      const indexResult = await this._loadFromDocumentFile(regionData);
-      if (indexResult) {
-        devLog(`✅ Loaded ${regionShard} shard from static files`);
-        return indexResult;
-      }
-
-      throw new Error(`No valid index files for region ${regionShard}`);
+      // Load both city and county regions
+      return await this._loadBothRegions(manifest);
     } catch (error) {
       logError('❌ Static index loading failed:', error);
-      // Re-throw to maintain the Promise<FlexSearchIndexBundle> return type
       throw error;
     }
   }
@@ -183,24 +166,8 @@ class ClientOnlyAddressIndexLoader {
         `📊 Found manifest v${manifest.metadata.version} with ${manifest.metadata.total_regions} regions`
       );
 
-      const regionShard = this._getRegionShardFromCookie();
-      const regionData =
-        manifest.regions.find((r) => r.region === regionShard) ||
-        manifest.regions.find((r) => r.region === 'stl_county');
-
-      if (!regionData) {
-        throw new Error(`No region data for ${regionShard}`);
-      }
-
-      devLog(`🌎 Using region shard: ${regionShard} (progressive mode)`);
-
-      const indexResult = await this._loadFromDocumentFile(regionData, true);
-      if (indexResult) {
-        devLog(`✅ Loaded ${regionShard} shard with progressive enhancement`);
-        return indexResult;
-      }
-
-      throw new Error(`No valid index files for region ${regionShard}`);
+      // Load both regions progressively
+      return await this._loadBothRegionsProgressive(manifest);
     } catch (error) {
       logError('❌ Progressive static index loading failed:', error);
       throw error;
@@ -382,8 +349,8 @@ class ClientOnlyAddressIndexLoader {
     lng: number;
   }): Promise<FlexSearchIndexBundle> {
     if (!userLocation) {
-      // Fallback to current behavior if no location provided
-      return this.loadAddressIndex();
+      // Fallback to progressive behavior if no location provided
+      return this.loadAddressIndexProgressive();
     }
 
     // Check if we have a cached bundle for this location
@@ -394,8 +361,8 @@ class ClientOnlyAddressIndexLoader {
 
     devLog(`🌎 Loading addresses near user location (grid: ${gridId})`);
 
-    // For now, load the full region and filter - in production you'd have pre-built grid files
-    const fullBundle = await this.loadAddressIndex();
+    // For now, load the full region progressively and filter - in production you'd have pre-built grid files
+    const fullBundle = await this.loadAddressIndexProgressive();
     return this._filterBundleByLocation(fullBundle, userLocation);
   }
 
@@ -436,6 +403,162 @@ class ClientOnlyAddressIndexLoader {
       parcelIds: filteredParcelIds,
       addressData: filteredAddressData
     };
+  }
+
+  private async _loadBothRegions(
+    manifest: ShardManifest
+  ): Promise<FlexSearchIndexBundle> {
+    const cityRegion = manifest.regions.find((r) => r.region === 'stl_city');
+    const countyRegion = manifest.regions.find(
+      (r) => r.region === 'stl_county'
+    );
+
+    if (!cityRegion || !countyRegion) {
+      throw new Error('Missing city or county region data');
+    }
+
+    devLog('🌎 Loading county first for instant search, city in background');
+
+    // Load county first (bigger dataset, more addresses)
+    const countyBundle = await this._loadFromDocumentFile(countyRegion, false);
+    if (!countyBundle) {
+      throw new Error('Failed to load county region');
+    }
+
+    devLog(
+      `⚡ County loaded (${countyBundle.parcelIds.length} addresses), starting city background load`
+    );
+
+    // Start city loading in background, but return county immediately
+    setTimeout(async () => {
+      try {
+        const cityBundle = await this._loadFromDocumentFile(cityRegion, false);
+        if (cityBundle) {
+          // Merge city data into existing index
+          this._mergeIntoExistingIndex(cityBundle, 'stl_city');
+        }
+      } catch (error) {
+        devLog(`⚠️ Background city loading failed: ${error}`);
+      }
+    }, 100);
+
+    return {
+      ...countyBundle,
+      regions: ['stl_county']
+    };
+  }
+
+  private async _loadBothRegionsProgressive(
+    manifest: ShardManifest
+  ): Promise<FlexSearchIndexBundle> {
+    const cityRegion = manifest.regions.find((r) => r.region === 'stl_city');
+    const countyRegion = manifest.regions.find(
+      (r) => r.region === 'stl_county'
+    );
+
+    if (!cityRegion || !countyRegion) {
+      throw new Error('Missing city or county region data');
+    }
+
+    devLog('🌎 Loading county progressively first, city in background');
+
+    // Load county progressively first
+    const countyBundle = await this._loadFromDocumentFile(countyRegion, true);
+    if (!countyBundle) {
+      throw new Error('Failed to load county region progressively');
+    }
+
+    devLog('⚡ County loaded progressively, starting city background load');
+
+    // Start city loading in background
+    setTimeout(async () => {
+      try {
+        const cityBundle = await this._loadFromDocumentFile(cityRegion, true);
+        if (cityBundle) {
+          this._mergeIntoExistingIndex(cityBundle, 'stl_city');
+          // Set flag when both regions are fully loaded
+          if (typeof window !== 'undefined') {
+            (
+              window as unknown as { addressIndexBothRegionsReady: boolean }
+            ).addressIndexBothRegionsReady = true;
+          }
+        }
+      } catch (error) {
+        devLog(`⚠️ Background city loading failed: ${error}`);
+      }
+    }, 500);
+
+    // Set flag when county is ready (progressive loading first phase complete)
+    if (typeof window !== 'undefined') {
+      (window as unknown as { addressIndexReady: boolean }).addressIndexReady =
+        true;
+    }
+
+    return {
+      ...countyBundle,
+      regions: ['stl_county']
+    };
+  }
+
+  private _mergeIndexes(
+    bundles: FlexSearchIndexBundle[],
+    regions: string[]
+  ): FlexSearchIndexBundle {
+    const mergedIndex = new Index(FLEXSEARCH_CONFIG);
+    const mergedParcelIds: string[] = [];
+    const mergedAddressData: Record<string, string> = {};
+
+    bundles.forEach((bundle, index) => {
+      const regionName = regions[index];
+      bundle.parcelIds.forEach((parcelId) => {
+        mergedParcelIds.push(parcelId);
+        mergedAddressData[parcelId] = bundle.addressData[parcelId];
+        mergedIndex.add(parcelId, bundle.addressData[parcelId]);
+      });
+      devLog(
+        `  ✅ Merged ${bundle.parcelIds.length} addresses from ${regionName}`
+      );
+    });
+
+    devLog(
+      `🔗 Combined index contains ${mergedParcelIds.length} total addresses`
+    );
+
+    return {
+      index: mergedIndex,
+      parcelIds: mergedParcelIds,
+      addressData: mergedAddressData,
+      regions
+    };
+  }
+
+  private _mergeIntoExistingIndex(
+    cityBundle: FlexSearchIndexBundle,
+    regionName: string
+  ): void {
+    if (!this.bundle) {
+      devLog('⚠️ No existing bundle to merge into');
+      return;
+    }
+
+    // Add city addresses to existing county index
+    cityBundle.parcelIds.forEach((parcelId) => {
+      this.bundle!.parcelIds.push(parcelId);
+      this.bundle!.addressData[parcelId] = cityBundle.addressData[parcelId];
+      this.bundle!.index.add(parcelId, cityBundle.addressData[parcelId]);
+    });
+
+    // Update regions array
+    if (this.bundle.regions) {
+      this.bundle.regions.push(regionName);
+    } else {
+      this.bundle.regions = ['stl_county', regionName];
+    }
+
+    devLog(
+      `🔗 Merged ${cityBundle.parcelIds.length} addresses from ${regionName} into existing index`
+    );
+    devLog(`📊 Total addresses now: ${this.bundle.parcelIds.length}`);
   }
 }
 

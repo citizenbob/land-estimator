@@ -1,4 +1,4 @@
-import { loadAddressIndex } from '@services/loadAddressIndex';
+import { loadAddressIndexProgressive } from '@services/loadAddressIndex';
 import { devLog, devWarn } from '@lib/logger';
 
 interface PreloadStatus {
@@ -69,7 +69,7 @@ class BackgroundPreloader {
     );
 
     try {
-      await loadAddressIndex();
+      await loadAddressIndexProgressive();
 
       this.status.isComplete = true;
       this.status.endTime = Date.now();

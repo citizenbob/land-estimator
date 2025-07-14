@@ -18,9 +18,9 @@ export async function GET(
   }
 
   try {
-    const data = await getParcelMetadata();
+    const data = await getParcelMetadata(id);
     if (!data) {
-      return NextResponse.json({ error: 'Not found' }, { status: 404 });
+      return NextResponse.json({ error: 'Parcel not found' }, { status: 404 });
     }
     return NextResponse.json(data, {
       headers: { 'Cache-Control': 'public, max-age=3600' }

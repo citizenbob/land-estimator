@@ -23,16 +23,14 @@ describe('parcelMetadata service', () => {
     vi.clearAllMocks();
   });
 
-  it('getParcelMetadata throws error when service is disabled', async () => {
-    await expect(getParcelMetadata()).rejects.toThrow(
-      'Parcel metadata service is disabled. Use the simplified address lookup instead.'
-    );
+  it('getParcelMetadata handles missing parcel ID gracefully', async () => {
+    const result = await getParcelMetadata('');
+    expect(result).toBeNull();
   });
 
-  it('getBulkParcelMetadata throws error when service is disabled', async () => {
-    await expect(getBulkParcelMetadata()).rejects.toThrow(
-      'Parcel metadata service is disabled. Use the simplified address lookup instead.'
-    );
+  it('getBulkParcelMetadata handles empty array gracefully', async () => {
+    const result = await getBulkParcelMetadata([]);
+    expect(result).toEqual([]);
   });
 
   it('createBoundingBoxFromParcel returns correct bounds as strings', () => {

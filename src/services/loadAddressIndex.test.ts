@@ -157,7 +157,7 @@ describe('loadAddressIndex', () => {
     it('handles missing lookup file gracefully', async () => {
       document.cookie = 'regionShard=stl-city';
 
-      // Manifest fetch succeeds
+      // Manifest fetch succeeds with both regions
       mockFetch.mockResolvedValueOnce({
         ok: true,
         json: () =>
@@ -168,22 +168,28 @@ describe('loadAddressIndex', () => {
                 version: '1.0.0',
                 document_file: 'stl_city-document.json',
                 lookup_file: 'stl_city-document.json'
+              },
+              {
+                region: 'stl_county',
+                version: '1.0.0',
+                document_file: 'stl_county-document.json',
+                lookup_file: 'stl_county-document.json'
               }
             ],
             metadata: {
               generated_at: '2025-07-12T11:37:03.373280',
               version: '1.0.0',
-              total_regions: 1,
+              total_regions: 2,
               source: 'Document Mode Pipeline'
             }
           })
       });
 
-      // Document file fetch fails
+      // County document file fetch fails (loads first)
       mockFetch.mockResolvedValueOnce({ ok: false, status: 404 });
 
       await expect(loadAddressIndex()).rejects.toThrow(
-        'No valid index files for region stl_city'
+        'Failed to load county region'
       );
     });
   });
@@ -192,6 +198,7 @@ describe('loadAddressIndex', () => {
     it('caches results between calls', async () => {
       document.cookie = 'regionShard=stl-city';
 
+      // Manifest fetch with both regions
       mockFetch.mockResolvedValueOnce({
         ok: true,
         json: () =>
@@ -202,27 +209,34 @@ describe('loadAddressIndex', () => {
                 version: '1.0.0',
                 document_file: 'stl_city-document.json',
                 lookup_file: 'stl_city-document.json'
+              },
+              {
+                region: 'stl_county',
+                version: '1.0.0',
+                document_file: 'stl_county-document.json',
+                lookup_file: 'stl_county-document.json'
               }
             ],
             metadata: {
               generated_at: '2025-07-12T11:37:03.373280',
               version: '1.0.0',
-              total_regions: 1,
+              total_regions: 2,
               source: 'Document Mode Pipeline'
             }
           })
       });
 
+      // County data fetch (loads first)
       mockFetch.mockResolvedValueOnce({
         ok: true,
         json: () =>
           Promise.resolve([
             {
-              id: 'P001',
-              full_address: 'Test Address',
+              id: 'P002',
+              full_address: 'County Test Address',
               latitude: 38.627,
               longitude: -90.1994,
-              region: 'St. Louis City'
+              region: 'St. Louis County'
             }
           ])
       });
@@ -237,6 +251,7 @@ describe('loadAddressIndex', () => {
     it('reloads after cache clear', async () => {
       document.cookie = 'regionShard=stl-city';
 
+      // First load - manifest with both regions
       mockFetch.mockResolvedValueOnce({
         ok: true,
         json: () =>
@@ -247,16 +262,23 @@ describe('loadAddressIndex', () => {
                 version: '1.0.0',
                 document_file: 'stl_city-document.json',
                 lookup_file: 'stl_city-document.json'
+              },
+              {
+                region: 'stl_county',
+                version: '1.0.0',
+                document_file: 'stl_county-document.json',
+                lookup_file: 'stl_county-document.json'
               }
             ],
             metadata: {
               generated_at: '2025-07-12T11:37:03.373280',
               version: '1.0.0',
-              total_regions: 1,
+              total_regions: 2,
               source: 'Document Mode Pipeline'
             }
           })
       });
+      // First load - county data
       mockFetch.mockResolvedValueOnce({
         ok: true,
         json: () =>
@@ -266,7 +288,7 @@ describe('loadAddressIndex', () => {
               full_address: 'Test Address 1',
               latitude: 38.627,
               longitude: -90.1994,
-              region: 'St. Louis City'
+              region: 'St. Louis County'
             }
           ])
       });
@@ -275,6 +297,7 @@ describe('loadAddressIndex', () => {
 
       clearAddressIndexCache();
 
+      // Second load - manifest again
       mockFetch.mockResolvedValueOnce({
         ok: true,
         json: () =>
@@ -285,16 +308,23 @@ describe('loadAddressIndex', () => {
                 version: '1.0.0',
                 document_file: 'stl_city-document.json',
                 lookup_file: 'stl_city-document.json'
+              },
+              {
+                region: 'stl_county',
+                version: '1.0.0',
+                document_file: 'stl_county-document.json',
+                lookup_file: 'stl_county-document.json'
               }
             ],
             metadata: {
               generated_at: '2025-07-12T11:37:03.373280',
               version: '1.0.0',
-              total_regions: 1,
+              total_regions: 2,
               source: 'Document Mode Pipeline'
             }
           })
       });
+      // Second load - county data again
       mockFetch.mockResolvedValueOnce({
         ok: true,
         json: () =>
@@ -304,7 +334,7 @@ describe('loadAddressIndex', () => {
               full_address: 'Test Address 2',
               latitude: 38.627,
               longitude: -90.1994,
-              region: 'St. Louis City'
+              region: 'St. Louis County'
             }
           ])
       });
@@ -353,6 +383,7 @@ describe('loadAddressIndex', () => {
         writable: true
       });
 
+      // Manifest with both regions
       mockFetch.mockResolvedValueOnce({
         ok: true,
         json: () =>
@@ -363,17 +394,39 @@ describe('loadAddressIndex', () => {
                 version: '1.0.0',
                 document_file: 'stl_city-document.json',
                 lookup_file: 'stl_city-document.json'
+              },
+              {
+                region: 'stl_county',
+                version: '1.0.0',
+                document_file: 'stl_county-document.json',
+                lookup_file: 'stl_county-document.json'
               }
             ],
             metadata: {
               generated_at: '2025-07-12T11:37:03.373280',
               version: '1.0.0',
-              total_regions: 1,
+              total_regions: 2,
               source: 'Document Mode Pipeline'
             }
           })
       });
 
+      // County data (loads first)
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: () =>
+          Promise.resolve([
+            {
+              id: 'P002',
+              full_address: 'County Address',
+              latitude: 38.627,
+              longitude: -90.1994,
+              region: 'St. Louis County'
+            }
+          ])
+      });
+
+      // City data (loads second)
       mockFetch.mockResolvedValueOnce({
         ok: true,
         json: () =>
@@ -391,7 +444,10 @@ describe('loadAddressIndex', () => {
       await loadAddressIndex();
 
       expect(mockFetch).toHaveBeenCalledWith('/search/latest.json');
-      expect(mockFetch).toHaveBeenCalledWith('/search/stl_city-document.json');
+      expect(mockFetch).toHaveBeenCalledWith(
+        '/search/stl_county-document.json'
+      );
+      // Note: City data loads in background with setTimeout, so it may not be called in tests
 
       delete (global as unknown as { window?: Window }).window;
     });

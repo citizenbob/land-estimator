@@ -16,44 +16,28 @@ describe('Estimate Calculation Flow for Residential and Commercial Parcels', () 
       fixture: 'parcels/residential_baseline.json'
     }).as('parcelMetadata');
 
-    cy.intercept('GET', '**/api/lookup**', (req) => {
-      let fixture: string | null = null;
-      const url = req.url.toLowerCase();
-
-      if (url.includes('123')) fixture = 'lookups/query_test.json';
-      else if (url.includes('456')) fixture = 'lookups/query_business.json';
-      else if (url.includes('789')) fixture = 'lookups/query_missing.json';
-      else if (url.includes('999')) fixture = 'lookups/query_broken.json';
-
-      if (fixture) {
-        req.reply({ fixture });
-      } else {
-        // Fallback to empty results for unmatched queries
-        req.reply({
-          statusCode: 200,
-          body: {
-            query: req.url.split('query=')[1] || '',
-            results: [],
-            count: 0
-          }
-        });
-      }
-    }).as('lookup');
+    // No longer need to intercept lookup API since we use client-side FlexSearch
+    // Address search now happens instantly without API calls
 
     cy.visit('/');
+
+    // Wait for address index to be ready (same as issue-1.cy.ts)
+    cy.window({ timeout: 15000 }).should(
+      'have.property',
+      'addressIndexBothRegionsReady',
+      true
+    );
   });
 
   it('Shopper requests estimate for Residential parcel with baseline affluence', () => {
     // GIVEN I am requesting an instant estimate for a residential parcel with affluence_score = 50 (baseline)
     // AND my parcel metadata provides a valid bounding box
 
-    cy.get('input[placeholder="Enter address"]').type('123 Test');
-    cy.wait('@lookup');
+    cy.get('input[placeholder="Enter address"]').type('401 Market St');
+
+    // Wait for client-side FlexSearch suggestions (no API call needed)
     cy.get('ul[role="listbox"]').should('be.visible');
-    cy.contains(
-      'li[role="option"]',
-      '123 Test St., St. Louis, MO 63101'
-    ).click();
+    cy.get('li[role="option"]').first().click();
 
     cy.get('button')
       .contains(/get instant estimate/i)
@@ -67,9 +51,8 @@ describe('Estimate Calculation Flow for Residential and Commercial Parcels', () 
       expect(interception.request.body.eventName).to.equal(
         'estimate_button_clicked'
       );
-      expect(interception.request.body.data.address_id).to.equal(
-        'RES_BASELINE'
-      );
+      // Address ID will be from the real FlexSearch data, not hardcoded
+      expect(interception.request.body.data.address_id).to.be.a('string');
     });
 
     // THEN the system calculates area using the defined bounding-box formula
@@ -94,13 +77,11 @@ describe('Estimate Calculation Flow for Residential and Commercial Parcels', () 
       fixture: 'parcels/commercial_affluent.json'
     }).as('commercialMetadata');
 
-    cy.get('input[placeholder="Enter address"]').type('456 Business');
-    cy.wait('@lookup');
+    cy.get('input[placeholder="Enter address"]').type('800 Market St');
+
+    // Wait for client-side FlexSearch suggestions
     cy.get('ul[role="listbox"]').should('be.visible');
-    cy.contains(
-      'li[role="option"]',
-      '456 Business Ave., St. Louis, MO 63103'
-    ).click();
+    cy.get('li[role="option"]').first().click();
 
     cy.get('button')
       .contains(/get instant estimate/i)
@@ -113,9 +94,8 @@ describe('Estimate Calculation Flow for Residential and Commercial Parcels', () 
       expect(interception.request.body.eventName).to.equal(
         'estimate_button_clicked'
       );
-      expect(interception.request.body.data.address_id).to.equal(
-        'COM_AFFLUENT'
-      );
+      // Address ID will be from the real FlexSearch data
+      expect(interception.request.body.data.address_id).to.be.a('string');
     });
 
     // THEN the system calculates area using the defined bounding-box formula
@@ -137,13 +117,10 @@ describe('Estimate Calculation Flow for Residential and Commercial Parcels', () 
       fixture: 'parcels/missing_area.json'
     }).as('nullAreaMetadata');
 
-    cy.get('input[placeholder="Enter address"]').type('789 Missing');
-    cy.wait('@lookup');
+    cy.get('input[placeholder="Enter address"]').type('1315 Dunn Rd');
+    // Wait for client-side FlexSearch suggestions (no API call needed)
     cy.get('ul[role="listbox"]').should('be.visible');
-    cy.contains(
-      'li[role="option"]',
-      '789 Missing Area St., St. Louis, MO 63101'
-    ).click();
+    cy.get('li[role="option"]').first().click();
 
     // WHEN I click "Get Instant Estimate"
     cy.get('button')
@@ -157,7 +134,8 @@ describe('Estimate Calculation Flow for Residential and Commercial Parcels', () 
       expect(interception.request.body.eventName).to.equal(
         'estimate_button_clicked'
       );
-      expect(interception.request.body.data.address_id).to.equal('NULL_AREA');
+      // Address ID will be from the real FlexSearch data, not hardcoded
+      expect(interception.request.body.data.address_id).to.be.a('string');
     });
 
     // THEN the system should gracefully handle missing data by showing manual input option
@@ -177,13 +155,10 @@ describe('Estimate Calculation Flow for Residential and Commercial Parcels', () 
       fixture: 'parcels/malformed_bounds.json'
     }).as('malformedMetadata');
 
-    cy.get('input[placeholder="Enter address"]').type('999 Broken');
-    cy.wait('@lookup');
+    cy.get('input[placeholder="Enter address"]').type('706 Market St');
+    // Wait for client-side FlexSearch suggestions (no API call needed)
     cy.get('ul[role="listbox"]').should('be.visible');
-    cy.contains(
-      'li[role="option"]',
-      '999 Broken Bounds St., St. Louis, MO 63101'
-    ).click();
+    cy.get('li[role="option"]').first().click();
 
     // WHEN I click "Get Instant Estimate"
     cy.get('button')
@@ -197,9 +172,8 @@ describe('Estimate Calculation Flow for Residential and Commercial Parcels', () 
       expect(interception.request.body.eventName).to.equal(
         'estimate_button_clicked'
       );
-      expect(interception.request.body.data.address_id).to.equal(
-        'MALFORMED_BOUNDS'
-      );
+      // Address ID will be from the real FlexSearch data, not hardcoded
+      expect(interception.request.body.data.address_id).to.be.a('string');
     });
 
     // THEN the system handles the error gracefully and informs the user

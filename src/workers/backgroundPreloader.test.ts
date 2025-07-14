@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import backgroundPreloader, {
   BackgroundPreloader
 } from './backgroundPreloader';
-import { loadAddressIndex } from '@services/loadAddressIndex';
+import { loadAddressIndexProgressive } from '@services/loadAddressIndex';
 import { setupBrowserEnvironment } from '@lib/testUtils';
 import { MOCK_FLEXSEARCH_BUNDLE } from '@lib/testData';
 
@@ -14,13 +14,13 @@ vi.mock('@lib/logger', () => ({
 
 describe('BackgroundPreloader', () => {
   let preloader: BackgroundPreloader;
-  let mockLoadAddressIndex: ReturnType<typeof vi.fn>;
+  let mockLoadAddressIndexProgressive: ReturnType<typeof vi.fn>;
   let mockDispatchEvent: ReturnType<typeof vi.fn>;
 
   beforeEach(() => {
     setupBrowserEnvironment();
 
-    mockLoadAddressIndex = vi.mocked(loadAddressIndex);
+    mockLoadAddressIndexProgressive = vi.mocked(loadAddressIndexProgressive);
     mockDispatchEvent = vi.fn();
     vi.spyOn(console, 'log').mockImplementation(() => {});
     vi.spyOn(console, 'warn').mockImplementation(() => {});
@@ -79,7 +79,7 @@ describe('BackgroundPreloader', () => {
 
       await preloader.start();
 
-      expect(mockLoadAddressIndex).not.toHaveBeenCalled();
+      expect(mockLoadAddressIndexProgressive).not.toHaveBeenCalled();
       expect(preloader.getStatus().isLoading).toBe(false);
     });
 
@@ -88,7 +88,7 @@ describe('BackgroundPreloader', () => {
 
       await preloader.start();
 
-      expect(mockLoadAddressIndex).not.toHaveBeenCalled();
+      expect(mockLoadAddressIndexProgressive).not.toHaveBeenCalled();
     });
 
     it('should not start if already complete', async () => {
@@ -96,16 +96,16 @@ describe('BackgroundPreloader', () => {
 
       await preloader.start();
 
-      expect(mockLoadAddressIndex).not.toHaveBeenCalled();
+      expect(mockLoadAddressIndexProgressive).not.toHaveBeenCalled();
     });
 
     it('should successfully preload address index', async () => {
       const { devLog } = vi.mocked(await import('@lib/logger'));
-      mockLoadAddressIndex.mockResolvedValue(MOCK_FLEXSEARCH_BUNDLE);
+      mockLoadAddressIndexProgressive.mockResolvedValue(MOCK_FLEXSEARCH_BUNDLE);
 
       await preloader.start();
 
-      expect(mockLoadAddressIndex).toHaveBeenCalledOnce();
+      expect(mockLoadAddressIndexProgressive).toHaveBeenCalledOnce();
       expect(devLog).toHaveBeenCalledWith(
         '🚀 [Background Preloader] Starting aggressive address index preload...'
       );
@@ -114,7 +114,7 @@ describe('BackgroundPreloader', () => {
       );
     });
     it('should update status correctly during successful preload', async () => {
-      mockLoadAddressIndex.mockResolvedValue(MOCK_FLEXSEARCH_BUNDLE);
+      mockLoadAddressIndexProgressive.mockResolvedValue(MOCK_FLEXSEARCH_BUNDLE);
 
       const startPromise = preloader.start();
 
@@ -131,7 +131,7 @@ describe('BackgroundPreloader', () => {
     });
 
     it('should dispatch success event after successful preload', async () => {
-      mockLoadAddressIndex.mockResolvedValue(MOCK_FLEXSEARCH_BUNDLE);
+      mockLoadAddressIndexProgressive.mockResolvedValue(MOCK_FLEXSEARCH_BUNDLE);
 
       await preloader.start();
 
@@ -145,7 +145,7 @@ describe('BackgroundPreloader', () => {
 
     it('should handle preload errors gracefully', async () => {
       const testError = new Error('Network failure');
-      mockLoadAddressIndex.mockRejectedValue(testError);
+      mockLoadAddressIndexProgressive.mockRejectedValue(testError);
 
       await preloader.start();
 
@@ -159,7 +159,7 @@ describe('BackgroundPreloader', () => {
     it('should log error during failed preload', async () => {
       const { devWarn } = vi.mocked(await import('@lib/logger'));
       const testError = new Error('Network failure');
-      mockLoadAddressIndex.mockRejectedValue(testError);
+      mockLoadAddressIndexProgressive.mockRejectedValue(testError);
 
       await preloader.start();
 
@@ -171,7 +171,7 @@ describe('BackgroundPreloader', () => {
 
     it('should dispatch error event after failed preload', async () => {
       const testError = new Error('Network failure');
-      mockLoadAddressIndex.mockRejectedValue(testError);
+      mockLoadAddressIndexProgressive.mockRejectedValue(testError);
 
       await preloader.start();
 
@@ -185,7 +185,7 @@ describe('BackgroundPreloader', () => {
 
     it('should handle non-Error exceptions', async () => {
       const testError = 'String error';
-      mockLoadAddressIndex.mockRejectedValue(testError);
+      mockLoadAddressIndexProgressive.mockRejectedValue(testError);
 
       await preloader.start();
 
@@ -208,7 +208,7 @@ describe('BackgroundPreloader', () => {
       const loadPromise = new Promise<void>((resolve) => {
         resolveLoad = resolve;
       });
-      mockLoadAddressIndex.mockReturnValue(loadPromise);
+      mockLoadAddressIndexProgressive.mockReturnValue(loadPromise);
 
       const startPromise = preloader.start();
 
@@ -225,7 +225,7 @@ describe('BackgroundPreloader', () => {
 
   describe('reset', () => {
     it('should reset status to initial state', async () => {
-      mockLoadAddressIndex.mockResolvedValue(MOCK_FLEXSEARCH_BUNDLE);
+      mockLoadAddressIndexProgressive.mockResolvedValue(MOCK_FLEXSEARCH_BUNDLE);
       await preloader.start();
 
       expect(preloader.getStatus().isComplete).toBe(true);
@@ -241,13 +241,13 @@ describe('BackgroundPreloader', () => {
       });
     });
     it('should allow restart after reset', async () => {
-      mockLoadAddressIndex.mockResolvedValue(MOCK_FLEXSEARCH_BUNDLE);
+      mockLoadAddressIndexProgressive.mockResolvedValue(MOCK_FLEXSEARCH_BUNDLE);
       await preloader.start();
 
       preloader.reset();
       await preloader.start();
 
-      expect(mockLoadAddressIndex).toHaveBeenCalledTimes(2);
+      expect(mockLoadAddressIndexProgressive).toHaveBeenCalledTimes(2);
     });
   });
 
@@ -261,7 +261,7 @@ describe('BackgroundPreloader', () => {
       const loadPromise = new Promise<void>((resolve) => {
         resolveLoad = resolve;
       });
-      mockLoadAddressIndex.mockReturnValue(loadPromise);
+      mockLoadAddressIndexProgressive.mockReturnValue(loadPromise);
 
       preloader.start();
 
@@ -272,14 +272,16 @@ describe('BackgroundPreloader', () => {
     });
 
     it('should return true when successfully completed', async () => {
-      mockLoadAddressIndex.mockResolvedValue(MOCK_FLEXSEARCH_BUNDLE);
+      mockLoadAddressIndexProgressive.mockResolvedValue(MOCK_FLEXSEARCH_BUNDLE);
       await preloader.start();
 
       expect(preloader.isDataReady()).toBe(true);
     });
 
     it('should return false when completed with error', async () => {
-      mockLoadAddressIndex.mockRejectedValue(new Error('Test error'));
+      mockLoadAddressIndexProgressive.mockRejectedValue(
+        new Error('Test error')
+      );
       await preloader.start();
 
       expect(preloader.isDataReady()).toBe(false);
@@ -314,18 +316,20 @@ describe('backgroundPreloader singleton', () => {
   });
 
   it('should allow manual start operation', async () => {
-    const mockLoadAddressIndex = vi.mocked(loadAddressIndex);
-    mockLoadAddressIndex.mockResolvedValue(MOCK_FLEXSEARCH_BUNDLE);
+    const mockLoadAddressIndexProgressive = vi.mocked(
+      loadAddressIndexProgressive
+    );
+    mockLoadAddressIndexProgressive.mockResolvedValue(MOCK_FLEXSEARCH_BUNDLE);
 
     // Reset singleton state to ensure clean test
     backgroundPreloader.reset();
 
     // Clear any previous mock calls
-    mockLoadAddressIndex.mockClear();
+    mockLoadAddressIndexProgressive.mockClear();
 
     await backgroundPreloader.start();
 
-    expect(mockLoadAddressIndex).toHaveBeenCalledOnce();
+    expect(mockLoadAddressIndexProgressive).toHaveBeenCalledOnce();
     expect(backgroundPreloader.getStatus().isComplete).toBe(true);
   });
 });
