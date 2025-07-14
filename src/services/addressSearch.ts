@@ -11,7 +11,7 @@
  */
 
 import {
-  loadAddressIndex,
+  loadAddressIndexProgressive,
   type FlexSearchIndexBundle
 } from '@services/loadAddressIndex';
 import { logError } from '@lib/errorUtils';
@@ -105,7 +105,8 @@ export async function searchAddresses(
       console.log('🔍 Loading static FlexSearch index...');
       const loadStart = performance.now();
 
-      addressSearchBundle = await loadAddressIndex();
+      // Use progressive loading for better UX
+      addressSearchBundle = await loadAddressIndexProgressive();
 
       const loadTime = performance.now() - loadStart;
       console.log(`✅ Static index loaded in ${loadTime.toFixed(2)}ms`);

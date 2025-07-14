@@ -10,7 +10,8 @@ import { setupConsoleMocks } from '@lib/testUtils';
 const mockAddressData: AddressLookupRecord[] = MOCK_ADDRESS_LOOKUP_DATA;
 
 vi.mock('./loadAddressIndex', () => ({
-  loadAddressIndex: vi.fn()
+  loadAddressIndex: vi.fn(),
+  loadAddressIndexProgressive: vi.fn()
 }));
 
 vi.mock('@lib/errorUtils', () => ({
@@ -18,7 +19,7 @@ vi.mock('@lib/errorUtils', () => ({
 }));
 
 describe('addressSearch - Client-Only Fast Rebuild Strategy', () => {
-  let mockLoadAddressIndex: ReturnType<typeof vi.fn>;
+  let mockLoadAddressIndexProgressive: ReturnType<typeof vi.fn>;
 
   beforeEach(async () => {
     vi.clearAllMocks();
@@ -27,7 +28,9 @@ describe('addressSearch - Client-Only Fast Rebuild Strategy', () => {
 
     // Mock the loadAddressIndex module
     const loadModule = await import('./loadAddressIndex');
-    mockLoadAddressIndex = vi.mocked(loadModule.loadAddressIndex);
+    mockLoadAddressIndexProgressive = vi.mocked(
+      loadModule.loadAddressIndexProgressive
+    );
   });
 
   afterEach(() => {
@@ -40,7 +43,7 @@ describe('addressSearch - Client-Only Fast Rebuild Strategy', () => {
         search: vi.fn().mockReturnValue([0, 1])
       };
 
-      mockLoadAddressIndex.mockResolvedValue({
+      mockLoadAddressIndexProgressive.mockResolvedValue({
         index: mockIndex,
         parcelIds: mockAddressData.map((addr) => addr.id),
         addressData: Object.fromEntries(
@@ -50,7 +53,7 @@ describe('addressSearch - Client-Only Fast Rebuild Strategy', () => {
 
       const results = await searchAddresses('riverview');
 
-      expect(mockLoadAddressIndex).toHaveBeenCalled();
+      expect(mockLoadAddressIndexProgressive).toHaveBeenCalled();
       expect(mockIndex.search).toHaveBeenCalledWith('riverview', {
         bool: 'and',
         limit: 10
@@ -62,7 +65,9 @@ describe('addressSearch - Client-Only Fast Rebuild Strategy', () => {
       const { logError } = await import('@lib/errorUtils');
       const consoleSpy = vi.mocked(logError);
 
-      mockLoadAddressIndex.mockRejectedValue(new Error('Index loading failed'));
+      mockLoadAddressIndexProgressive.mockRejectedValue(
+        new Error('Index loading failed')
+      );
 
       const results = await searchAddresses('test');
 
@@ -79,7 +84,7 @@ describe('addressSearch - Client-Only Fast Rebuild Strategy', () => {
         search: vi.fn().mockReturnValue([0])
       };
 
-      mockLoadAddressIndex.mockResolvedValue({
+      mockLoadAddressIndexProgressive.mockResolvedValue({
         index: mockIndex,
         parcelIds: [mockAddressData[0].id],
         addressData: {
@@ -100,7 +105,7 @@ describe('addressSearch - Client-Only Fast Rebuild Strategy', () => {
         search: vi.fn().mockReturnValue([0, 1, 2, 3])
       };
 
-      mockLoadAddressIndex.mockResolvedValue({
+      mockLoadAddressIndexProgressive.mockResolvedValue({
         index: mockIndex,
         parcelIds: mockAddressData.map((addr) => addr.id),
         addressData: Object.fromEntries(
@@ -122,7 +127,7 @@ describe('addressSearch - Client-Only Fast Rebuild Strategy', () => {
         search: vi.fn().mockReturnValue([mockAddressData[0].id])
       };
 
-      mockLoadAddressIndex.mockResolvedValue({
+      mockLoadAddressIndexProgressive.mockResolvedValue({
         index: mockIndex,
         parcelIds: [mockAddressData[0].id],
         addressData: {
@@ -145,7 +150,7 @@ describe('addressSearch - Client-Only Fast Rebuild Strategy', () => {
         search: vi.fn().mockReturnValue([0])
       };
 
-      mockLoadAddressIndex.mockResolvedValue({
+      mockLoadAddressIndexProgressive.mockResolvedValue({
         index: mockIndex,
         parcelIds: [mockAddressData[0].id],
         addressData: {
@@ -156,7 +161,7 @@ describe('addressSearch - Client-Only Fast Rebuild Strategy', () => {
       await searchAddresses('test1');
       await searchAddresses('test2');
 
-      expect(mockLoadAddressIndex).toHaveBeenCalledTimes(1);
+      expect(mockLoadAddressIndexProgressive).toHaveBeenCalledTimes(1);
       expect(mockIndex.search).toHaveBeenCalledTimes(2);
     });
   });
@@ -166,14 +171,14 @@ describe('addressSearch - Client-Only Fast Rebuild Strategy', () => {
       const results = await searchAddresses('a');
 
       expect(results).toEqual([]);
-      expect(mockLoadAddressIndex).not.toHaveBeenCalled();
+      expect(mockLoadAddressIndexProgressive).not.toHaveBeenCalled();
     });
 
     it('should return empty array for empty queries', async () => {
       const results = await searchAddresses('');
 
       expect(results).toEqual([]);
-      expect(mockLoadAddressIndex).not.toHaveBeenCalled();
+      expect(mockLoadAddressIndexProgressive).not.toHaveBeenCalled();
     });
 
     it('should trim whitespace from queries', async () => {
@@ -181,7 +186,7 @@ describe('addressSearch - Client-Only Fast Rebuild Strategy', () => {
         search: vi.fn().mockReturnValue([0])
       };
 
-      mockLoadAddressIndex.mockResolvedValue({
+      mockLoadAddressIndexProgressive.mockResolvedValue({
         index: mockIndex,
         parcelIds: [mockAddressData[0].id],
         addressData: {
@@ -201,7 +206,7 @@ describe('addressSearch - Client-Only Fast Rebuild Strategy', () => {
       const results = await searchAddresses('  a  ');
 
       expect(results).toEqual([]);
-      expect(mockLoadAddressIndex).not.toHaveBeenCalled();
+      expect(mockLoadAddressIndexProgressive).not.toHaveBeenCalled();
     });
 
     it('should normalize Missouri-specific queries', async () => {
@@ -209,7 +214,7 @@ describe('addressSearch - Client-Only Fast Rebuild Strategy', () => {
         search: vi.fn().mockReturnValue([0])
       };
 
-      mockLoadAddressIndex.mockResolvedValue({
+      mockLoadAddressIndexProgressive.mockResolvedValue({
         index: mockIndex,
         parcelIds: [mockAddressData[0].id],
         addressData: {

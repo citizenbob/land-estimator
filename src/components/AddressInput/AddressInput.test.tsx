@@ -21,6 +21,15 @@ vi.mock('@services/logger', () => ({
   logEvent: vi.fn()
 }));
 
+vi.mock('@services/loadAddressIndex', () => ({
+  loadAddressIndex: vi.fn()
+}));
+
+vi.mock('@services/addressSearch', () => ({
+  searchAddresses: vi.fn(),
+  resetAddressSearchCache: vi.fn()
+}));
+
 const mockFetch = createMockFetch();
 const createMockApiRecord = createMockApiRecordFactory();
 
@@ -31,9 +40,16 @@ const setup = () => {
 };
 
 describe('AddressInput', () => {
-  beforeEach(() => {
+  let mockSearchAddresses: ReturnType<typeof vi.fn>;
+
+  beforeEach(async () => {
     mockFetch.mockReset();
     setupConsoleMocks();
+    vi.clearAllMocks();
+
+    // Mock the searchAddresses module
+    const searchModule = await import('@services/addressSearch');
+    mockSearchAddresses = vi.mocked(searchModule.searchAddresses);
   });
 
   afterEach(() => {
@@ -94,17 +110,15 @@ describe('AddressInput', () => {
   });
 
   it('handles API failures gracefully and displays an error message', async () => {
-    mockFetch.mockRejectedValueOnce(new Error('Internal Server Error'));
+    // Mock search to throw an error
+    mockSearchAddresses.mockRejectedValue(new Error('Search failed'));
 
     const { input } = setup();
     fireEvent.change(input, { target: { value: '1600' } });
 
-    await waitFor(
-      () => {
-        expect(mockFetch).toHaveBeenCalledWith('/api/lookup?query=1600');
-      },
-      { timeout: 2000 }
-    );
+    await waitFor(() => {
+      expect(mockSearchAddresses).toHaveBeenCalledWith('1600', 10);
+    });
 
     const alert = await screen.findByRole('alert');
     expect(alert).toHaveTextContent(/error fetching suggestions/i);
@@ -192,33 +206,29 @@ describe('AddressInput', () => {
   it('does not trigger an API call when a suggestion is selected', async () => {
     const mockApiRecord = createMockApiRecord(MOCK_LOCAL_ADDRESSES[1]);
 
-    mockFetch.mockResolvedValueOnce({
-      ok: true,
-      json: async () => ({
-        query: '2323 E Highland',
-        results: [mockApiRecord],
-        count: 1
-      })
-    });
+    // Mock search to return results
+    mockSearchAddresses.mockResolvedValue([
+      {
+        id: mockApiRecord.id,
+        display_name: mockApiRecord.display_name,
+        region: 'St. Louis City',
+        normalized: '2323 e highland st louis city mo'
+      }
+    ]);
 
     const { input } = setup();
 
     fireEvent.change(input, { target: { value: '2323 E Highland' } });
 
-    await waitFor(
-      () => {
-        expect(mockFetch).toHaveBeenCalledWith(
-          '/api/lookup?query=2323%20e%20highland'
-        );
-      },
-      { timeout: 2000 }
-    );
+    await waitFor(() => {
+      expect(mockSearchAddresses).toHaveBeenCalledWith('2323 e highland', 10);
+    });
 
     await waitFor(() => {
       expect(screen.getByRole('option')).toBeInTheDocument();
     });
 
-    mockFetch.mockClear();
+    mockSearchAddresses.mockClear();
 
     const suggestionElement = screen.getByRole('option');
     fireEvent.click(suggestionElement);
@@ -228,7 +238,7 @@ describe('AddressInput', () => {
     });
 
     await new Promise((resolve) => setTimeout(resolve, 700));
-    expect(mockFetch).not.toHaveBeenCalled();
+    expect(mockSearchAddresses).not.toHaveBeenCalled();
   });
 
   it('clears previous suggestions while fetching new ones', async () => {

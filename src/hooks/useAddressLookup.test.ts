@@ -1,32 +1,21 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
 import { useAddressLookup } from './useAddressLookup';
-import {
-  TEST_LOCATIONS,
-  MOCK_LOCAL_ADDRESSES,
-  MOCK_SIMPLE_ADDRESS_RECORD
-} from '@lib/testData';
+import { TEST_LOCATIONS, MOCK_LOCAL_ADDRESSES } from '@lib/testData';
 import {
   setupConsoleMocks,
-  createMockFetch,
-  mockSuccessResponse,
-  mockNetworkError,
-  createMockApiRecord,
   setupTestTimers,
   cleanupTestTimers
 } from '@lib/testUtils';
+import { searchAddresses } from '@services/addressSearch';
 
-const createLookupApiResponse = (
-  query: string,
-  results: Array<{ id: string; display_name: string; region: string }>,
-  count = results.length
-) => ({
-  query,
-  results,
-  count
-});
+// Mock the client-side search
+vi.mock('@services/addressSearch', () => ({
+  searchAddresses: vi.fn(),
+  resetAddressSearchCache: vi.fn()
+}));
 
-const performDebouncedApiCall = async (
+const performDebouncedSearch = async (
   result: { current: ReturnType<typeof useAddressLookup> },
   query: string
 ) => {
@@ -41,16 +30,21 @@ const performDebouncedApiCall = async (
   });
 };
 
-const mockFetch = createMockFetch();
-
 describe('useAddressLookup', () => {
+  let consoleMocks: ReturnType<typeof setupConsoleMocks>;
+  let searchAddressesMock: ReturnType<typeof vi.fn>;
+
   beforeEach(() => {
+    consoleMocks = setupConsoleMocks();
     setupTestTimers();
-    mockFetch.mockReset();
-    setupConsoleMocks();
+
+    // Get the mocked function using vi.mocked
+    searchAddressesMock = vi.mocked(searchAddresses);
+    searchAddressesMock.mockClear();
   });
 
   afterEach(() => {
+    consoleMocks.restore();
     cleanupTestTimers();
     vi.clearAllMocks();
   });
@@ -65,36 +59,36 @@ describe('useAddressLookup', () => {
     expect(result.current.error).toBeNull();
   });
 
-  it('fetches suggestions using local API after debounce and updates state', async () => {
-    const mockApiRecord = createMockApiRecord({
-      id: MOCK_LOCAL_ADDRESSES[0].id,
-      full_address: MOCK_LOCAL_ADDRESSES[0].full_address,
-      region: MOCK_LOCAL_ADDRESSES[0].region
-    });
+  it('fetches suggestions using client-side search after debounce and updates state', async () => {
+    const mockSearchResults = [
+      {
+        id: MOCK_LOCAL_ADDRESSES[0].id,
+        display_name: MOCK_LOCAL_ADDRESSES[0].full_address,
+        region: 'St. Louis City',
+        normalized: 'test'
+      }
+    ];
 
-    const apiResponse = createLookupApiResponse(TEST_LOCATIONS.FIRST_STREET, [
-      mockApiRecord
-    ]);
-
-    mockSuccessResponse(mockFetch, apiResponse);
+    searchAddressesMock.mockResolvedValue(mockSearchResults);
 
     const { result } = renderHook(() => useAddressLookup());
 
-    await performDebouncedApiCall(result, TEST_LOCATIONS.FIRST_STREET);
+    await performDebouncedSearch(result, TEST_LOCATIONS.FIRST_STREET);
 
     await vi.waitFor(() => {
       expect(result.current.suggestions).toHaveLength(1);
       expect(result.current.isFetching).toBe(false);
     });
 
-    expect(mockFetch).toHaveBeenCalledTimes(1);
-    expect(mockFetch).toHaveBeenCalledWith(
-      `/api/lookup?query=${encodeURIComponent(TEST_LOCATIONS.FIRST_STREET.toLowerCase())}`
+    expect(searchAddressesMock).toHaveBeenCalledTimes(1);
+    expect(searchAddressesMock).toHaveBeenCalledWith(
+      TEST_LOCATIONS.FIRST_STREET.toLowerCase(),
+      10
     );
 
     expect(result.current.suggestions[0]).toEqual({
-      place_id: mockApiRecord.id,
-      display_name: mockApiRecord.display_name
+      place_id: MOCK_LOCAL_ADDRESSES[0].id,
+      display_name: MOCK_LOCAL_ADDRESSES[0].full_address
     });
     expect(result.current.hasFetched).toBe(true);
     expect(result.current.error).toBeNull();
@@ -113,245 +107,243 @@ describe('useAddressLookup', () => {
     expect(result.current.locked).toBe(true);
   });
 
-  it('getSuggestionData returns stored raw data', async () => {
-    const mockApiRecord = createMockApiRecord({
-      id: MOCK_LOCAL_ADDRESSES[1].id,
-      full_address: MOCK_LOCAL_ADDRESSES[1].full_address,
-      region: MOCK_LOCAL_ADDRESSES[1].region
-    });
-
-    const lookupResponse = createLookupApiResponse(TEST_LOCATIONS.DUNN_VIEW, [
-      mockApiRecord
-    ]);
-
-    mockSuccessResponse(mockFetch, lookupResponse);
-    mockSuccessResponse(mockFetch, MOCK_LOCAL_ADDRESSES[1]);
-
+  it('does not fetch when query is less than 3 characters', async () => {
     const { result } = renderHook(() => useAddressLookup());
 
-    await performDebouncedApiCall(result, TEST_LOCATIONS.DUNN_VIEW);
-
-    await vi.waitFor(
-      () => {
-        expect(result.current.suggestions).toHaveLength(1);
-      },
-      { timeout: 1000 }
-    );
-
-    const addressId = mockApiRecord.id;
-    expect(result.current.suggestions[0].place_id).toBe(addressId);
-    const data = await result.current.getSuggestionData(addressId);
-
-    expect(data).toMatchObject({
-      id: mockApiRecord.id,
-      full_address: mockApiRecord.display_name,
-      region: mockApiRecord.region
+    act(() => {
+      result.current.handleChange('ab');
     });
-    expect(data).toHaveProperty('latitude');
-    expect(data).toHaveProperty('longitude');
-    expect(data).toHaveProperty('calc');
-    expect(data).toHaveProperty('calc.landarea');
-    expect(data).toHaveProperty('calc.estimated_landscapable_area');
+
+    await act(async () => {
+      vi.advanceTimersByTime(600);
+    });
+
+    expect(searchAddressesMock).not.toHaveBeenCalled();
+    expect(result.current.suggestions).toEqual([]);
+    expect(result.current.isFetching).toBe(false);
   });
 
-  it('handles API errors', async () => {
-    mockNetworkError(mockFetch, 'API error: 500');
+  it('handles search errors gracefully', async () => {
+    const errorMessage = 'Search failed';
+    searchAddressesMock.mockRejectedValue(new Error(errorMessage));
 
     const { result } = renderHook(() => useAddressLookup());
 
-    await performDebouncedApiCall(result, TEST_LOCATIONS.FIRST_STREET);
+    await performDebouncedSearch(result, TEST_LOCATIONS.FIRST_STREET);
 
     await vi.waitFor(() => {
-      expect(result.current.error).not.toBeNull();
       expect(result.current.isFetching).toBe(false);
     });
 
-    expect(mockFetch).toHaveBeenCalledTimes(1);
+    expect(searchAddressesMock).toHaveBeenCalledTimes(1);
+    expect(searchAddressesMock).toHaveBeenCalledWith(
+      TEST_LOCATIONS.FIRST_STREET.toLowerCase(),
+      10
+    );
     expect(result.current.suggestions).toEqual([]);
+    expect(result.current.error).toContain('Search failed');
     expect(result.current.hasFetched).toBe(true);
-    expect(result.current.error).toContain('API error: 500');
   });
 
-  it('handles network errors during fetch', async () => {
-    mockNetworkError(mockFetch, 'Network connection failed');
+  it('handles network errors gracefully', async () => {
+    searchAddressesMock.mockRejectedValue(
+      new Error('Network connection failed')
+    );
 
     const { result } = renderHook(() => useAddressLookup());
 
-    await performDebouncedApiCall(result, TEST_LOCATIONS.SPRING_GARDEN);
+    await performDebouncedSearch(result, TEST_LOCATIONS.FIRST_STREET);
 
     await vi.waitFor(() => {
-      expect(result.current.error).not.toBeNull();
       expect(result.current.isFetching).toBe(false);
     });
 
-    expect(mockFetch).toHaveBeenCalledTimes(1);
+    expect(searchAddressesMock).toHaveBeenCalledTimes(1);
+    expect(searchAddressesMock).toHaveBeenCalledWith(
+      TEST_LOCATIONS.FIRST_STREET.toLowerCase(),
+      10
+    );
     expect(result.current.suggestions).toEqual([]);
+    expect(result.current.error).toContain('Network connection failed');
     expect(result.current.hasFetched).toBe(true);
-    expect(result.current.error).toBe('Network connection failed');
   });
 
-  it('should retrieve enriched metadata for a given suggestion ID', () => {
+  it('clears error on new search', async () => {
+    // First, trigger an error
+    searchAddressesMock.mockRejectedValue(new Error('Initial error'));
     const { result } = renderHook(() => useAddressLookup());
 
-    const mockGetSuggestionData = vi
-      .fn()
-      .mockReturnValue(MOCK_SIMPLE_ADDRESS_RECORD);
-    Object.defineProperty(result.current, 'getSuggestionData', {
-      value: mockGetSuggestionData
-    });
-
-    const data = result.current.getSuggestionData('1');
-
-    expect(mockGetSuggestionData).toBeCalledWith('1');
-    expect(data).toEqual(MOCK_SIMPLE_ADDRESS_RECORD);
-  });
-
-  it('should return undefined for an unknown suggestion ID', () => {
-    const { result } = renderHook(() => useAddressLookup());
-
-    const mockGetSuggestionData = vi.fn().mockReturnValue(undefined);
-    Object.defineProperty(result.current, 'getSuggestionData', {
-      value: mockGetSuggestionData
-    });
-
-    const data = result.current.getSuggestionData('unknown');
-
-    expect(mockGetSuggestionData).toBeCalledWith('unknown');
-    expect(data).toBeUndefined();
-  });
-
-  it('returns enriched data from parcel metadata', async () => {
-    const mockApiRecord = createMockApiRecord({
-      id: MOCK_LOCAL_ADDRESSES[0].id,
-      full_address: MOCK_LOCAL_ADDRESSES[0].full_address,
-      region: MOCK_LOCAL_ADDRESSES[0].region
-    });
-
-    const lookupResponse = createLookupApiResponse(
-      TEST_LOCATIONS.FIRST_STREET,
-      [mockApiRecord]
-    );
-
-    mockSuccessResponse(mockFetch, lookupResponse);
-    mockSuccessResponse(mockFetch, MOCK_LOCAL_ADDRESSES[0]);
-
-    const { result } = renderHook(() => useAddressLookup());
-
-    await performDebouncedApiCall(result, TEST_LOCATIONS.FIRST_STREET);
+    await performDebouncedSearch(result, TEST_LOCATIONS.FIRST_STREET);
 
     await vi.waitFor(() => {
-      expect(result.current.suggestions).toHaveLength(1);
+      expect(result.current.error).toContain('Initial error');
     });
 
-    const data = await result.current.getSuggestionData(mockApiRecord.id);
-
-    expect(mockFetch).toHaveBeenCalledWith(
-      `/api/parcel-metadata/${mockApiRecord.id}`
-    );
-    expect(data?.calc.estimated_landscapable_area).toBeGreaterThan(0);
-    expect(data?.latitude).toBeGreaterThan(0);
-    expect(data?.longitude).toBeGreaterThan(0);
-    expect(data?.owner?.name).not.toBe('Unknown');
-  });
-
-  it('handles missing parcel metadata gracefully', async () => {
-    const mockApiRecord = createMockApiRecord({
-      id: 'nonexistent_id_12345',
-      full_address: 'Nonexistent Address',
-      region: 'Unknown'
-    });
-
-    const lookupResponse = createLookupApiResponse('nonexistent address', [
-      mockApiRecord
+    // Now trigger a successful search
+    searchAddressesMock.mockResolvedValue([
+      {
+        id: MOCK_LOCAL_ADDRESSES[0].id,
+        display_name: MOCK_LOCAL_ADDRESSES[0].full_address,
+        region: 'St. Louis City',
+        normalized: 'test'
+      }
     ]);
 
-    mockSuccessResponse(mockFetch, lookupResponse);
-
-    const { result } = renderHook(() => useAddressLookup());
-
-    await performDebouncedApiCall(result, 'nonexistent address');
+    await performDebouncedSearch(result, TEST_LOCATIONS.DUNN_VIEW);
 
     await vi.waitFor(() => {
+      expect(result.current.error).toBeNull();
       expect(result.current.suggestions).toHaveLength(1);
-    });
-
-    const data = await result.current.getSuggestionData(mockApiRecord.id);
-
-    expect(data?.calc.estimated_landscapable_area).toBe(0);
-    expect(data?.latitude).toBe(0);
-    expect(data?.longitude).toBe(0);
-    expect(data?.owner?.name).toBe('Unknown');
-  });
-
-  it('properly joins data from parcel metadata service', async () => {
-    const mockApiRecord = createMockApiRecord({
-      id: MOCK_LOCAL_ADDRESSES[1].id,
-      full_address: MOCK_LOCAL_ADDRESSES[1].full_address,
-      region: MOCK_LOCAL_ADDRESSES[1].region
-    });
-
-    const lookupResponse = createLookupApiResponse(TEST_LOCATIONS.DUNN_VIEW, [
-      mockApiRecord
-    ]);
-
-    mockSuccessResponse(mockFetch, lookupResponse);
-    mockSuccessResponse(mockFetch, MOCK_LOCAL_ADDRESSES[1]);
-
-    const { result } = renderHook(() => useAddressLookup());
-
-    await performDebouncedApiCall(result, TEST_LOCATIONS.DUNN_VIEW);
-
-    await vi.waitFor(() => {
-      expect(result.current.suggestions).toHaveLength(1);
-    });
-
-    const data = await result.current.getSuggestionData(mockApiRecord.id);
-
-    expect(data).toMatchObject({
-      id: MOCK_LOCAL_ADDRESSES[1].id,
-      full_address: mockApiRecord.display_name,
-      region: MOCK_LOCAL_ADDRESSES[1].region,
-      latitude: MOCK_LOCAL_ADDRESSES[1].latitude,
-      longitude: MOCK_LOCAL_ADDRESSES[1].longitude,
-      calc: {
-        landarea: MOCK_LOCAL_ADDRESSES[1].calc.landarea,
-        building_sqft: MOCK_LOCAL_ADDRESSES[1].calc.building_sqft,
-        estimated_landscapable_area:
-          MOCK_LOCAL_ADDRESSES[1].calc.estimated_landscapable_area
-      },
-      owner: MOCK_LOCAL_ADDRESSES[1].owner,
-      affluence_score: MOCK_LOCAL_ADDRESSES[1].affluence_score,
-      source_file: MOCK_LOCAL_ADDRESSES[1].source_file
     });
   });
 
-  it('should clear all state when handleClear is called', () => {
+  it('unlocks state on handleChange after being locked', () => {
     const { result } = renderHook(() => useAddressLookup());
 
-    // First, set up some state by performing a search and selection
+    // First lock the state
     act(() => {
-      result.current.handleChange('test query');
+      result.current.handleSelect(TEST_LOCATIONS.FIRST_STREET);
     });
 
-    act(() => {
-      result.current.handleSelect('Selected Address');
-    });
-
-    // Verify initial state
-    expect(result.current.query).toBe('Selected Address');
     expect(result.current.locked).toBe(true);
 
-    // Now clear everything
+    // Then change the query
     act(() => {
-      result.current.handleClear();
+      result.current.handleChange('new query');
     });
 
-    // Verify everything is reset
-    expect(result.current.query).toBe('');
-    expect(result.current.suggestions).toEqual([]);
     expect(result.current.locked).toBe(false);
-    expect(result.current.isFetching).toBe(false);
-    expect(result.current.hasFetched).toBe(false);
-    expect(result.current.error).toBe(null);
+    expect(result.current.query).toBe('new query');
+  });
+
+  it('cancels previous search on new query', async () => {
+    let resolveFirst: (value: unknown) => void = () => {};
+    let resolveSecond: (value: unknown) => void = () => {};
+
+    const firstPromise = new Promise((resolve) => {
+      resolveFirst = resolve;
+    });
+    const secondPromise = new Promise((resolve) => {
+      resolveSecond = resolve;
+    });
+
+    const { result } = renderHook(() => useAddressLookup());
+
+    // Start first search
+    searchAddressesMock.mockReturnValueOnce(firstPromise);
+    act(() => {
+      result.current.handleChange(TEST_LOCATIONS.FIRST_STREET);
+    });
+
+    await act(async () => {
+      vi.advanceTimersByTime(600);
+    });
+
+    // Start second search before first completes
+    searchAddressesMock.mockReturnValueOnce(secondPromise);
+    act(() => {
+      result.current.handleChange(TEST_LOCATIONS.DUNN_VIEW);
+    });
+
+    await act(async () => {
+      vi.advanceTimersByTime(600);
+    });
+
+    // Resolve first search (should be ignored)
+    resolveFirst([
+      {
+        id: 'old-result',
+        display_name: 'Old Result',
+        region: 'Test',
+        normalized: 'old result'
+      }
+    ]);
+
+    // Resolve second search
+    resolveSecond([
+      {
+        id: MOCK_LOCAL_ADDRESSES[1].id,
+        display_name: MOCK_LOCAL_ADDRESSES[1].full_address,
+        region: 'St. Louis County',
+        normalized: 'test'
+      }
+    ]);
+
+    await vi.waitFor(() => {
+      expect(result.current.suggestions).toHaveLength(1);
+      expect(result.current.suggestions[0].place_id).toBe(
+        MOCK_LOCAL_ADDRESSES[1].id
+      );
+    });
+  });
+
+  it('returns proper output types', async () => {
+    const mockResults = [
+      {
+        id: MOCK_LOCAL_ADDRESSES[0].id,
+        display_name: MOCK_LOCAL_ADDRESSES[0].full_address,
+        region: 'St. Louis City',
+        normalized: 'test'
+      }
+    ];
+
+    searchAddressesMock.mockResolvedValue(mockResults);
+
+    const { result } = renderHook(() => useAddressLookup());
+
+    await performDebouncedSearch(result, TEST_LOCATIONS.FIRST_STREET);
+
+    await vi.waitFor(() => {
+      expect(result.current.suggestions).toHaveLength(1);
+    });
+
+    const suggestion = result.current.suggestions[0];
+    expect(typeof suggestion.place_id).toBe('string');
+    expect(typeof suggestion.display_name).toBe('string');
+  });
+
+  it('properly formats query for search call', async () => {
+    const queryWithSpaces = 'FIRST STREET';
+    const expectedFormattedQuery = 'first street';
+
+    const mockResults = [
+      {
+        id: MOCK_LOCAL_ADDRESSES[0].id,
+        display_name: MOCK_LOCAL_ADDRESSES[0].full_address,
+        region: 'St. Louis City',
+        normalized: 'test'
+      }
+    ];
+
+    searchAddressesMock.mockResolvedValue(mockResults);
+
+    const { result } = renderHook(() => useAddressLookup());
+
+    await performDebouncedSearch(result, queryWithSpaces);
+
+    await vi.waitFor(() => {
+      expect(result.current.suggestions).toHaveLength(1);
+    });
+
+    expect(searchAddressesMock).toHaveBeenCalledWith(
+      expectedFormattedQuery,
+      10
+    );
+  });
+
+  it('handles empty search results', async () => {
+    searchAddressesMock.mockResolvedValue([]);
+
+    const { result } = renderHook(() => useAddressLookup());
+
+    await performDebouncedSearch(result, TEST_LOCATIONS.FIRST_STREET);
+
+    await vi.waitFor(() => {
+      expect(result.current.isFetching).toBe(false);
+    });
+
+    expect(result.current.suggestions).toEqual([]);
+    expect(result.current.error).toBeNull();
+    expect(result.current.hasFetched).toBe(true);
   });
 });

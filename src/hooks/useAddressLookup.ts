@@ -1,7 +1,7 @@
 import { useState, useRef } from 'react';
-import { AddressLookupRecord } from '@services/addressSearch';
+import { searchAddresses, AddressLookupRecord } from '@services/addressSearch';
 import { LocalAddressRecord } from '@app-types';
-import { createNetworkError, getErrorMessage, logError } from '@lib/errorUtils';
+import { getErrorMessage, logError } from '@lib/errorUtils';
 import { deduplicatedLookup } from '@lib/requestDeduplication';
 import { devLog } from '@lib/logger';
 
@@ -18,11 +18,11 @@ export function useAddressLookup() {
   const rawDataRef = useRef<Record<string, AddressLookupRecord>>({});
 
   const handleChange = (value: string) => {
-    if (locked) return;
     setQuery(value);
     setSuggestions([]);
     setError(null);
     setHasFetched(false);
+    setLocked(false);
 
     if (!value) {
       setIsFetching(false);
@@ -43,22 +43,9 @@ export function useAddressLookup() {
     deduplicatedLookup(
       value,
       async (normalizedQuery) => {
-        const response = await fetch(
-          `/api/lookup?query=${encodeURIComponent(normalizedQuery)}`
-        );
-        if (!response.ok) {
-          throw createNetworkError(
-            `Failed to fetch address suggestions: ${response.status} ${response.statusText}`,
-            { status: response.status, statusText: response.statusText }
-          );
-        }
-        const responseData = await response.json();
-        devLog('📥 API response:', responseData);
-
-        const results: AddressLookupRecord[] = Array.isArray(responseData)
-          ? responseData
-          : responseData.results || [];
-
+        // Use client-side search instead of API call
+        const results = await searchAddresses(normalizedQuery, 10);
+        devLog('📥 Client search results:', results);
         return results;
       },
       { debounce: true, debounceDelay: 200 }
