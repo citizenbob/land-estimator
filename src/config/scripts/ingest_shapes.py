@@ -35,6 +35,7 @@ import pandas as pd
 import geopandas as gpd
 from shapely.geometry import Point
 from dbfread import DBF
+import numpy as np
 
 class ShapefileProcessor:
     """Process shapefiles and extract parcel data"""
@@ -301,7 +302,7 @@ class ShapefileProcessor:
         return None
     
     def process_city_data(self) -> tuple:
-        """Process St. Louis City shapefile data"""
+        """Process St. Louis City shapefile data with enhanced calculations"""
         print("🌆 Processing St. Louis City shapefiles...")
         
         # Use actual shapefile directory, not temp directory
@@ -392,77 +393,112 @@ class ShapefileProcessor:
         results = []
         geometry_data = {}
         
+        # First pass: collect all data for regional statistics
+        temp_results = []
         for idx, (_, row) in enumerate(gdf.iterrows()):
-            if idx % 5000 == 0 and idx > 0:
-                print(f"   ⚙️ Processed {idx:,}/{len(gdf):,} city parcels...")
-                
             parcel_id = str(row.get(parcel_id_field, "")).strip()
             if not parcel_id:
                 continue
                 
-            # Use pre-transformed geometry (much faster)
+            # Get assessment data
+            assessment_total = self.safe_to_numeric(self.get_field_value(row, "city", "assessment", "total"), 0)
+            assessment_land = self.safe_to_numeric(self.get_field_value(row, "city", "assessment", "land"), 0)
+            assessment_improvement = self.safe_to_numeric(self.get_field_value(row, "city", "assessment", "improvement"), 0)
+            
+            temp_results.append({
+                'parcel_id': parcel_id,
+                'row': row,
+                'idx': idx,
+                'assessment': {
+                    'total': assessment_total,
+                    'land': assessment_land,
+                    'improvement': assessment_improvement
+                }
+            })
+        
+        # Calculate regional statistics
+        print("📊 Calculating regional statistics...")
+        regional_stats = self.calculate_regional_stats(temp_results, "city")
+        
+        # Second pass: process with enhanced calculations
+        for temp_record in temp_results:
+            idx = temp_record['idx']
+            row = temp_record['row']
+            parcel_id = temp_record['parcel_id']
+            
+            if idx % 5000 == 0 and idx > 0:
+                print(f"   ⚙️ Processed {idx:,}/{len(temp_results):,} city parcels...")
+            
+            # Use pre-transformed geometry and centroid
             wgs84_geom = gdf_wgs84.iloc[idx].geometry
             geometry_data[parcel_id] = self.extract_parcel_geometry(wgs84_geom, already_transformed=True)
-            
-            # Use pre-calculated centroid (much faster)
             centroid = centroids.iloc[idx]
             lat, lng = centroid.y, centroid.x
             
-            # Get address data
+            # Address processing (existing code)
             raw_street_address = self.get_field_value(row, "city", "address", "street_primary", "")
             full_street_address = str(raw_street_address).strip()
             zip_code_raw = str(self.get_field_value(row, "city", "address", "zip", "")).strip()
-            zip_code_raw = re.sub(r"\.0$", "", zip_code_raw)  # Remove .0 from float zips
+            zip_code_raw = re.sub(r"\.0$", "", zip_code_raw)
             
             if not full_street_address or full_street_address.lower() in ['nan', 'none', 'null']:
                 continue
                 
-            # Standardize address
             raw_full_address = f"{full_street_address}, St. Louis, MO {zip_code_raw}"
             standardized_address = self.standardize_address(raw_full_address, default_city="St. Louis")
             
             if not standardized_address:
                 continue
             
-            # Calculate property metrics
+            # Enhanced property calculations
             land_area = self.safe_to_numeric(row.get("landarea"), 0)
             building_sqft = self.safe_to_numeric(self.get_field_value(row, "city", "building", "area"), 0)
+            building_year = self.safe_to_numeric(self.get_field_value(row, "city", "building", "year"), 0)
             
             prop_class_code = self.get_field_value(row, "city", "property_class", None)
             property_type = self.classify_property(prop_class_code, "city")
             
-            est_landscapable_area = self.calculate_landscapable_area(land_area, building_sqft, property_type)
+            # Advanced landscapable area calculation
+            landscaping_analysis = self.calculate_advanced_landscapable_area(
+                land_area, building_sqft, property_type, temp_record['assessment']
+            )
             
-            # For Document Mode, we only need lightweight search data
-            results.append({
+            # Create base record
+            base_record = {
                 "id": parcel_id,
                 "full_address": standardized_address,
                 "latitude": round(lat, 6),
                 "longitude": round(lng, 6),
                 "region": "St. Louis City",
-                # Additional data for intermediate files
                 "original_parcel_id": parcel_id,
                 "calc": {
                     "landarea_sqft": land_area,
                     "building_sqft": building_sqft,
-                    "estimated_landscapable_area_sqft": est_landscapable_area,
-                    "property_type": property_type
+                    "building_year": building_year,
+                    "estimated_landscapable_area_sqft": landscaping_analysis['landscapable_area'],
+                    "property_type": property_type,
+                    "confidence_score": landscaping_analysis['confidence_score'],
+                    "landscaping_difficulty": landscaping_analysis['landscaping_difficulty']  # Change from 'difficulty'
                 },
                 "owner": {
-                    "name": self.get_field_value(row, "city", "owner", "name", "")
+                    "name": self.get_field_value(row, "city", "owner", "name", ""),
+                    "name2": self.get_field_value(row, "city", "owner", "name2", ""),
+                    "address": self.get_field_value(row, "city", "owner", "address", "")
                 },
-                "assessment": {
-                    "total": self.safe_to_numeric(self.get_field_value(row, "city", "assessment", "total"), 0),
-                    "land": self.safe_to_numeric(self.get_field_value(row, "city", "assessment", "land"), 0),
-                    "improvement": self.safe_to_numeric(self.get_field_value(row, "city", "assessment", "improvement"), 0)
-                }
-            })
+                "assessment": temp_record['assessment']
+            }
             
-        print(f"✅ Processed {len(results)} city records")
+            # Add enhanced pricing calculations
+            pricing_components = self.calculate_pricing_components(base_record, regional_stats)
+            base_record.update(pricing_components)
+            
+            results.append(base_record)
+        
+        print(f"✅ Processed {len(results)} city records with enhanced calculations")
         return results, geometry_data
     
     def process_county_data(self) -> tuple:
-        """Process St. Louis County shapefile data"""
+        """Process St. Louis County shapefile data with enhanced calculations"""
         print("🏘️ Processing St. Louis County shapefiles...")
         
         # Use actual shapefile directory, not temp directory
@@ -527,19 +563,49 @@ class ShapefileProcessor:
         geometry_data = {}
         parcel_id_field = self.field_mappings["county"]["parcel_id"]
         
+        # First pass: collect all data for regional statistics
+        temp_results = []
         for idx, (_, row) in enumerate(gdf.iterrows()):
-            if idx % 5000 == 0 and idx > 0:
-                print(f"   ⚙️ Processed {idx:,}/{len(gdf):,} county parcels...")
-                
             parcel_id = str(row.get(parcel_id_field, "")).strip()
             if not parcel_id:
                 continue
                 
-            # Use pre-transformed geometry (much faster)
+            # Get assessment data
+            assessment_total = self.safe_to_numeric(self.get_field_value(row, "county", "assessment", "total"), 0)
+            assessment_land = self.safe_to_numeric(self.get_field_value(row, "county", "assessment", "land"), 0)
+            assessment_improvement = self.safe_to_numeric(self.get_field_value(row, "county", "assessment", "improvement"), 0)
+            
+            temp_results.append({
+                'parcel_id': parcel_id,
+                'row': row,
+                'idx': idx,
+                'assessment': {
+                    'total': assessment_total,
+                    'land': assessment_land,
+                    'improvement': assessment_improvement
+                }
+            })
+    
+        # Calculate regional statistics
+        print("📊 Calculating regional statistics...")
+        regional_stats = self.calculate_regional_stats(temp_results, "county")
+        
+        # Second pass: process with enhanced calculations
+        for temp_record in temp_results:
+            idx = temp_record['idx']
+            row = temp_record['row']
+            parcel_id = temp_record['parcel_id']
+            
+            if idx % 5000 == 0 and idx > 0:
+                print(f"   ⚙️ Processed {idx:,}/{len(temp_results):,} county parcels...")
+            
+            # Use pre-transformed geometry and centroid
             wgs84_geom = gdf_wgs84.iloc[idx].geometry
             geometry_data[parcel_id] = self.extract_parcel_geometry(wgs84_geom, already_transformed=True)
+            centroid = centroids.iloc[idx]
+            lat, lng = centroid.y, centroid.x
             
-            # Get address data
+            # Address processing (existing code)
             raw_address = str(self.get_field_value(row, "county", "address", "full", "")).strip()
             raw_zip = str(self.get_field_value(row, "county", "address", "zip", "")).strip()
             raw_municipality = str(self.get_field_value(row, "county", "address", "municipality", "")).strip().title()
@@ -555,56 +621,203 @@ class ShapefileProcessor:
                 
             full_address_for_std = f"{raw_address}, {city_to_use}, MO {zip_to_use}"
             standardized_address = self.standardize_address(
-                full_address_for_std,
-                default_city=city_to_use,
-                default_state="MO",
-                default_zip=zip_to_use
+                full_address_for_std, default_city=city_to_use, default_state="MO", default_zip=zip_to_use
             )
             
             if not standardized_address:
                 continue
-                
-            # Use pre-calculated centroid (much faster)
-            centroid = centroids.iloc[idx]
-            lat, lng = centroid.y, centroid.x
             
-            # Calculate property metrics
+            # Enhanced property calculations
             land_area = self.safe_to_numeric(row.get("landarea"), 0)
             building_sqft = self.safe_to_numeric(self.get_field_value(row, "county", "building", "area"), 0)
+            building_year = self.safe_to_numeric(self.get_field_value(row, "county", "building", "year"), 0)
             
             prop_class_code = self.get_field_value(row, "county", "property_class", None)
             property_type = self.classify_property(prop_class_code, "county")
             
-            est_landscapable_area = self.calculate_landscapable_area(land_area, building_sqft, property_type)
+            # Advanced landscapable area calculation
+            landscaping_analysis = self.calculate_advanced_landscapable_area(
+                land_area, building_sqft, property_type, temp_record['assessment']
+            )
             
-            results.append({
+            # Create base record
+            base_record = {
                 "id": parcel_id,
                 "full_address": standardized_address,
                 "latitude": round(lat, 6),
                 "longitude": round(lng, 6),
                 "region": raw_municipality.title() if raw_municipality else "St. Louis County",
-                # Additional data for intermediate files
                 "original_parcel_id": parcel_id,
                 "calc": {
                     "landarea_sqft": land_area,
                     "building_sqft": building_sqft,
-                    "estimated_landscapable_area_sqft": est_landscapable_area,
-                    "property_type": property_type
+                    "building_year": building_year,
+                    "estimated_landscapable_area_sqft": landscaping_analysis['landscapable_area'],
+                    "property_type": property_type,
+                    "confidence_score": landscaping_analysis['confidence_score'],
+                    "landscaping_difficulty": landscaping_analysis['landscaping_difficulty']  # Change from 'difficulty'
                 },
                 "owner": {
-                    "name": self.get_field_value(row, "county", "owner", "name", "")
+                    "name": self.get_field_value(row, "county", "owner", "name", ""),
+                    "tenure": self.get_field_value(row, "county", "owner", "tenure", "")
                 },
-                "assessment": {
-                    "total": self.safe_to_numeric(self.get_field_value(row, "county", "assessment", "total"), 0),
-                    "land": self.safe_to_numeric(self.get_field_value(row, "county", "assessment", "land"), 0),
-                    "improvement": self.safe_to_numeric(self.get_field_value(row, "county", "assessment", "improvement"), 0)
-                }
-            })
+                "assessment": temp_record['assessment']
+            }
             
-        print(f"✅ Processed {len(results)} county records")
+            # Add enhanced pricing calculations
+            pricing_components = self.calculate_pricing_components(base_record, regional_stats)
+            base_record.update(pricing_components)
+            
+            results.append(base_record)
+        
+        print(f"✅ Processed {len(results)} county records with enhanced calculations")
         return results, geometry_data
+    
+    def calculate_regional_stats(self, all_data, region):
+        """Calculate regional statistics for affluence scoring"""
+        assessments = []
+        for record in all_data:
+            if record.get('assessment', {}).get('total', 0) > 0:
+                assessments.append(record['assessment']['total'])
+        
+        if not assessments:
+            return {
+                'median_assessment': 150000,
+                'mean_assessment': 175000,
+                'percentile_75': 250000,
+                'percentile_25': 100000,
+                'total_parcels': len(all_data)
+            }
+        
+        return {
+            'median_assessment': np.median(assessments),
+            'mean_assessment': np.mean(assessments),
+            'percentile_75': np.percentile(assessments, 75),
+            'percentile_25': np.percentile(assessments, 25),
+            'total_parcels': len(all_data)
+        }
 
+    def calculate_affluence_score(self, assessment_total, assessment_land, region_stats):
+        """Calculate affluence score (0-100) based on assessment data"""
+        if not assessment_total or assessment_total <= 0:
+            return 50  # Baseline score
+        
+        # Calculate percentile rank within region
+        regional_median = region_stats.get('median_assessment', 150000)
+        percentile_rank = min(100, (assessment_total / regional_median) * 50)
+        
+        # Adjust for land value ratio
+        if assessment_land and assessment_land > 0:
+            land_ratio = assessment_land / assessment_total
+            if land_ratio > 0.4:  # High land value areas
+                percentile_rank *= 1.2
+        
+        return min(100, max(0, round(percentile_rank, 1)))
 
+    def calculate_commercial_multiplier(self, property_type, assessment_total=0):
+        """Calculate commercial property multiplier"""
+        if property_type == "commercial":
+            return 0.85
+        elif property_type == "industrial":
+            return 0.75
+        elif property_type == "agricultural":
+            return 0.90
+        # High-value residential (likely commercial use)
+        elif property_type == "residential" and assessment_total > 500000:
+            return 0.90
+        return 1.0
+
+    def calculate_maintenance_multiplier(self, property_type, affluence_score):
+        """Calculate maintenance cost multiplier"""
+        base_multiplier = {
+            "residential": 1.0,
+            "commercial": 0.8,
+            "industrial": 0.6,
+            "agricultural": 0.7
+        }.get(property_type, 1.0)
+        
+        # Affluence adjustment (0.8 to 1.2 range)
+        affluence_multiplier = 0.8 + (affluence_score / 100) * 0.4
+        
+        return base_multiplier * affluence_multiplier
+
+    def calculate_advanced_landscapable_area(self, land_area, building_sqft, property_type, assessment_data=None):
+        """Enhanced landscapable area calculation with pricing factors"""
+        land_area = self.safe_to_numeric(land_area, 0)
+        building_sqft = self.safe_to_numeric(building_sqft, 0)
+        
+        if land_area <= 0:
+            return {
+                'landscapable_area': 0,
+                'confidence_score': 0,
+                'landscaping_difficulty': 'unknown'  # Keep this consistent
+            }
+        
+        # Base calculation
+        base_landscapable = self.calculate_landscapable_area(land_area, building_sqft, property_type)
+        
+        # Confidence scoring
+        confidence_score = 0.7  # Base confidence
+        if building_sqft > 0:
+            confidence_score += 0.2
+        if assessment_data and assessment_data.get('total', 0) > 0:
+            confidence_score += 0.1
+        
+        # Landscaping difficulty assessment
+        difficulty = 'moderate'
+        if property_type == 'industrial':
+            difficulty = 'high'
+        elif property_type == 'commercial':
+            difficulty = 'moderate'
+        elif land_area > 43560:  # > 1 acre
+            difficulty = 'low'
+        elif land_area < 5000:  # < 0.11 acres
+            difficulty = 'high'
+        
+        return {
+            'landscapable_area': base_landscapable,
+            'confidence_score': min(1.0, confidence_score),
+            'landscaping_difficulty': difficulty  # Keep this consistent
+        }
+
+    def calculate_pricing_components(self, record, regional_stats):
+        """Calculate all pricing components for a parcel"""
+        assessment_total = record.get('assessment', {}).get('total', 0)
+        assessment_land = record.get('assessment', {}).get('land', 0)
+        property_type = record.get('calc', {}).get('property_type', 'residential')
+        landscapable_area = record.get('calc', {}).get('estimated_landscapable_area_sqft', 0)
+        
+        # Calculate affluence score
+        affluence_score = self.calculate_affluence_score(
+            assessment_total, assessment_land, regional_stats
+        )
+        
+        # Calculate multipliers
+        commercial_multiplier = self.calculate_commercial_multiplier(property_type, assessment_total)
+        maintenance_multiplier = self.calculate_maintenance_multiplier(property_type, affluence_score)
+        
+        # Combined multiplier for pricing
+        combined_multiplier = commercial_multiplier * (0.8 + (affluence_score / 100) * 0.4)
+        
+        return {
+            'affluence_score': affluence_score,
+            'commercial_multiplier': commercial_multiplier,
+            'maintenance_multiplier': maintenance_multiplier,
+            'combined_multiplier': combined_multiplier,
+            'pricing_tier': self._determine_pricing_tier(affluence_score, assessment_total)
+        }
+
+    def _determine_pricing_tier(self, affluence_score, assessment_total):
+        """Determine pricing tier for business intelligence"""
+        if affluence_score >= 80 or assessment_total >= 400000:
+            return 'premium'
+        elif affluence_score >= 60 or assessment_total >= 200000:
+            return 'standard'
+        elif affluence_score >= 40 or assessment_total >= 100000:
+            return 'value'
+        else:
+            return 'economy'
+    
 class DocumentModePipeline:
     """Document Mode Pipeline - Clean Implementation"""
     
@@ -736,7 +949,12 @@ class DocumentModePipeline:
                     "region": record["region"],
                     "calc": record["calc"],
                     "owner": record["owner"],
-                    "assessment": record["assessment"]
+                    "assessment": record["assessment"],
+                    "affluence_score": record.get("affluence_score", 50),
+                    "commercial_multiplier": record.get("commercial_multiplier", 1.0),
+                    "maintenance_multiplier": record.get("maintenance_multiplier", 1.0),
+                    "combined_multiplier": record.get("combined_multiplier", 1.0),
+                    "pricing_tier": record.get("pricing_tier", "standard")
                 }
                 for record in city_data
             }
@@ -765,7 +983,13 @@ class DocumentModePipeline:
                     "region": record["region"],
                     "calc": record["calc"],
                     "owner": record["owner"],
-                    "assessment": record["assessment"]
+                    "assessment": record["assessment"],
+                    # Add enhanced pricing data for county too
+                    "affluence_score": record.get("affluence_score", 50),
+                    "commercial_multiplier": record.get("commercial_multiplier", 1.0),
+                    "maintenance_multiplier": record.get("maintenance_multiplier", 1.0),
+                    "combined_multiplier": record.get("combined_multiplier", 1.0),
+                    "pricing_tier": record.get("pricing_tier", "standard")
                 }
                 for record in county_data
             }
@@ -1000,10 +1224,26 @@ class DocumentModePipeline:
                         "upload",
                         str(file_path), 
                         f"search/{file_path.name}"
-                    ], capture_output=True, text=True, check=True, cwd=str(self.project_root))
+                    ], capture_output=True, text=True, timeout=600, cwd=str(self.project_root))
                     
-                    print(f"✅ Uploaded {file_path.name} to Firebase backup")
+                    if result.returncode == 0:
+                        # Parse the JSON output to check if upload actually succeeded
+                        try:
+                            output_data = json.loads(result.stdout.split('\n')[-2])  # Last line before empty
+                            if output_data.get('success', False):
+                                print(f"✅ Uploaded {file_path.name} to Firebase backup")
+                            else:
+                                print(f"⚠️ Firebase upload failed for {file_path.name}: {output_data.get('error', 'Unknown error')}")
+                        except (json.JSONDecodeError, IndexError):
+                            # Fallback to checking return code only
+                            print(f"✅ Uploaded {file_path.name} to Firebase backup")
+                    else:
+                        print(f"⚠️ Firebase upload failed for {file_path.name}")
+                        print(f"   stdout: {result.stdout}")
+                        print(f"   stderr: {result.stderr}")
                     
+                except subprocess.TimeoutExpired:
+                    print(f"⚠️ Firebase upload timed out for {file_path.name} (10 minutes)")
                 except subprocess.CalledProcessError as e:
                     print(f"⚠️ Firebase upload failed for {file_path.name}: {e.stderr}")
                     # Don't fail the pipeline for Firebase issues
