@@ -1,7 +1,5 @@
 describe('Capture Address Inquiries and Log Shopper Behavior', () => {
   beforeEach(() => {
-    cy.intercept('POST', '/api/log', { statusCode: 200 }).as('log');
-
     cy.visit('/');
 
     cy.window({ timeout: 15000 }).should(
@@ -24,7 +22,7 @@ describe('Capture Address Inquiries and Log Shopper Behavior', () => {
 
     cy.get('li[role="option"]').first().click();
 
-    cy.wait('@log').then((interception) => {
+    cy.wait('@globalLogApi').then((interception) => {
       expect(interception.request.body.eventName).to.equal('address_selected');
       expect(interception.request.body.data.query).to.equal('621 Market St');
       expect(interception.request.body.data.address_id).to.be.a('string');
@@ -43,14 +41,14 @@ describe('Capture Address Inquiries and Log Shopper Behavior', () => {
 
     cy.get('ul[role="listbox"]').should('be.visible');
     cy.get('li[role="option"]').first().click();
-    cy.wait('@log');
+    cy.wait('@globalLogApi');
 
     cy.get('button')
       .contains(/get instant estimate/i)
       .should('be.visible')
       .click();
 
-    cy.wait('@log').then((interception) => {
+    cy.wait('@globalLogApi').then((interception) => {
       expect(interception.request.body.eventName).to.equal(
         'estimate_button_clicked'
       );
@@ -72,7 +70,7 @@ describe('Capture Address Inquiries and Log Shopper Behavior', () => {
 
     cy.get('li[role="option"]').first().click();
 
-    cy.wait('@log').then((interception) => {
+    cy.wait('@globalLogApi').then((interception) => {
       expect(interception.request.body.eventName).to.equal('address_selected');
       expect(interception.request.body.data.address_id).to.be.a('string');
     });
@@ -82,7 +80,7 @@ describe('Capture Address Inquiries and Log Shopper Behavior', () => {
       .should('be.visible')
       .click();
 
-    cy.wait('@log').then((interception) => {
+    cy.wait('@globalLogApi').then((interception) => {
       expect(interception.request.body.eventName).to.equal(
         'estimate_button_clicked'
       );

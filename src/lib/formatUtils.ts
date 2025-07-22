@@ -18,8 +18,15 @@ export function formatCurrency(
 ): string {
   const { includeSymbol = true, decimalPlaces = 2 } = options;
 
-  const formatted = amount.toFixed(decimalPlaces);
-  return includeSymbol ? `$${formatted}` : formatted;
+  // Use Intl.NumberFormat for proper currency formatting with commas
+  const formatted = new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency: 'USD',
+    minimumFractionDigits: decimalPlaces,
+    maximumFractionDigits: decimalPlaces
+  }).format(amount);
+
+  return includeSymbol ? formatted : formatted.replace('$', '');
 }
 
 /**

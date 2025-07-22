@@ -13,8 +13,12 @@ interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
   style?: React.CSSProperties;
 }
 
-const Button: React.FC<ButtonProps> = ({ children, ...props }) => {
-  return <ButtonStyles {...props}>{children}</ButtonStyles>;
+const Button: React.FC<ButtonProps> = ({ children, loading, ...props }) => {
+  return (
+    <ButtonStyles loading={loading} {...props}>
+      {children}
+    </ButtonStyles>
+  );
 };
 
 export default Button;

@@ -3,7 +3,7 @@ import tokens from '@tokens/tokens.json';
 import { getToken } from '@tokens/tokenUtils';
 
 export const CalculatorContainer = styled.div.attrs(() => ({
-  className: 'estimate-calculator rounded-md shadow-sm'
+  className: 'estimate-calculator rounded-md shadow-sm w-full'
 }))`
   padding: ${({ theme }) =>
     getToken(theme, 'spacing.base.value', tokens.spacing.base.value)};

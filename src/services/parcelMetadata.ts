@@ -1,3 +1,24 @@
+// Raw parcel data structure from Vercel Blob
+interface RawParcelData {
+  id: string;
+  primary_full_address: string;
+  latitude: number;
+  longitude: number;
+  region: string;
+  calc: {
+    landarea_sqft: number;
+    building_sqft: number;
+    estimated_landscapable_area_sqft: number;
+    property_type: string;
+  };
+  owner: {
+    name: string;
+  };
+  affluence_score: number;
+  source_file?: string;
+  processed_date?: string;
+}
+
 export interface ParcelMetadata {
   id: string;
   full_address: string;
@@ -38,33 +59,94 @@ export async function loadParcelMetadata(): Promise<
   console.log('🚀 Loading parcel metadata from cold storage...');
 
   try {
-    // Load from CDN/cold storage - check multiple possible endpoints
-    let response: Response;
-    const endpoints = [
-      'https://storage.googleapis.com/land-estimator-29ee9.firebasestorage.app/cdn/parcel/latest.json',
-      '/parcel/latest.json',
-      '/data/parcel/latest.json',
-      '/public/parcel/latest.json'
-    ];
+    // Load from Vercel Blob storage - regional gzipped files
+    const regions = ['stl_city', 'stl_county'];
+    // Load all parcels for all regions
+    let allParcels: ParcelMetadata[] = [];
 
-    let lastError: Error | null = null;
-    for (const endpoint of endpoints) {
+    for (const region of regions) {
       try {
-        response = await fetch(endpoint);
-        if (response.ok) break;
+        const blobUrl = `https://lchevt1wkhcax7cz.public.blob.vercel-storage.com/cdn/${region}-parcel_metadata.json.gz`;
+        console.log(`🔍 Fetching ${region} from:`, blobUrl);
+
+        const response = await fetch(blobUrl);
+        console.log(`📡 Response status for ${region}:`, response.status);
+        console.log(
+          `📡 Response headers for ${region}:`,
+          Object.fromEntries(response.headers.entries())
+        );
+
+        if (!response.ok) {
+          console.warn(`Failed to load ${region} data: ${response.status}`);
+          continue;
+        }
+
+        // Handle gzipped response - check if DecompressionStream is available
+        console.log(
+          '🔧 DecompressionStream available:',
+          typeof DecompressionStream !== 'undefined'
+        );
+
+        let text: string;
+        if (typeof DecompressionStream !== 'undefined') {
+          // Browser/modern environment
+          const decompressed = response.body?.pipeThrough(
+            new DecompressionStream('gzip')
+          );
+          text = await new Response(decompressed).text();
+        } else {
+          // Node.js environment - try using zlib
+          const { gunzip } = await import('zlib');
+          const { promisify } = await import('util');
+          const gunzipAsync = promisify(gunzip);
+
+          const buffer = await response.arrayBuffer();
+          const decompressed = await gunzipAsync(Buffer.from(buffer));
+          text = decompressed.toString('utf-8');
+        }
+        console.log(`📄 Text length for ${region}:`, text.length);
+        console.log(`📄 Text preview for ${region}:`, text.substring(0, 200));
+
+        const regionData = JSON.parse(text);
+        console.log(
+          `🔧 Parsed data structure for ${region}:`,
+          Object.keys(regionData)
+        );
+
+        // Extract parcels from nested structure and map field names
+        const rawParcels = Object.values(
+          regionData.parcels || {}
+        ) as RawParcelData[];
+        const parcels: ParcelMetadata[] = rawParcels.map((rawParcel) => ({
+          id: rawParcel.id,
+          full_address: rawParcel.primary_full_address,
+          latitude: rawParcel.latitude,
+          longitude: rawParcel.longitude,
+          region: rawParcel.region,
+          calc: {
+            landarea: rawParcel.calc?.landarea_sqft || 0,
+            building_sqft: rawParcel.calc?.building_sqft || 0,
+            estimated_landscapable_area:
+              rawParcel.calc?.estimated_landscapable_area_sqft || 0,
+            property_type: rawParcel.calc?.property_type || 'unknown'
+          },
+          owner: {
+            name: rawParcel.owner?.name || 'Unknown'
+          },
+          affluence_score: rawParcel.affluence_score || 0,
+          source_file: rawParcel.source_file || region,
+          processed_date: rawParcel.processed_date || new Date().toISOString()
+        }));
+        // Use concat to avoid stack overflow with large datasets
+        allParcels = allParcels.concat(parcels);
+
+        console.log(`✅ Loaded ${parcels.length} parcels from ${region}`);
       } catch (error) {
-        lastError = error as Error;
-        continue;
+        console.error(`❌ Failed to load ${region} parcel data:`, error);
       }
     }
 
-    if (!response! || !response.ok) {
-      throw new Error(
-        `Failed to load parcel metadata from any endpoint. Last error: ${lastError?.message}`
-      );
-    }
-
-    const parcelData: ParcelMetadata[] = await response.json();
+    const parcelData = allParcels;
 
     // Create lookup map
     parcelMetadataCache = new Map();

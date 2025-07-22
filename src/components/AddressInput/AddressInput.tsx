@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useRef, createRef, useEffect } from 'react';
+import React, { useRef, createRef, useEffect, useState } from 'react';
 import { useAddressLookup } from '@hooks/useAddressLookup';
 import { useEventLogger } from '@hooks/useEventLogger';
 import { useSuggestionNavigation } from '@hooks/useSuggestionNavigation';
@@ -66,6 +66,9 @@ const AddressInput = ({
     mockSelectedSuggestion || null
   );
 
+  // Loading state for the estimate button
+  const [isEstimateLoading, setIsEstimateLoading] = useState(false);
+
   const {
     showLoading,
     showErrorAlert,
@@ -118,8 +121,11 @@ const AddressInput = ({
 
     logAddressEvent(matched, 'estimate_button_clicked');
 
+    setIsEstimateLoading(true);
+
     try {
       const response = await fetch(`/api/parcel-metadata/${matched.place_id}`);
+
       if (!response.ok) {
         throw new Error(`Failed to fetch parcel data: ${response.status}`);
       }
@@ -165,6 +171,8 @@ const AddressInput = ({
         };
         onAddressSelect(enrichedData);
       }
+    } finally {
+      setIsEstimateLoading(false);
     }
   };
 
@@ -227,13 +235,17 @@ const AddressInput = ({
         />
       )}
       {showEstimateButton && (
-        <Button
-          type="button"
-          onClick={onEstimateClick}
-          aria-label="Get Instant Estimate"
-        >
-          Get Instant Estimate
-        </Button>
+        <div className="flex justify-start">
+          <Button
+            type="button"
+            onClick={onEstimateClick}
+            loading={isEstimateLoading}
+            disabled={isEstimateLoading}
+            aria-label="Get Instant Estimate"
+          >
+            {isEstimateLoading ? 'Calculating...' : 'Get Instant Estimate'}
+          </Button>
+        </div>
       )}
     </Form>
   );

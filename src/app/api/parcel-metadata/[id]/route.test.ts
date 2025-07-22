@@ -39,7 +39,7 @@ describe('/api/parcel-metadata/[id] route', () => {
       const data = await response.json();
 
       expect(response.status).toBe(500);
-      expect(data).toEqual({ error: 'Internal error' });
+      expect(data).toEqual({ error: 'Failed to fetch parcel metadata' });
       expect(mockGetParcelMetadata).toHaveBeenCalledWith('test-id');
 
       consoleErrorSpy.mockRestore();
@@ -75,17 +75,13 @@ describe('/api/parcel-metadata/[id] route', () => {
       const data = await response.json();
 
       expect(response.status).toBe(500);
-      expect(data).toEqual({ error: 'Internal error' });
+      expect(data).toEqual({ error: 'Failed to fetch parcel metadata' });
       expect(mockGetParcelMetadata).toHaveBeenCalledWith('123');
       expect(consoleErrorSpy).toHaveBeenCalledWith(
-        '[Error]',
+        'Error in parcel metadata API:',
         expect.objectContaining({
           message:
-            'Parcel metadata service is disabled. Use the simplified address lookup instead.',
-          context: expect.objectContaining({
-            operation: 'parcel_metadata_lookup',
-            parcelId: '123'
-          })
+            'Parcel metadata service is disabled. Use the simplified address lookup instead.'
         })
       );
 

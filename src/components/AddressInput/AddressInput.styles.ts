@@ -3,7 +3,7 @@ import tokens from '@tokens/tokens.json';
 import { getToken } from '@tokens/tokenUtils';
 
 export const Form = styled.form.attrs(() => ({
-  className: 'relative flex flex-col rounded-md shadow-sm'
+  className: 'relative flex flex-col rounded-md shadow-sm w-full'
 }))`
   gap: ${({ theme }) =>
     getToken(theme, 'spacing.sm.value', tokens.spacing.sm.value)};
