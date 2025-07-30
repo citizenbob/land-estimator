@@ -4,9 +4,8 @@ import { firestoreAdmin } from '@config/firebaseAdmin';
 import { logError, getErrorMessage } from '@lib/errorUtils';
 
 /**
- * Event logging endpoint for analytics and debugging
- * @param request Request containing event name and associated data
- * @returns JSON confirmation of event logging
+ * @param request - Request containing eventName and data properties
+ * @returns Success confirmation or error response
  */
 export async function POST(request: Request) {
   try {

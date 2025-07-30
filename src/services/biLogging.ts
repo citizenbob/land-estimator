@@ -6,8 +6,8 @@
  */
 
 import { logEvent } from '@services/logger';
-import { EstimateResult } from '../types/landscapeEstimatorTypes';
-import { EnrichedAddressSuggestion } from '@app-types';
+import { EstimateResult } from '@app-types/landscapeEstimatorTypes';
+import { EnrichedAddressSuggestion } from '@app-types/localAddressTypes';
 
 interface BILoggingOptions {
   addressData: EnrichedAddressSuggestion;

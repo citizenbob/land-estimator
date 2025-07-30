@@ -5,7 +5,8 @@
 
 import fs from 'fs';
 import path from 'path';
-import type { StaticAddressManifest, AddressLookupData } from '@app-types';
+// Import types from flexsearch module declaration
+import type { StaticAddressManifest, AddressLookupData } from 'flexsearch';
 
 /**
  * Load static address index files from the filesystem (server-side only)

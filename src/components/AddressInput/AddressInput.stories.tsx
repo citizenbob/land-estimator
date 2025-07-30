@@ -3,7 +3,7 @@
 import type { Meta, StoryObj } from '@storybook/react';
 import { fn } from '@storybook/test';
 import AddressInput from '@components/AddressInput/AddressInput';
-import { EnrichedAddressSuggestion } from '@app-types';
+import { EnrichedAddressSuggestion } from '@app-types/localAddressTypes';
 
 const baseLookupArgs = {
   query: '',

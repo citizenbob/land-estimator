@@ -1,20 +1,8 @@
 import React, { KeyboardEvent } from 'react';
-import { AddressSuggestion } from '@app-types';
+import { AddressSuggestion } from '@app-types/localAddressTypes';
 
 /**
- * Hook that manages keyboard navigation for a list of suggestions
- *
- * This hook implements the WAI-ARIA keyboard interaction patterns for comboboxes:
- * - Arrow up/down: Navigate through suggestions (with wrapping)
- * - Enter: Select the current suggestion
- * - Escape: Close the suggestions and return focus to input
- * - Tab: Standard tab behavior (no prevention)
- *
- * The focus management follows this pattern:
- * 1. Input field receives focus initially
- * 2. Arrow keys move focus between suggestion items
- * 3. Escape key returns focus to the input field
- * 4. Selection via Enter or click triggers the onSelect callback
+ * Hook that manages keyboard navigation for suggestion lists
  *
  * @param inputRef - Reference to the input field element
  * @param onSelect - Callback function triggered when a suggestion is selected

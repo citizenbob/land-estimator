@@ -1,5 +1,8 @@
 import { useMemo } from 'react';
-import { AddressSuggestion, EnrichedAddressSuggestion } from '@app-types';
+import {
+  AddressSuggestion,
+  EnrichedAddressSuggestion
+} from '@app-types/localAddressTypes';
 
 interface InputState {
   showLoading: boolean;
@@ -10,11 +13,6 @@ interface InputState {
   uniqueSuggestions: EnrichedAddressSuggestion[];
 }
 
-/**
- * Converts an AddressSuggestion to an EnrichedAddressSuggestion by ensuring latitude/longitude properties
- * @param suggestion The base suggestion to enrich
- * @returns An enriched suggestion with latitude/longitude properties
- */
 export function enrichSuggestion(
   suggestion: AddressSuggestion
 ): EnrichedAddressSuggestion {
@@ -36,18 +34,6 @@ export function enrichSuggestion(
 
 /**
  * Hook that manages derived UI states for the AddressInput component
- *
- * This hook processes the raw state from useAddressLookup and computes derived UI states
- * that determine what should be shown to the user. It handles:
- *
- * 1. Deduplication of suggestions by display_name
- * 2. Enrichment of suggestions with default lat/lon values when missing
- * 3. Logic for when to show/hide various UI elements:
- *    - Loading indicator during API requests
- *    - Error alerts when API calls fail
- *    - Suggestions dropdown with properly formatted items
- *    - Clear button when an address is locked
- *    - Estimate button when ready to proceed
  *
  * @param query - The current search query text
  * @param suggestions - Array of address suggestions from the API

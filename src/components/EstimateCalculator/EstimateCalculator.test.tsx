@@ -2,21 +2,25 @@ import React from 'react';
 import { describe, it, beforeEach, afterEach, vi, expect } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import '@testing-library/jest-dom';
+import { createTestSuite } from '@lib/testUtils';
 import { EstimateCalculator } from './EstimateCalculator';
 import { useLandscapeEstimator } from '@hooks/useLandscapeEstimator';
 import { MOCK_ENRICHED_ADDRESS_DATA } from '../../lib/testData';
-import type { EnrichedAddressSuggestion } from '@app-types';
+import type { EnrichedAddressSuggestion } from '@app-types/localAddressTypes';
 
 vi.mock('@hooks/useLandscapeEstimator');
 const mockUseLandscapeEstimator =
   useLandscapeEstimator as unknown as ReturnType<typeof vi.fn>;
 
 describe('EstimateCalculator', () => {
+  const testSuite = createTestSuite();
   const calculateEstimateMock = vi.fn();
 
   const mockAddressData = MOCK_ENRICHED_ADDRESS_DATA;
 
   beforeEach(() => {
+    testSuite.beforeEachSetup();
+
     calculateEstimateMock.mockImplementation(() => Promise.resolve());
     mockUseLandscapeEstimator.mockReturnValue({
       estimate: {
@@ -32,7 +36,7 @@ describe('EstimateCalculator', () => {
   });
 
   afterEach(() => {
-    vi.clearAllMocks();
+    testSuite.afterEachCleanup();
   });
 
   it('renders the component with default selected services', () => {

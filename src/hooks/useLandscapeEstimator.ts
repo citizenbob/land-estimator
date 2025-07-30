@@ -1,5 +1,5 @@
 import { useState, useCallback } from 'react';
-import { EnrichedAddressSuggestion } from '@app-types';
+import { EnrichedAddressSuggestion } from '@app-types/localAddressTypes';
 import { estimateLandscapingPrice } from '@services/landscapeEstimator';
 import { createInsufficientDataError, getErrorMessage } from '@lib/errorUtils';
 
@@ -67,9 +67,6 @@ export interface EstimateResult {
 /**
  * Hook that provides landscaping price estimates based on address data
  *
- * Takes an EnrichedAddressSuggestion and calculates landscaping costs using
- * the boundingbox data. Handles different service types and pricing options.
- *
  * @returns Object containing estimate data, status, and calculation functions
  */
 export function useLandscapeEstimator() {
@@ -77,13 +74,6 @@ export function useLandscapeEstimator() {
   const [estimate, setEstimate] = useState<EstimateResult | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  /**
-   * Calculates a landscaping estimate based on address data
-   *
-   * @param addressData - Enriched address suggestion with land area data
-   * @param options - Optional configuration for estimate calculation
-   * @returns Promise resolving to the estimate result or throws if data insufficient
-   */
   const calculateEstimate = async (
     addressData: EnrichedAddressSuggestion,
     options?: LandscapeEstimatorOptions

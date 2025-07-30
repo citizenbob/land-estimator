@@ -6,7 +6,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { backgroundPreloader } from '@workers';
+import backgroundPreloader from '@workers/backgroundPreloader';
 import { devLog, devWarn } from '@lib/logger';
 
 export default function BackgroundPreloadStatus() {

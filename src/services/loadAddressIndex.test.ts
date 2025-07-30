@@ -1,4 +1,5 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { createTestSuite } from '@lib/testUtils';
 
 // New Shard Manifest type matching our simplified structure
 interface ShardManifest {
@@ -47,14 +48,18 @@ import { createMockFetch } from '@lib/testUtils';
 const mockFetch = createMockFetch();
 
 describe('loadAddressIndex', () => {
+  const testSuite = createTestSuite();
   let loadAddressIndex: typeof import('./loadAddressIndex').loadAddressIndex;
   let clearAddressIndexCache: typeof import('./loadAddressIndex').clearAddressIndexCache;
   let originalWindow: Window | undefined;
 
   beforeEach(async () => {
-    vi.clearAllMocks();
+    testSuite.beforeEachSetup();
 
     originalWindow = (global as unknown as { window?: Window }).window;
+
+    // Set up fetch mock
+    global.fetch = mockFetch;
 
     Object.defineProperty(globalThis, 'window', {
       value: { location: { origin: 'http://localhost:3000' } },
@@ -69,10 +74,12 @@ describe('loadAddressIndex', () => {
   });
 
   afterEach(() => {
-    if (originalWindow) {
+    testSuite.afterEachCleanup();
+
+    if (originalWindow !== undefined) {
       (global as unknown as { window?: Window }).window = originalWindow;
     } else {
-      delete (global as unknown as { window?: unknown }).window;
+      delete (global as unknown as { window?: Window }).window;
     }
   });
 

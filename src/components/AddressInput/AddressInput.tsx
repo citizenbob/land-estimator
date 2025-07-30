@@ -11,13 +11,16 @@ import Button from '@components/Button/Button';
 import SuggestionsList from '@components/SuggestionsList/SuggestionsList';
 import Alert from '@components/Alert/Alert';
 import { Form } from '@components/AddressInput/AddressInput.styles';
-import { AddressSuggestion, EnrichedAddressSuggestion } from '@app-types';
+import {
+  AddressSuggestion,
+  EnrichedAddressSuggestion
+} from '@app-types/localAddressTypes';
 import {
   AddressSelectedEvent,
   EstimateButtonClickedEvent,
   EventMap,
   LogOptions
-} from '@app-types';
+} from '@app-types/analytics';
 import { motion } from 'framer-motion';
 
 interface AddressInputProps {

@@ -2,9 +2,12 @@
  * @fileoverview Mock data and test fixtures for testing address lookup and estimation functionality
  */
 
-import type { FlexSearchIndexBundle } from '@app-types';
+import type { FlexSearchIndexBundle } from '@services/loadAddressIndex';
 import { vi } from 'vitest';
-import type { LocalAddressRecord, AddressSuggestion } from '@app-types';
+import type {
+  LocalAddressRecord,
+  AddressSuggestion
+} from '@app-types/localAddressTypes';
 
 /**
  * Mock local address records for testing address lookup functionality

@@ -3,7 +3,7 @@ import backgroundPreloader, {
   BackgroundPreloader
 } from './backgroundPreloader';
 import { loadAddressIndexProgressive } from '@services/loadAddressIndex';
-import { setupBrowserEnvironment } from '@lib/testUtils';
+import { createTestSuite } from '@lib/testUtils';
 import { MOCK_FLEXSEARCH_BUNDLE } from '@lib/testData';
 
 vi.mock('@services/loadAddressIndex');
@@ -13,17 +13,20 @@ vi.mock('@lib/logger', () => ({
 }));
 
 describe('BackgroundPreloader', () => {
+  const testSuite = createTestSuite({
+    consoleMocks: true,
+    browserEnvironment: true
+  });
+
   let preloader: BackgroundPreloader;
   let mockLoadAddressIndexProgressive: ReturnType<typeof vi.fn>;
   let mockDispatchEvent: ReturnType<typeof vi.fn>;
 
   beforeEach(() => {
-    setupBrowserEnvironment();
+    testSuite.beforeEachSetup();
 
     mockLoadAddressIndexProgressive = vi.mocked(loadAddressIndexProgressive);
     mockDispatchEvent = vi.fn();
-    vi.spyOn(console, 'log').mockImplementation(() => {});
-    vi.spyOn(console, 'warn').mockImplementation(() => {});
 
     Object.defineProperty(global, 'window', {
       value: {
@@ -44,12 +47,10 @@ describe('BackgroundPreloader', () => {
 
     // Reset singleton state for tests
     backgroundPreloader.reset();
-
-    vi.clearAllMocks();
   });
 
   afterEach(() => {
-    vi.restoreAllMocks();
+    testSuite.afterEachCleanup();
   });
 
   describe('constructor', () => {
@@ -290,13 +291,16 @@ describe('BackgroundPreloader', () => {
 });
 
 describe('backgroundPreloader singleton', () => {
+  const testSuite = createTestSuite({
+    browserEnvironment: true
+  });
+
   beforeEach(() => {
-    setupBrowserEnvironment();
-    vi.clearAllMocks();
+    testSuite.beforeEachSetup();
   });
 
   afterEach(() => {
-    vi.restoreAllMocks();
+    testSuite.afterEachCleanup();
   });
 
   it('should be an instance of BackgroundPreloader', () => {

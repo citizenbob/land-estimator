@@ -2,9 +2,14 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import serviceWorkerClient, {
   ServiceWorkerClient
 } from './serviceWorkerClient';
-import { setupBrowserEnvironment, createCacheMocks } from '@lib/testUtils';
+import { createTestSuite, createCacheMocks } from '@lib/testUtils';
 
 describe('ServiceWorkerClient', () => {
+  const testSuite = createTestSuite({
+    consoleMocks: true,
+    browserEnvironment: true
+  });
+
   let client: ServiceWorkerClient;
   let mockNavigator: {
     serviceWorker: {
@@ -27,7 +32,7 @@ describe('ServiceWorkerClient', () => {
   let mockCache: ReturnType<typeof createCacheMocks>['mockCache'];
 
   beforeEach(() => {
-    setupBrowserEnvironment();
+    testSuite.beforeEachSetup();
 
     const cacheMocks = createCacheMocks();
     mockCache = cacheMocks.mockCache;
@@ -73,11 +78,10 @@ describe('ServiceWorkerClient', () => {
     vi.spyOn(console, 'error').mockImplementation(() => {});
 
     client = new ServiceWorkerClient();
-    vi.clearAllMocks();
   });
 
   afterEach(() => {
-    vi.restoreAllMocks();
+    testSuite.afterEachCleanup();
   });
 
   describe('constructor', () => {
@@ -161,12 +165,13 @@ describe('ServiceWorkerClient', () => {
   });
 
   describe('preloadVersionedIndexes', () => {
-    beforeEach(async () => {
-      await client.register();
-      vi.clearAllMocks();
-    });
+    let client: ServiceWorkerClient;
 
     it('should successfully preload versioned indexes', async () => {
+      client = new ServiceWorkerClient();
+      await client.register();
+      vi.clearAllMocks();
+
       const mockResponse = { success: true };
 
       setTimeout(() => {
@@ -193,6 +198,10 @@ describe('ServiceWorkerClient', () => {
     });
 
     it('should return false when service worker not available', async () => {
+      client = new ServiceWorkerClient();
+      await client.register();
+      vi.clearAllMocks();
+
       client['isSupported'] = false;
 
       const result = await client.preloadVersionedIndexes();
@@ -204,6 +213,10 @@ describe('ServiceWorkerClient', () => {
     });
 
     it('should return false when registration not available', async () => {
+      client = new ServiceWorkerClient();
+      await client.register();
+      vi.clearAllMocks();
+
       client['registration'] = null;
 
       const result = await client.preloadVersionedIndexes();
@@ -215,6 +228,10 @@ describe('ServiceWorkerClient', () => {
     });
 
     it('should handle preload failure response', async () => {
+      client = new ServiceWorkerClient();
+      await client.register();
+      vi.clearAllMocks();
+
       const mockResponse = { success: false, error: 'Preload failed' };
 
       setTimeout(() => {
@@ -235,6 +252,10 @@ describe('ServiceWorkerClient', () => {
     });
 
     it('should handle timeout', async () => {
+      client = new ServiceWorkerClient();
+      await client.register();
+      vi.clearAllMocks();
+
       const result = await client.preloadVersionedIndexes({ timeout: 50 });
 
       expect(result).toBe(false);
@@ -245,6 +266,10 @@ describe('ServiceWorkerClient', () => {
     });
 
     it('should use custom timeout option', async () => {
+      client = new ServiceWorkerClient();
+      await client.register();
+      vi.clearAllMocks();
+
       const mockResponse = { success: true };
 
       setTimeout(() => {
@@ -262,12 +287,13 @@ describe('ServiceWorkerClient', () => {
   });
 
   describe('clearCache', () => {
-    beforeEach(async () => {
-      await client.register();
-      vi.clearAllMocks();
-    });
+    let client: ServiceWorkerClient;
 
     it('should successfully clear cache', async () => {
+      client = new ServiceWorkerClient();
+      await client.register();
+      vi.clearAllMocks();
+
       const mockResponse = { success: true };
 
       setTimeout(() => {
@@ -294,6 +320,10 @@ describe('ServiceWorkerClient', () => {
     });
 
     it('should return false when service worker not available', async () => {
+      client = new ServiceWorkerClient();
+      await client.register();
+      vi.clearAllMocks();
+
       client['isSupported'] = false;
 
       const result = await client.clearCache();
@@ -305,6 +335,10 @@ describe('ServiceWorkerClient', () => {
     });
 
     it('should handle cache clear failure', async () => {
+      client = new ServiceWorkerClient();
+      await client.register();
+      vi.clearAllMocks();
+
       const mockResponse = { success: false, error: 'Clear failed' };
 
       setTimeout(() => {
@@ -386,12 +420,13 @@ describe('ServiceWorkerClient', () => {
   });
 
   describe('warmupCache', () => {
-    beforeEach(async () => {
-      await client.register();
-      vi.clearAllMocks();
-    });
+    let client: ServiceWorkerClient;
 
     it('should trigger preload when cache is empty', async () => {
+      client = new ServiceWorkerClient();
+      await client.register();
+      vi.clearAllMocks();
+
       mockCache.keys.mockResolvedValue([]);
 
       const mockResponse = { success: true };
@@ -416,6 +451,10 @@ describe('ServiceWorkerClient', () => {
     });
 
     it('should skip preload when cache already warm', async () => {
+      client = new ServiceWorkerClient();
+      await client.register();
+      vi.clearAllMocks();
+
       const mockRequests = [{ url: 'https://example.com/file1.json' }];
       mockCache.keys.mockResolvedValue(mockRequests);
 
@@ -432,12 +471,10 @@ describe('ServiceWorkerClient', () => {
   });
 
   describe('backgroundPreload', () => {
-    beforeEach(async () => {
+    it('should start background preload without waiting', async () => {
       await client.register();
       vi.clearAllMocks();
-    });
 
-    it('should start background preload without waiting', async () => {
       client.backgroundPreload();
 
       expect(console.log).toHaveBeenCalledWith(
@@ -448,6 +485,9 @@ describe('ServiceWorkerClient', () => {
     });
 
     it('should skip background preload when service worker not supported', async () => {
+      await client.register();
+      vi.clearAllMocks();
+
       client['isSupported'] = false;
 
       client.backgroundPreload();
@@ -458,6 +498,9 @@ describe('ServiceWorkerClient', () => {
     });
 
     it('should handle background preload setup errors gracefully', async () => {
+      await client.register();
+      vi.clearAllMocks();
+
       vi.spyOn(client, 'preloadVersionedIndexes').mockImplementation(() => {
         throw new Error('Setup failed');
       });
@@ -473,12 +516,10 @@ describe('ServiceWorkerClient', () => {
   });
 
   describe('refreshCache', () => {
-    beforeEach(async () => {
+    it('should successfully refresh cache (clear + preload)', async () => {
       await client.register();
       vi.clearAllMocks();
-    });
 
-    it('should successfully refresh cache (clear + preload)', async () => {
       const mockResponse = { success: true };
 
       let callCount = 0;
@@ -509,6 +550,9 @@ describe('ServiceWorkerClient', () => {
     });
 
     it('should return false if cache clear fails', async () => {
+      await client.register();
+      vi.clearAllMocks();
+
       const mockResponse = { success: false };
 
       setTimeout(() => {
@@ -632,12 +676,10 @@ describe('ServiceWorkerClient', () => {
   });
 
   describe('prefetchUrl', () => {
-    beforeEach(async () => {
+    it('should return true when URL is already cached', async () => {
       await client.register();
       vi.clearAllMocks();
-    });
 
-    it('should return true when URL is already cached', async () => {
       const testUrl = 'https://example.com/test.json';
       mockCache.match.mockResolvedValue({ ok: true });
 
@@ -651,6 +693,9 @@ describe('ServiceWorkerClient', () => {
     });
 
     it('should successfully prefetch uncached URL', async () => {
+      await client.register();
+      vi.clearAllMocks();
+
       const testUrl = 'https://example.com/test.json';
       mockCache.match.mockResolvedValue(null);
 
@@ -673,6 +718,9 @@ describe('ServiceWorkerClient', () => {
     });
 
     it('should return false when service worker not supported', async () => {
+      await client.register();
+      vi.clearAllMocks();
+
       client['isSupported'] = false;
 
       const result = await client.prefetchUrl('https://example.com/test.json');
@@ -681,6 +729,9 @@ describe('ServiceWorkerClient', () => {
     });
 
     it('should handle prefetch errors', async () => {
+      await client.register();
+      vi.clearAllMocks();
+
       const testUrl = 'https://example.com/test.json';
       mockCache.match.mockResolvedValue(null);
 
@@ -705,12 +756,10 @@ describe('ServiceWorkerClient', () => {
   });
 
   describe('sendMessage (private method)', () => {
-    beforeEach(async () => {
+    it('should reject when no active service worker', async () => {
       await client.register();
       vi.clearAllMocks();
-    });
 
-    it('should reject when no active service worker', async () => {
       mockRegistration.active = null;
 
       try {
@@ -722,6 +771,9 @@ describe('ServiceWorkerClient', () => {
     });
 
     it('should timeout when no response received', async () => {
+      await client.register();
+      vi.clearAllMocks();
+
       try {
         await client['sendMessage']({ type: 'TEST' }, 50);
         expect.fail('Should have thrown an error');
@@ -733,6 +785,9 @@ describe('ServiceWorkerClient', () => {
     });
 
     it('should reject when service worker returns error', async () => {
+      await client.register();
+      vi.clearAllMocks();
+
       const mockResponse = { success: false, error: 'Operation failed' };
 
       setTimeout(() => {
@@ -754,13 +809,16 @@ describe('ServiceWorkerClient', () => {
 });
 
 describe('serviceWorkerClient singleton', () => {
+  const testSuite = createTestSuite({
+    browserEnvironment: true
+  });
+
   beforeEach(() => {
-    setupBrowserEnvironment();
-    vi.clearAllMocks();
+    testSuite.beforeEachSetup();
   });
 
   afterEach(() => {
-    vi.restoreAllMocks();
+    testSuite.afterEachCleanup();
   });
 
   it('should be an instance of ServiceWorkerClient', () => {

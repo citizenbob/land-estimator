@@ -1,17 +1,23 @@
 import React from 'react';
 import { render, screen, fireEvent } from '@testing-library/react';
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import SuggestionsList from './SuggestionsList';
 import { MOCK_SUGGESTIONS } from '@lib/testData';
-import { setupConsoleMocks } from '@lib/testUtils';
+import { createTestSuite } from '@lib/testUtils';
 
 const mockRefs: React.RefObject<HTMLLIElement>[] = MOCK_SUGGESTIONS.map(() =>
   React.createRef<HTMLLIElement>()
 ) as React.RefObject<HTMLLIElement>[];
 
 describe('SuggestionsList Component', () => {
+  const testSuite = createTestSuite({ consoleMocks: true });
+
   beforeEach(() => {
-    setupConsoleMocks();
+    testSuite.beforeEachSetup();
+  });
+
+  afterEach(() => {
+    testSuite.afterEachCleanup();
   });
 
   it('renders suggestions correctly', () => {

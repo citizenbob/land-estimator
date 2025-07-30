@@ -1,5 +1,5 @@
 import React from 'react';
-import { AddressSuggestion } from '@app-types';
+import { AddressSuggestion } from '@app-types/localAddressTypes';
 import {
   SuggestionsListStyles as List,
   SuggestionItemStyles as ListItem

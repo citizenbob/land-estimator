@@ -2,10 +2,9 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getParcelMetadata } from '@services/parcelMetadata';
 
 /**
- * Parcel metadata lookup endpoint
- * @param request NextRequest instance
- * @param params Route parameters containing parcel ID
- * @returns JSON response with complete parcel metadata
+ * @param request - NextRequest instance
+ * @param context - Route context containing params promise with parcel id
+ * @returns Parcel metadata object or error response
  */
 export async function GET(
   request: NextRequest,

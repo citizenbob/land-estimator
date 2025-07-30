@@ -1,7 +1,7 @@
 import React from 'react';
 import { render } from '@testing-library/react';
 import { vi, describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { setupBrowserEnvironment, createConsoleMocks } from '@lib/testUtils';
+import { createTestSuite } from '@lib/testUtils';
 
 vi.mock('@workers/serviceWorkerClient', () => ({
   default: {
@@ -18,12 +18,20 @@ import serviceWorkerClient from '@workers/serviceWorkerClient';
 const mockServiceWorkerClient = vi.mocked(serviceWorkerClient);
 
 describe('ServiceWorkerRegistration', () => {
-  let consoleSpies: ReturnType<typeof createConsoleMocks>;
+  const testSuite = createTestSuite({
+    consoleMocks: true,
+    browserEnvironment: true,
+    timers: true
+  });
+
+  function getConsoleSpies() {
+    return testSuite.getContext().consoleMocks as ReturnType<
+      typeof import('@lib/testUtils').createConsoleMocks
+    >;
+  }
 
   beforeEach(() => {
-    setupBrowserEnvironment();
-    vi.useFakeTimers();
-    consoleSpies = createConsoleMocks();
+    testSuite.beforeEachSetup();
 
     if (!window.addEventListener) {
       window.addEventListener = vi.fn();
@@ -44,10 +52,7 @@ describe('ServiceWorkerRegistration', () => {
   });
 
   afterEach(() => {
-    vi.useRealTimers();
-    vi.clearAllTimers();
-    vi.clearAllMocks();
-    consoleSpies?.restore();
+    testSuite.afterEachCleanup();
   });
 
   describe('Component lifecycle', () => {
@@ -73,11 +78,11 @@ describe('ServiceWorkerRegistration', () => {
 
       await vi.runAllTimersAsync();
 
-      expect(consoleSpies.logSpy).toHaveBeenCalledWith(
+      expect(getConsoleSpies().logSpy).toHaveBeenCalledWith(
         '[SW Registration] Initializing service worker...'
       );
 
-      expect(consoleSpies.logSpy).toHaveBeenCalledWith(
+      expect(getConsoleSpies().logSpy).toHaveBeenCalledWith(
         '[SW Registration] Service worker registered successfully'
       );
     });
@@ -113,7 +118,7 @@ describe('ServiceWorkerRegistration', () => {
 
       await vi.runAllTimersAsync();
 
-      expect(consoleSpies.logSpy).toHaveBeenCalledWith(
+      expect(getConsoleSpies().logSpy).toHaveBeenCalledWith(
         '[SW Registration] Service worker registered successfully'
       );
     });
@@ -130,7 +135,7 @@ describe('ServiceWorkerRegistration', () => {
 
       await vi.runAllTimersAsync();
 
-      expect(consoleSpies.logSpy).toHaveBeenCalledWith(
+      expect(getConsoleSpies().logSpy).toHaveBeenCalledWith(
         '[SW Registration] Service worker registration failed or not supported'
       );
     });
@@ -148,7 +153,7 @@ describe('ServiceWorkerRegistration', () => {
 
       await vi.runAllTimersAsync();
 
-      expect(consoleSpies.errorSpy).toHaveBeenCalledWith(
+      expect(getConsoleSpies().errorSpy).toHaveBeenCalledWith(
         '[SW Registration] Service worker initialization failed:',
         registrationError
       );
@@ -174,7 +179,7 @@ describe('ServiceWorkerRegistration', () => {
       vi.advanceTimersByTime(2000);
       await vi.runOnlyPendingTimersAsync();
 
-      expect(consoleSpies.logSpy).toHaveBeenCalledWith(
+      expect(getConsoleSpies().logSpy).toHaveBeenCalledWith(
         '[SW Registration] Starting static file cache warmup...'
       );
       expect(mockServiceWorkerClient.preloadStaticFiles).toHaveBeenCalledTimes(
@@ -192,10 +197,10 @@ describe('ServiceWorkerRegistration', () => {
       vi.advanceTimersByTime(2000);
       await vi.runOnlyPendingTimersAsync();
 
-      expect(consoleSpies.logSpy).toHaveBeenCalledWith(
+      expect(getConsoleSpies().logSpy).toHaveBeenCalledWith(
         '[SW Registration] Static files cached successfully'
       );
-      expect(consoleSpies.logSpy).toHaveBeenCalledWith(
+      expect(getConsoleSpies().logSpy).toHaveBeenCalledWith(
         '[SW Registration] Cache warmup completed'
       );
     });
@@ -213,7 +218,7 @@ describe('ServiceWorkerRegistration', () => {
       vi.advanceTimersByTime(2000);
       await vi.runOnlyPendingTimersAsync();
 
-      expect(consoleSpies.warnSpy).toHaveBeenCalledWith(
+      expect(getConsoleSpies().warnSpy).toHaveBeenCalledWith(
         '[SW Registration] Cache warmup failed:',
         preloadError
       );
@@ -295,19 +300,19 @@ describe('ServiceWorkerRegistration', () => {
       vi.advanceTimersByTime(2000);
       await vi.runOnlyPendingTimersAsync();
 
-      expect(consoleSpies.logSpy).toHaveBeenCalledWith(
+      expect(getConsoleSpies().logSpy).toHaveBeenCalledWith(
         '[SW Registration] Initializing service worker...'
       );
-      expect(consoleSpies.logSpy).toHaveBeenCalledWith(
+      expect(getConsoleSpies().logSpy).toHaveBeenCalledWith(
         '[SW Registration] Service worker registered successfully'
       );
-      expect(consoleSpies.logSpy).toHaveBeenCalledWith(
+      expect(getConsoleSpies().logSpy).toHaveBeenCalledWith(
         '[SW Registration] Starting static file cache warmup...'
       );
-      expect(consoleSpies.logSpy).toHaveBeenCalledWith(
+      expect(getConsoleSpies().logSpy).toHaveBeenCalledWith(
         '[SW Registration] Static files cached successfully'
       );
-      expect(consoleSpies.logSpy).toHaveBeenCalledWith(
+      expect(getConsoleSpies().logSpy).toHaveBeenCalledWith(
         '[SW Registration] Cache warmup completed'
       );
     });
@@ -327,7 +332,7 @@ describe('ServiceWorkerRegistration', () => {
       vi.advanceTimersByTime(2000);
       await vi.runOnlyPendingTimersAsync();
 
-      expect(consoleSpies.errorSpy).toHaveBeenCalledWith(
+      expect(getConsoleSpies().errorSpy).toHaveBeenCalledWith(
         '[SW Registration] Service worker initialization failed:',
         registrationError
       );

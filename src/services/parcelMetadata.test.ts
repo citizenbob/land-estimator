@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { MOCK_PARCEL_METADATA } from '@lib/testData';
 import {
   getParcelMetadata,
@@ -6,6 +6,7 @@ import {
   createBoundingBoxFromParcel,
   ParcelMetadata
 } from './parcelMetadata';
+import { createTestSuite } from '@lib/testUtils';
 
 vi.mock('@workers/versionedBundleLoader', () => ({
   loadVersionedBundle: vi.fn().mockResolvedValue({
@@ -19,8 +20,14 @@ vi.mock('@workers/versionedBundleLoader', () => ({
 }));
 
 describe('parcelMetadata service', () => {
+  const testSuite = createTestSuite();
+
   beforeEach(() => {
-    vi.clearAllMocks();
+    testSuite.beforeEachSetup();
+  });
+
+  afterEach(() => {
+    testSuite.afterEachCleanup();
   });
 
   it('getParcelMetadata handles missing parcel ID gracefully', async () => {

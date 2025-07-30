@@ -2,11 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
 import { useAddressLookup } from './useAddressLookup';
 import { TEST_LOCATIONS, MOCK_LOCAL_ADDRESSES } from '@lib/testData';
-import {
-  setupConsoleMocks,
-  setupTestTimers,
-  cleanupTestTimers
-} from '@lib/testUtils';
+import { createTestSuite } from '@lib/testUtils';
 import { searchAddresses } from '@services/addressSearch';
 
 // Mock the client-side search
@@ -31,12 +27,11 @@ const performDebouncedSearch = async (
 };
 
 describe('useAddressLookup', () => {
-  let consoleMocks: ReturnType<typeof setupConsoleMocks>;
+  const testSuite = createTestSuite({ consoleMocks: true, timers: true });
   let searchAddressesMock: ReturnType<typeof vi.fn>;
 
   beforeEach(() => {
-    consoleMocks = setupConsoleMocks();
-    setupTestTimers();
+    testSuite.beforeEachSetup();
 
     // Get the mocked function using vi.mocked
     searchAddressesMock = vi.mocked(searchAddresses);
@@ -44,9 +39,7 @@ describe('useAddressLookup', () => {
   });
 
   afterEach(() => {
-    consoleMocks.restore();
-    cleanupTestTimers();
-    vi.clearAllMocks();
+    testSuite.afterEachCleanup();
   });
 
   it('initializes with default state', () => {

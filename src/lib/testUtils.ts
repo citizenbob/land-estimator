@@ -6,7 +6,7 @@ import { fireEvent, screen, waitFor } from '@testing-library/react';
 import { expect, vi } from 'vitest';
 import { MOCK_LOCAL_ADDRESSES, TestItem, TestBundle } from './testData';
 import { useAddressLookup } from '@hooks/useAddressLookup';
-import { EventMap, LogOptions } from '@app-types';
+import { EventMap, LogOptions } from '@app-types/analytics';
 
 /**
  * Types and selects a suggestion from an address input field
@@ -351,7 +351,7 @@ export function setupMixpanelMocks() {
 
   vi.mock('mixpanel-browser', () => ({
     default: {
-      track: mockMixpanelTrack
+      track: () => true
     }
   }));
 
@@ -822,6 +822,66 @@ export function setupComponentTestSuite(
     beforeEachSetup,
     afterEachCleanup,
     getContext: () => testContext
+  };
+}
+
+/**
+ * Simple test suite setup for basic test patterns
+ * @param options - Configuration options for test setup
+ */
+export function createTestSuite(
+  options: {
+    consoleMocks?: boolean;
+    timers?: boolean;
+    fetch?: boolean;
+    browserEnvironment?: boolean;
+  } = {}
+) {
+  const context: Record<string, unknown> = {};
+
+  const beforeEachSetup = () => {
+    if (options.consoleMocks !== false) {
+      context.consoleMocks = createConsoleMocks();
+    }
+
+    if (options.timers) {
+      setupTestTimers();
+      context.timersSetup = true;
+    }
+
+    if (options.fetch !== false) {
+      context.mockFetch = createMockFetch();
+    }
+
+    if (options.browserEnvironment !== false) {
+      setupBrowserEnvironment();
+    }
+
+    vi.clearAllMocks();
+    return context;
+  };
+
+  const afterEachCleanup = () => {
+    if (
+      context.consoleMocks &&
+      typeof context.consoleMocks === 'object' &&
+      'restore' in context.consoleMocks
+    ) {
+      (context.consoleMocks as { restore: () => void }).restore();
+    }
+
+    if (context.timersSetup) {
+      cleanupTestTimers();
+    }
+
+    vi.clearAllMocks();
+    vi.restoreAllMocks();
+  };
+
+  return {
+    beforeEachSetup,
+    afterEachCleanup,
+    getContext: () => context
   };
 }
 

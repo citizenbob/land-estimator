@@ -1,13 +1,19 @@
 import { renderHook, act } from '@testing-library/react';
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import React from 'react';
 import { useSuggestionNavigation } from './useSuggestionNavigation';
 import { MOCK_SUGGESTIONS } from '@lib/testData';
-import { setupConsoleMocks } from '@lib/testUtils';
+import { createTestSuite } from '@lib/testUtils';
 
 describe('useSuggestionNavigation', () => {
+  const testSuite = createTestSuite({ consoleMocks: true });
+
   beforeEach(() => {
-    setupConsoleMocks();
+    testSuite.beforeEachSetup();
+  });
+
+  afterEach(() => {
+    testSuite.afterEachCleanup();
   });
 
   it('should call onSelect when Enter is pressed on a suggestion', () => {

@@ -1,7 +1,7 @@
 import React from 'react';
 import { render } from '@testing-library/react';
 import { vi, describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { setupBrowserEnvironment, createConsoleMocks } from '@lib/testUtils';
+import { createTestSuite } from '@lib/testUtils';
 
 vi.mock('@config/mixpanelClient', () => ({
   default: {
@@ -17,11 +17,19 @@ import mixpanel from '@config/mixpanelClient';
 const mockMixpanel = vi.mocked(mixpanel);
 
 describe('MixpanelInitializer', () => {
-  let consoleSpies: ReturnType<typeof createConsoleMocks>;
+  const testSuite = createTestSuite({
+    consoleMocks: true,
+    browserEnvironment: true
+  });
+
+  function getConsoleSpies() {
+    return testSuite.getContext().consoleMocks as ReturnType<
+      typeof import('@lib/testUtils').createConsoleMocks
+    >;
+  }
 
   beforeEach(() => {
-    setupBrowserEnvironment();
-    consoleSpies = createConsoleMocks();
+    testSuite.beforeEachSetup();
 
     mockMixpanel.register.mockReset();
     mockMixpanel.init.mockReset();
@@ -30,9 +38,7 @@ describe('MixpanelInitializer', () => {
   });
 
   afterEach(() => {
-    vi.clearAllMocks();
-    vi.unstubAllEnvs();
-    consoleSpies?.restore();
+    testSuite.afterEachCleanup();
   });
 
   describe('Component lifecycle', () => {
@@ -79,7 +85,7 @@ describe('MixpanelInitializer', () => {
 
       render(<MixpanelInitializer />);
 
-      expect(consoleSpies.logSpy).toHaveBeenCalledWith(
+      expect(getConsoleSpies().logSpy).toHaveBeenCalledWith(
         '[Mixpanel] Initializing analytics...'
       );
     });
@@ -124,7 +130,7 @@ describe('MixpanelInitializer', () => {
         referrer: 'https://example.com'
       });
 
-      expect(consoleSpies.logSpy).toHaveBeenCalledWith(
+      expect(getConsoleSpies().logSpy).toHaveBeenCalledWith(
         '[Mixpanel] Analytics initialized successfully'
       );
     });
@@ -161,7 +167,7 @@ describe('MixpanelInitializer', () => {
 
       render(<MixpanelInitializer />);
 
-      expect(consoleSpies.warnSpy).toHaveBeenCalledWith(
+      expect(getConsoleSpies().warnSpy).toHaveBeenCalledWith(
         '[Mixpanel] Token not configured, analytics disabled'
       );
       expect(mockMixpanel.register).not.toHaveBeenCalled();
@@ -182,7 +188,7 @@ describe('MixpanelInitializer', () => {
 
       render(<MixpanelInitializer />);
 
-      expect(consoleSpies.errorSpy).toHaveBeenCalledWith(
+      expect(getConsoleSpies().errorSpy).toHaveBeenCalledWith(
         '[Mixpanel] Initialization failed:',
         initError
       );
@@ -304,7 +310,7 @@ describe('MixpanelInitializer', () => {
 
       render(<MixpanelInitializer />);
 
-      expect(consoleSpies.logSpy).toHaveBeenCalledWith(
+      expect(getConsoleSpies().logSpy).toHaveBeenCalledWith(
         '[Mixpanel] Analytics initialized successfully'
       );
     });
@@ -320,7 +326,7 @@ describe('MixpanelInitializer', () => {
 
       render(<MixpanelInitializer />);
 
-      expect(consoleSpies.logSpy).toHaveBeenCalledWith(
+      expect(getConsoleSpies().logSpy).toHaveBeenCalledWith(
         '[Mixpanel] Analytics initialized successfully'
       );
     });
@@ -336,7 +342,7 @@ describe('MixpanelInitializer', () => {
 
       render(<MixpanelInitializer />);
 
-      expect(consoleSpies.warnSpy).toHaveBeenCalledWith(
+      expect(getConsoleSpies().warnSpy).toHaveBeenCalledWith(
         '[Mixpanel] Token not configured, analytics disabled'
       );
     });

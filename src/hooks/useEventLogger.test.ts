@@ -1,19 +1,22 @@
 import { renderHook, act } from '@testing-library/react';
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { useEventLogger } from './useEventLogger';
 import * as loggerModule from '@services/logger';
 import { EstimateButtonClickedEvent } from '../types/analytics';
-import { setupConsoleMocks } from '@lib/testUtils';
+import { createTestSuite } from '@lib/testUtils';
 import { MOCK_ANALYTICS_EVENTS } from '@lib/testData';
 
 describe('useEventLogger', () => {
+  const testSuite = createTestSuite({ consoleMocks: true });
   const mockLogEvent = vi.fn().mockResolvedValue(undefined);
-  let consoleSpies: ReturnType<typeof setupConsoleMocks>;
 
   beforeEach(() => {
-    vi.resetAllMocks();
-    consoleSpies = setupConsoleMocks();
+    testSuite.beforeEachSetup();
     vi.spyOn(loggerModule, 'logEvent').mockImplementation(mockLogEvent);
+  });
+
+  afterEach(() => {
+    testSuite.afterEachCleanup();
   });
 
   it('uses the logger service with default options', async () => {
@@ -68,6 +71,11 @@ describe('useEventLogger', () => {
 
     const errorEvent: EstimateButtonClickedEvent = {
       address_id: '789-ghi'
+    };
+
+    const consoleSpies = testSuite.getContext().consoleMocks as {
+      errorSpy: ReturnType<typeof vi.spyOn>;
+      warnSpy: ReturnType<typeof vi.spyOn>;
     };
 
     await act(async () => {

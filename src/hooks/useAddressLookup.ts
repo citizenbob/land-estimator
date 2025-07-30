@@ -1,6 +1,6 @@
 import { useState, useRef } from 'react';
 import { searchAddresses, AddressLookupRecord } from '@services/addressSearch';
-import { LocalAddressRecord } from '@app-types';
+import { LocalAddressRecord } from '@app-types/localAddressTypes';
 import { getErrorMessage, logError } from '@lib/errorUtils';
 import { deduplicatedLookup } from '@lib/requestDeduplication';
 import { devLog } from '@lib/logger';
@@ -37,13 +37,9 @@ export function useAddressLookup() {
 
     setIsFetching(true);
 
-    /**
-     * Use deduplication utility for debounced, deduplicated lookups
-     */
     deduplicatedLookup(
       value,
       async (normalizedQuery) => {
-        // Use client-side search instead of API call
         const results = await searchAddresses(normalizedQuery, 10);
         devLog('📥 Client search results:', results);
         return results;
@@ -51,9 +47,6 @@ export function useAddressLookup() {
       { debounce: true, debounceDelay: 200 }
     )
       .then((results) => {
-        /**
-         * Only update state if this query is still current
-         */
         const simplified = results.map((item) => {
           rawDataRef.current[item.id] = item;
           return {
@@ -85,9 +78,6 @@ export function useAddressLookup() {
     setLocked(true);
   };
 
-  /**
-   * Clear the input and reset all state
-   */
   const handleClear = () => {
     setQuery('');
     setSuggestions([]);

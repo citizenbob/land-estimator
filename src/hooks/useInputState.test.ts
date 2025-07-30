@@ -1,7 +1,7 @@
 import { renderHook } from '@testing-library/react';
 import { describe, it, expect } from 'vitest';
 import { useInputState } from './useInputState';
-import { AddressSuggestion } from '@app-types';
+import { AddressSuggestion } from '@app-types/localAddressTypes';
 import { MOCK_SUGGESTIONS } from '@lib/testData';
 
 describe('useInputState', () => {

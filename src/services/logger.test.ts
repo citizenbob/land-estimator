@@ -5,38 +5,41 @@ import {
   mockSuccessResponse,
   mockErrorResponse,
   mockNetworkError,
-  setupConsoleMocks,
-  createMockFetch,
-  setupTestTimers,
-  cleanupTestTimers
+  createTestSuite
 } from '@lib/testUtils';
 import { MOCK_ANALYTICS_EVENTS } from '@lib/testData';
 
-const mockFetch = createMockFetch();
-
 describe('logEvent', () => {
+  const testSuite = createTestSuite({
+    consoleMocks: true,
+    timers: true,
+    fetch: true
+  });
   const mockMixpanelTrack = mixpanel.track as ReturnType<typeof vi.fn>;
-  let consoleSpies: {
-    errorSpy: ReturnType<typeof vi.spyOn>;
-    warnSpy: ReturnType<typeof vi.spyOn>;
-  };
 
   beforeEach(() => {
-    vi.clearAllMocks();
-    mockFetch.mockReset();
-    consoleSpies = setupConsoleMocks();
-    setupTestTimers();
+    testSuite.beforeEachSetup();
   });
 
   afterEach(() => {
-    vi.restoreAllMocks();
-    cleanupTestTimers();
+    testSuite.afterEachCleanup();
   });
+
+  // Helper to get mocks from test context
+  const getMockFetch = () =>
+    testSuite.getContext().mockFetch as ReturnType<typeof vi.fn>;
+  const getConsoleSpies = () =>
+    testSuite.getContext().consoleMocks as {
+      errorSpy: ReturnType<typeof vi.spyOn>;
+      warnSpy: ReturnType<typeof vi.spyOn>;
+    };
 
   const testEvent = 'address_selected';
   const testData = MOCK_ANALYTICS_EVENTS.ADDRESS_SELECTED;
 
   it('logs the event name and data to Mixpanel', async () => {
+    const mockFetch = getMockFetch();
+
     await logEvent(testEvent, testData, {
       toMixpanel: true,
       toFirestore: false
@@ -55,6 +58,7 @@ describe('logEvent', () => {
   });
 
   it('sends the payload to the /api/log endpoint for Firestore', async () => {
+    const mockFetch = getMockFetch();
     mockSuccessResponse(mockFetch, { success: true });
 
     await logEvent(testEvent, testData, {
@@ -80,6 +84,8 @@ describe('logEvent', () => {
   });
 
   it('handles Mixpanel logging errors gracefully', async () => {
+    const consoleSpies = getConsoleSpies();
+
     mockMixpanelTrack.mockImplementationOnce(() => {
       throw new Error('Mixpanel error');
     });
@@ -104,6 +110,9 @@ describe('logEvent', () => {
   });
 
   it('handles API fetch errors gracefully for Firestore logging', async () => {
+    const mockFetch = getMockFetch();
+    const consoleSpies = getConsoleSpies();
+
     mockErrorResponse(mockFetch, 500, 'Internal Server Error');
 
     await expect(
@@ -134,6 +143,9 @@ describe('logEvent', () => {
   });
 
   it('handles network errors gracefully for Firestore logging', async () => {
+    const mockFetch = getMockFetch();
+    const consoleSpies = getConsoleSpies();
+
     mockNetworkError(mockFetch, 'Network failed');
 
     await expect(
@@ -156,6 +168,8 @@ describe('logEvent', () => {
   });
 
   it('does not log to Mixpanel when toMixpanel is false', async () => {
+    const mockFetch = getMockFetch();
+
     mockSuccessResponse(mockFetch, {});
 
     await logEvent(testEvent, testData, {
@@ -168,6 +182,8 @@ describe('logEvent', () => {
   });
 
   it('does not log to Firestore via API when toFirestore is false', async () => {
+    const mockFetch = getMockFetch();
+
     await logEvent(testEvent, testData, {
       toMixpanel: true,
       toFirestore: false
@@ -178,6 +194,8 @@ describe('logEvent', () => {
   });
 
   it('adds a timestamp if one is not provided', async () => {
+    const mockFetch = getMockFetch();
+
     mockSuccessResponse(mockFetch, { success: true });
 
     await logEvent(testEvent, testData, {
@@ -206,6 +224,7 @@ describe('logEvent', () => {
   });
 
   it('preserves existing timestamp if one is provided', async () => {
+    const mockFetch = getMockFetch();
     const existingTimestamp = 1622540400000;
     const dataWithTimestamp = {
       ...testData,

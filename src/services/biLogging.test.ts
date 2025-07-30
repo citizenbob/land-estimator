@@ -1,8 +1,10 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { logEstimateForBI } from '@services/biLogging';
 import { logEvent } from '@services/logger';
-import type { EstimateResult } from '@app-types';
-import type { EnrichedAddressSuggestion } from '@app-types';
+import { createTestSuite } from '@lib/testUtils';
+
+import type { EstimateResult } from '@app-types/landscapeEstimatorTypes';
+import type { EnrichedAddressSuggestion } from '@app-types/localAddressTypes';
 import { MOCK_ENRICHED_ADDRESS_DATA, MOCK_BI_TEST_DATA } from '@lib/testData';
 
 vi.mock('@services/logger', () => ({
@@ -12,12 +14,14 @@ vi.mock('@services/logger', () => ({
 const mockLogEvent = logEvent as ReturnType<typeof vi.fn>;
 
 describe('biLogging', () => {
+  const testSuite = createTestSuite();
+
   beforeEach(() => {
-    vi.clearAllMocks();
+    testSuite.beforeEachSetup();
   });
 
   afterEach(() => {
-    vi.restoreAllMocks();
+    testSuite.afterEachCleanup();
   });
 
   describe('logEstimateForBI', () => {

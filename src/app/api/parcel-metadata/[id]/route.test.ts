@@ -1,7 +1,8 @@
 import { GET } from './route';
 import { getParcelMetadata } from '@services/parcelMetadata';
 import { NextRequest } from 'next/server';
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { createTestSuite } from '@lib/testUtils';
 
 vi.mock('@services/parcelMetadata', () => ({
   getParcelMetadata: vi.fn()
@@ -10,8 +11,14 @@ vi.mock('@services/parcelMetadata', () => ({
 const mockGetParcelMetadata = vi.mocked(getParcelMetadata);
 
 describe('/api/parcel-metadata/[id] route', () => {
+  const testSuite = createTestSuite();
+
   beforeEach(() => {
-    vi.clearAllMocks();
+    testSuite.beforeEachSetup();
+  });
+
+  afterEach(() => {
+    testSuite.afterEachCleanup();
   });
 
   const createMockRequest = (

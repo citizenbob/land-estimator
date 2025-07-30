@@ -5,7 +5,7 @@ import {
   resetAddressSearchCache
 } from './addressSearch';
 import { MOCK_ADDRESS_LOOKUP_DATA } from '@lib/testData';
-import { setupConsoleMocks } from '@lib/testUtils';
+import { createTestSuite } from '@lib/testUtils';
 
 const mockAddressData: AddressLookupRecord[] = MOCK_ADDRESS_LOOKUP_DATA;
 
@@ -20,13 +20,12 @@ vi.mock('@lib/errorUtils', () => ({
 
 describe('addressSearch - Client-Only Fast Rebuild Strategy', () => {
   let mockLoadAddressIndexProgressive: ReturnType<typeof vi.fn>;
+  const testSuite = createTestSuite({ consoleMocks: true });
 
   beforeEach(async () => {
-    vi.clearAllMocks();
+    testSuite.beforeEachSetup();
     resetAddressSearchCache();
-    setupConsoleMocks();
 
-    // Mock the loadAddressIndex module
     const loadModule = await import('./loadAddressIndex');
     mockLoadAddressIndexProgressive = vi.mocked(
       loadModule.loadAddressIndexProgressive
@@ -34,7 +33,7 @@ describe('addressSearch - Client-Only Fast Rebuild Strategy', () => {
   });
 
   afterEach(() => {
-    vi.restoreAllMocks();
+    testSuite.afterEachCleanup();
   });
 
   describe('FlexSearch Index Operations', () => {

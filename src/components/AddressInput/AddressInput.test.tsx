@@ -10,9 +10,8 @@ import userEvent from '@testing-library/user-event';
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import AddressInput from '@components/AddressInput/AddressInput';
 import {
-  setupConsoleMocks,
+  createTestSuite,
   createAddressLookupMock,
-  createMockFetch,
   createMockApiRecordFactory
 } from '@lib/testUtils';
 import { MOCK_LOCAL_ADDRESSES } from '@lib/testData';
@@ -30,7 +29,6 @@ vi.mock('@services/addressSearch', () => ({
   resetAddressSearchCache: vi.fn()
 }));
 
-const mockFetch = createMockFetch();
 const createMockApiRecord = createMockApiRecordFactory();
 
 const setup = () => {
@@ -40,12 +38,23 @@ const setup = () => {
 };
 
 describe('AddressInput', () => {
+  const testSuite = createTestSuite({
+    consoleMocks: true,
+    fetch: true
+  });
+
+  function getMockFetch() {
+    return testSuite.getContext().mockFetch as ReturnType<
+      typeof import('@lib/testUtils').createMockFetch
+    >;
+  }
+
   let mockSearchAddresses: ReturnType<typeof vi.fn>;
 
   beforeEach(async () => {
-    mockFetch.mockReset();
-    setupConsoleMocks();
-    vi.clearAllMocks();
+    testSuite.beforeEachSetup();
+
+    getMockFetch().mockReset();
 
     // Mock the searchAddresses module
     const searchModule = await import('@services/addressSearch');
@@ -53,7 +62,7 @@ describe('AddressInput', () => {
   });
 
   afterEach(() => {
-    vi.clearAllMocks();
+    testSuite.afterEachCleanup();
   });
 
   it('ensures suggestions have unique keys', async () => {
@@ -342,7 +351,7 @@ describe('AddressInput', () => {
         display_name: '123 Test St, St. Louis, MO 63101'
       };
 
-      mockFetch.mockResolvedValueOnce({
+      getMockFetch().mockResolvedValueOnce({
         ok: true,
         json: async () => mockParcelData
       } as Response);
@@ -369,7 +378,7 @@ describe('AddressInput', () => {
       });
 
       await waitFor(() => {
-        expect(mockFetch).toHaveBeenCalledWith(
+        expect(getMockFetch()).toHaveBeenCalledWith(
           '/api/parcel-metadata/test-parcel-123'
         );
         expect(onAddressSelect).toHaveBeenCalledWith({
@@ -396,7 +405,7 @@ describe('AddressInput', () => {
         display_name: '123 Test St, St. Louis, MO 63101'
       };
 
-      mockFetch.mockRejectedValueOnce(new Error('API Error'));
+      getMockFetch().mockRejectedValueOnce(new Error('API Error'));
 
       const mockLookup = createAddressLookupMock({
         query: '123 Test St',
@@ -421,7 +430,7 @@ describe('AddressInput', () => {
       });
 
       await waitFor(() => {
-        expect(mockFetch).toHaveBeenCalledWith(
+        expect(getMockFetch()).toHaveBeenCalledWith(
           '/api/parcel-metadata/test-parcel-123'
         );
         expect(mockLookup.getSuggestionData).toHaveBeenCalledWith(

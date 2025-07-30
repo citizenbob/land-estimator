@@ -1,16 +1,12 @@
 import React from 'react';
 import { render, screen, act } from '@testing-library/react';
 import { vi, describe, it, expect, beforeEach, afterEach } from 'vitest';
-import {
-  setupBrowserEnvironment,
-  createConsoleMocks,
-  createMockPreloadStatus
-} from '@lib/testUtils';
+import { createTestSuite, createMockPreloadStatus } from '@lib/testUtils';
 
 vi.mock('@workers/backgroundPreloader', () => ({
   default: {
     getStatus: vi.fn(),
-    start: vi.fn().mockResolvedValue(undefined)
+    start: vi.fn(() => Promise.resolve())
   }
 }));
 
@@ -20,22 +16,25 @@ import backgroundPreloader from '@workers/backgroundPreloader';
 const mockBackgroundPreloader = vi.mocked(backgroundPreloader);
 
 describe('BackgroundPreloadStatus', () => {
-  const { restore } = createConsoleMocks();
+  const testSuite = createTestSuite({
+    consoleMocks: true,
+    browserEnvironment: true,
+    timers: true
+  });
 
   beforeEach(() => {
-    setupBrowserEnvironment();
-    vi.useFakeTimers();
+    testSuite.beforeEachSetup();
+
     mockBackgroundPreloader.getStatus.mockReset();
+    mockBackgroundPreloader.start.mockReset();
+    mockBackgroundPreloader.start.mockImplementation(() => Promise.resolve());
     mockBackgroundPreloader.getStatus.mockReturnValue(
       createMockPreloadStatus()
     );
   });
 
   afterEach(() => {
-    vi.useRealTimers();
-    vi.clearAllMocks();
-    restore();
-    vi.unstubAllEnvs();
+    testSuite.afterEachCleanup();
   });
 
   describe('Environment-based rendering', () => {

@@ -1,15 +1,17 @@
 import { renderHook, act } from '@testing-library/react';
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { useLandscapeEstimator } from './useLandscapeEstimator';
 import * as estimatorModule from '@services/landscapeEstimator';
-import { EnrichedAddressSuggestion } from '@app-types';
+import { EnrichedAddressSuggestion } from '@app-types/localAddressTypes';
 import {
   MOCK_PRICE_BREAKDOWN,
   MOCK_ENRICHED_ADDRESS_DATA,
   MOCK_NOMINATIM_FALLBACK_DATA
 } from '@lib/testData';
+import { createTestSuite } from '@lib/testUtils';
 
 describe('useLandscapeEstimator', () => {
+  const testSuite = createTestSuite();
   const mockPriceBreakdown = MOCK_PRICE_BREAKDOWN;
 
   const mockAddressData: EnrichedAddressSuggestion = MOCK_ENRICHED_ADDRESS_DATA;
@@ -18,10 +20,14 @@ describe('useLandscapeEstimator', () => {
     MOCK_NOMINATIM_FALLBACK_DATA;
 
   beforeEach(() => {
-    vi.resetAllMocks();
+    testSuite.beforeEachSetup();
     vi.spyOn(estimatorModule, 'estimateLandscapingPrice').mockReturnValue(
       mockPriceBreakdown
     );
+  });
+
+  afterEach(() => {
+    testSuite.afterEachCleanup();
   });
 
   it('initializes with default state', () => {

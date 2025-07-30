@@ -1,6 +1,7 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { POST } from './route';
 import { createTestRequest } from '@lib/testUtils';
+import { createTestSuite } from '@lib/testUtils';
 
 const mockAdd = vi.fn();
 
@@ -17,8 +18,14 @@ vi.mock('firebase-admin/firestore', () => ({
 }));
 
 describe('/api/log POST handler', () => {
+  const testSuite = createTestSuite();
+
   beforeEach(() => {
-    vi.clearAllMocks();
+    testSuite.beforeEachSetup();
+  });
+
+  afterEach(() => {
+    testSuite.afterEachCleanup();
   });
 
   it('should write event and return success', async () => {

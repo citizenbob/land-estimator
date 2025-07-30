@@ -1,9 +1,22 @@
 import React from 'react';
 import { render, screen } from '@testing-library/react';
-import { expect } from 'vitest';
+import { expect, beforeEach, afterEach } from 'vitest';
+import { createTestSuite } from '@lib/testUtils';
 import Alert from './Alert';
 
 describe('Alert Component', () => {
+  const testSuite = createTestSuite({
+    fetch: false,
+    browserEnvironment: false
+  });
+
+  beforeEach(() => {
+    testSuite.beforeEachSetup();
+  });
+
+  afterEach(() => {
+    testSuite.afterEachCleanup();
+  });
   it('renders an alert style for type="success"', () => {
     render(
       <Alert role="status" type="success">
