@@ -6,6 +6,7 @@ import {
 } from './addressSearch';
 import { MOCK_ADDRESS_LOOKUP_DATA } from '@lib/testData';
 import { createTestSuite } from '@lib/testUtils';
+import { FLEXSEARCH_SEARCH_OPTIONS } from '@config/flexsearch';
 
 const mockAddressData: AddressLookupRecord[] = MOCK_ADDRESS_LOOKUP_DATA;
 
@@ -54,7 +55,7 @@ describe('addressSearch - Client-Only Fast Rebuild Strategy', () => {
 
       expect(mockLoadAddressIndexProgressive).toHaveBeenCalled();
       expect(mockIndex.search).toHaveBeenCalledWith('riverview', {
-        bool: 'and',
+        ...FLEXSEARCH_SEARCH_OPTIONS,
         limit: 10
       });
       expect(results).toHaveLength(2);
@@ -94,7 +95,7 @@ describe('addressSearch - Client-Only Fast Rebuild Strategy', () => {
       await searchAddresses('  test!@# query  ');
 
       expect(mockIndex.search).toHaveBeenCalledWith('test query', {
-        bool: 'and',
+        ...FLEXSEARCH_SEARCH_OPTIONS,
         limit: 10
       });
     });
@@ -115,7 +116,7 @@ describe('addressSearch - Client-Only Fast Rebuild Strategy', () => {
       const results = await searchAddresses('test', 2);
 
       expect(mockIndex.search).toHaveBeenCalledWith('test', {
-        bool: 'and',
+        ...FLEXSEARCH_SEARCH_OPTIONS,
         limit: 2
       });
       expect(results).toHaveLength(2);
@@ -196,7 +197,7 @@ describe('addressSearch - Client-Only Fast Rebuild Strategy', () => {
       await searchAddresses('  test query  ');
 
       expect(mockIndex.search).toHaveBeenCalledWith('test query', {
-        bool: 'and',
+        ...FLEXSEARCH_SEARCH_OPTIONS,
         limit: 10
       });
     });
@@ -224,7 +225,7 @@ describe('addressSearch - Client-Only Fast Rebuild Strategy', () => {
       await searchAddresses('RIVERVIEW, MO!');
 
       expect(mockIndex.search).toHaveBeenCalledWith('riverview mo', {
-        bool: 'and',
+        ...FLEXSEARCH_SEARCH_OPTIONS,
         limit: 10
       });
     });

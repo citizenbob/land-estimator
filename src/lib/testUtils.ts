@@ -145,6 +145,65 @@ export const mockJsonParsingError = (
 };
 
 /**
+ * Creates a sequence of mock fetch responses for multiple calls
+ * @param mockFetch - The mocked fetch function
+ * @param responses - Array of response configurations
+ */
+export const mockFetchSequence = (
+  mockFetch: ReturnType<typeof vi.fn>,
+  responses: Array<{
+    data: unknown;
+    ok?: boolean;
+    status?: number;
+    statusText?: string;
+  }>
+) => {
+  responses.forEach((response) => {
+    mockFetch.mockResolvedValueOnce(
+      createMockResponse(response.data, {
+        ok: response.ok,
+        status: response.status,
+        statusText: response.statusText
+      })
+    );
+  });
+};
+
+/**
+ * Mocks a successful fetch response that returns JSON data
+ * @param mockFetch - The mocked fetch function
+ * @param data - The JSON data to return
+ */
+export const mockJsonResponse = (
+  mockFetch: ReturnType<typeof vi.fn>,
+  data: unknown
+) => {
+  mockFetch.mockResolvedValueOnce({
+    ok: true,
+    status: 200,
+    json: () => Promise.resolve(data)
+  });
+};
+
+/**
+ * Mocks multiple successful JSON responses in sequence
+ * @param mockFetch - The mocked fetch function
+ * @param dataArray - Array of JSON data to return in sequence
+ */
+export const mockJsonSequence = (
+  mockFetch: ReturnType<typeof vi.fn>,
+  dataArray: unknown[]
+) => {
+  dataArray.forEach((data) => {
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      json: () => Promise.resolve(data)
+    });
+  });
+};
+
+/**
  * Alias for createConsoleMocks function for backward compatibility
  */
 export const setupConsoleMocks = createConsoleMocks;

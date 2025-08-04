@@ -15,6 +15,10 @@ import {
   type FlexSearchIndexBundle
 } from '@services/loadAddressIndex';
 import { logError } from '@lib/errorUtils';
+import {
+  FLEXSEARCH_SEARCH_OPTIONS,
+  DEFAULT_SEARCH_LIMIT
+} from '@config/flexsearch';
 
 export interface AddressLookupRecord {
   id: string;
@@ -92,7 +96,7 @@ function formatSearchResults(
  */
 export async function searchAddresses(
   query: string,
-  limit: number = 10
+  limit: number = DEFAULT_SEARCH_LIMIT
 ): Promise<AddressLookupRecord[]> {
   // Quick validation
   if (!query || query.trim().length < 2) {
@@ -122,7 +126,7 @@ export async function searchAddresses(
     const normalizedQuery = normalizeQuery(query);
     // Document Mode returns document IDs (strings), not indices
     const searchResults = addressSearchBundle.index.search(normalizedQuery, {
-      bool: 'and',
+      ...FLEXSEARCH_SEARCH_OPTIONS,
       limit
     }) as unknown as string[];
 

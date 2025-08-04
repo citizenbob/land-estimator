@@ -1,5 +1,9 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { createTestSuite } from '@lib/testUtils';
+import {
+  createTestSuite,
+  mockJsonResponse,
+  mockErrorResponse
+} from '@lib/testUtils';
 
 // New Shard Manifest type matching our simplified structure
 interface ShardManifest {
@@ -40,6 +44,40 @@ vi.mock('@lib/logger', () => ({
   devLog: vi.fn(),
   logError: vi.fn()
 }));
+
+// Mock data constants
+const mockManifestData = {
+  regions: [
+    {
+      region: 'stl_city',
+      version: '1.0.0',
+      document_file: 'stl_city-document.json',
+      lookup_file: 'stl_city-document.json'
+    },
+    {
+      region: 'stl_county',
+      version: '1.0.0',
+      document_file: 'stl_county-document.json',
+      lookup_file: 'stl_county-document.json'
+    }
+  ],
+  metadata: {
+    generated_at: '2025-07-12T11:37:03.373280',
+    version: '1.0.0',
+    total_regions: 2,
+    source: 'Document Mode Pipeline'
+  }
+};
+
+const mockCountyAddresses = [
+  {
+    id: 'P002',
+    full_address: 'County Test Address',
+    latitude: 38.627,
+    longitude: -90.1994,
+    region: 'St. Louis County'
+  }
+];
 
 /**
  * Mock fetch for static files
@@ -110,10 +148,7 @@ describe('loadAddressIndex', () => {
         }
       };
 
-      mockFetch.mockResolvedValueOnce({
-        ok: true,
-        json: () => Promise.resolve(mockManifest)
-      });
+      mockJsonResponse(mockFetch, mockManifest);
 
       // Mock the document file with raw address data
       const mockAddresses = [
@@ -133,10 +168,7 @@ describe('loadAddressIndex', () => {
         }
       ];
 
-      mockFetch.mockResolvedValueOnce({
-        ok: true,
-        json: () => Promise.resolve(mockAddresses)
-      });
+      mockJsonResponse(mockFetch, mockAddresses);
 
       const result = await loadAddressIndex();
 
@@ -153,7 +185,7 @@ describe('loadAddressIndex', () => {
 
     it('handles missing static manifest gracefully', async () => {
       // Manifest fetch fails (simulate 404)
-      mockFetch.mockResolvedValueOnce({ ok: false, status: 404 });
+      mockErrorResponse(mockFetch, 404);
 
       await expect(loadAddressIndex()).rejects.toThrow(
         'Manifest not found: 404'
@@ -165,35 +197,10 @@ describe('loadAddressIndex', () => {
       document.cookie = 'regionShard=stl-city';
 
       // Manifest fetch succeeds with both regions
-      mockFetch.mockResolvedValueOnce({
-        ok: true,
-        json: () =>
-          Promise.resolve({
-            regions: [
-              {
-                region: 'stl_city',
-                version: '1.0.0',
-                document_file: 'stl_city-document.json',
-                lookup_file: 'stl_city-document.json'
-              },
-              {
-                region: 'stl_county',
-                version: '1.0.0',
-                document_file: 'stl_county-document.json',
-                lookup_file: 'stl_county-document.json'
-              }
-            ],
-            metadata: {
-              generated_at: '2025-07-12T11:37:03.373280',
-              version: '1.0.0',
-              total_regions: 2,
-              source: 'Document Mode Pipeline'
-            }
-          })
-      });
+      mockJsonResponse(mockFetch, mockManifestData);
 
       // County document file fetch fails (loads first)
-      mockFetch.mockResolvedValueOnce({ ok: false, status: 404 });
+      mockErrorResponse(mockFetch, 404);
 
       await expect(loadAddressIndex()).rejects.toThrow(
         'Failed to load county region'
@@ -206,47 +213,10 @@ describe('loadAddressIndex', () => {
       document.cookie = 'regionShard=stl-city';
 
       // Manifest fetch with both regions
-      mockFetch.mockResolvedValueOnce({
-        ok: true,
-        json: () =>
-          Promise.resolve({
-            regions: [
-              {
-                region: 'stl_city',
-                version: '1.0.0',
-                document_file: 'stl_city-document.json',
-                lookup_file: 'stl_city-document.json'
-              },
-              {
-                region: 'stl_county',
-                version: '1.0.0',
-                document_file: 'stl_county-document.json',
-                lookup_file: 'stl_county-document.json'
-              }
-            ],
-            metadata: {
-              generated_at: '2025-07-12T11:37:03.373280',
-              version: '1.0.0',
-              total_regions: 2,
-              source: 'Document Mode Pipeline'
-            }
-          })
-      });
+      mockJsonResponse(mockFetch, mockManifestData);
 
       // County data fetch (loads first)
-      mockFetch.mockResolvedValueOnce({
-        ok: true,
-        json: () =>
-          Promise.resolve([
-            {
-              id: 'P002',
-              full_address: 'County Test Address',
-              latitude: 38.627,
-              longitude: -90.1994,
-              region: 'St. Louis County'
-            }
-          ])
-      });
+      mockJsonResponse(mockFetch, mockCountyAddresses);
 
       const result1 = await loadAddressIndex();
       const result2 = await loadAddressIndex();
@@ -259,32 +229,7 @@ describe('loadAddressIndex', () => {
       document.cookie = 'regionShard=stl-city';
 
       // First load - manifest with both regions
-      mockFetch.mockResolvedValueOnce({
-        ok: true,
-        json: () =>
-          Promise.resolve({
-            regions: [
-              {
-                region: 'stl_city',
-                version: '1.0.0',
-                document_file: 'stl_city-document.json',
-                lookup_file: 'stl_city-document.json'
-              },
-              {
-                region: 'stl_county',
-                version: '1.0.0',
-                document_file: 'stl_county-document.json',
-                lookup_file: 'stl_county-document.json'
-              }
-            ],
-            metadata: {
-              generated_at: '2025-07-12T11:37:03.373280',
-              version: '1.0.0',
-              total_regions: 2,
-              source: 'Document Mode Pipeline'
-            }
-          })
-      });
+      mockJsonResponse(mockFetch, mockManifestData);
       // First load - county data
       mockFetch.mockResolvedValueOnce({
         ok: true,

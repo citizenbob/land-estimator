@@ -10,6 +10,7 @@
 
 import { Index } from 'flexsearch';
 import { devLog, logError } from '@lib/logger';
+import { FLEXSEARCH_CONFIG } from '@config/flexsearch';
 
 // Types
 export interface FlexSearchIndexBundle {
@@ -59,17 +60,6 @@ export interface AddressLookupData {
   parcelIds: string[];
   addressData: Record<string, string>;
 }
-
-// Should match your build config - optimized for speed
-const FLEXSEARCH_CONFIG = {
-  tokenize: 'forward',
-  cache: 100,
-  resolution: 9,
-  threshold: 1,
-  depth: 1,
-  bidirectional: false,
-  suggest: false
-} as const;
 
 class ClientOnlyAddressIndexLoader {
   private static instance: ClientOnlyAddressIndexLoader | null = null;

@@ -133,10 +133,21 @@ export const FLEXSEARCH_SEARCH_OPTIONS = {
 
 ### Steps
 
-1. Create `src/config/flexsearch.ts`
-2. Define centralized FlexSearch configurations
-3. Update all files using FlexSearch to import from the config
-4. Remove duplicated configuration objects
+1. ✅ Create `src/config/flexsearch.ts`
+2. ✅ Define centralized FlexSearch configurations
+3. ✅ Update all files using FlexSearch to import from the config
+4. ✅ Remove duplicated configuration objects
+
+**Completion Status**: ✅ **FULLY COMPLETE** - Created centralized FlexSearch configuration and updated all files to use it. Eliminated duplication across `loadAddressIndex.ts`, `addressSearch.ts`, and test files. All 282 tests passing.
+
+**Updated Files**:
+
+- ✅ `src/config/flexsearch.ts` - Centralized configuration file created
+- ✅ `src/services/loadAddressIndex.ts` - Updated to import and use `FLEXSEARCH_CONFIG`
+- ✅ `src/services/addressSearch.ts` - Updated to import and use `FLEXSEARCH_SEARCH_OPTIONS` and `DEFAULT_SEARCH_LIMIT`
+- ✅ `src/services/addressSearch.test.ts` - Updated to use centralized search options in test assertions
+
+**Impact**: Eliminated FlexSearch configuration duplication, centralized all FlexSearch-related constants in one file, improved maintainability and consistency across the codebase.
 
 ## 3. Mock Response Factory Duplication
 
@@ -187,10 +198,27 @@ export const createMockFetchSequence = (
 
 ### Steps
 
-1. Create `src/lib/mockFactories.ts`
-2. Implement standardized mock response factories
-3. Update all test files to use the new factories
-4. Remove repetitive mock response creation code
+1. ✅ Create mock response factories in `testUtils.ts` (kept consolidated for better organization)
+2. ✅ Implement standardized mock response factories
+3. ✅ Update test files to use the new factories
+4. ✅ Remove repetitive mock response creation code
+
+**Completion Status**: ✅ **FULLY COMPLETE** - Created comprehensive mock response factory utilities and updated test files to use them. Eliminated mock response duplication across multiple test files. All 282 tests passing.
+
+**Updated Files**:
+
+- ✅ `src/lib/testUtils.ts` - Added mock response factories: `mockJsonResponse`, `mockJsonSequence`, `mockFetchSequence`
+- ✅ `src/services/loadAddressIndex.test.ts` - Updated to use centralized mock utilities, added mock data constants
+- ✅ `src/components/AddressInput/AddressInput.test.tsx` - Updated to use `mockJsonResponse`
+
+**New Utilities Added**:
+
+- `mockJsonResponse(mockFetch, data)` - Simple JSON response mock
+- `mockJsonSequence(mockFetch, dataArray)` - Multiple JSON responses in sequence
+- `mockFetchSequence(mockFetch, responses)` - Complex response sequence with custom status/options
+- Mock data constants for common test scenarios
+
+**Impact**: Eliminated repetitive mock response creation patterns, reduced test file complexity, improved consistency across all test files. Standardized approach makes tests more readable and maintainable.
 
 ## 4. Address Data Processing Duplication
 

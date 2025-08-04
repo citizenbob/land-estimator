@@ -12,7 +12,8 @@ import AddressInput from '@components/AddressInput/AddressInput';
 import {
   createTestSuite,
   createAddressLookupMock,
-  createMockApiRecordFactory
+  createMockApiRecordFactory,
+  mockJsonResponse
 } from '@lib/testUtils';
 import { MOCK_LOCAL_ADDRESSES } from '@lib/testData';
 
@@ -351,10 +352,7 @@ describe('AddressInput', () => {
         display_name: '123 Test St, St. Louis, MO 63101'
       };
 
-      getMockFetch().mockResolvedValueOnce({
-        ok: true,
-        json: async () => mockParcelData
-      } as Response);
+      mockJsonResponse(getMockFetch(), mockParcelData);
 
       const mockLookup = createAddressLookupMock({
         query: '123 Test St',
