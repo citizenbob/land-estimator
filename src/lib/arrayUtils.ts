@@ -3,12 +3,13 @@
  */
 
 /**
- * Sums a specific numeric property from an array of objects
- *
- * @param items - Array of objects to sum
- * @param property - Property name to sum
- * @returns Sum of the property values
+ * Utility functions for array manipulation and filtering
  */
+
+import { filterExactMatches } from '@lib/addressTransforms';
+
+// Re-export for backward compatibility
+export { filterExactMatches };
 export function sumByProperty<T>(items: T[], property: keyof T): number {
   return items.reduce((sum, item) => {
     const value = item[property];
@@ -121,21 +122,4 @@ export function deduplicateSuggestions<T extends { display_name: string }>(
   suggestions: T[]
 ): T[] {
   return uniqueByProperty(suggestions, 'display_name');
-}
-
-/**
- * Filters out suggestions that match the current query exactly
- *
- * @param suggestions - Array of suggestions to filter
- * @param query - Current search query
- * @returns Filtered suggestions that don't match the query
- */
-export function filterExactMatches<T extends { display_name: string }>(
-  suggestions: T[],
-  query: string
-): T[] {
-  const normalizedQuery = query.trim().toLowerCase();
-  return suggestions.filter(
-    (suggestion) => suggestion.display_name.toLowerCase() !== normalizedQuery
-  );
 }

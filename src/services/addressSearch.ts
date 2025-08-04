@@ -19,6 +19,7 @@ import {
   FLEXSEARCH_SEARCH_OPTIONS,
   DEFAULT_SEARCH_LIMIT
 } from '@config/flexsearch';
+import { extractRegion, normalizeQuery } from '@lib/addressTransforms';
 
 export interface AddressLookupRecord {
   id: string;
@@ -35,25 +36,6 @@ let addressSearchBundle: FlexSearchIndexBundle | null = null;
  */
 export function resetAddressSearchCache(): void {
   addressSearchBundle = null;
-}
-
-/**
- * Normalize search query for optimal FlexSearch results
- */
-function normalizeQuery(query: string): string {
-  return query
-    .toLowerCase()
-    .replace(/[^\w\s]/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim();
-}
-
-/**
- * Extract region from address (Missouri-specific patterns)
- */
-function extractRegion(displayName: string): string {
-  const regionMatch = displayName.match(/, ([^,]+), MO/);
-  return regionMatch ? regionMatch[1] : 'Missouri';
 }
 
 /**

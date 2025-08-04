@@ -4,6 +4,7 @@ import { LocalAddressRecord } from '@app-types/localAddressTypes';
 import { getErrorMessage, logError } from '@lib/errorUtils';
 import { deduplicatedLookup } from '@lib/requestDeduplication';
 import { devLog } from '@lib/logger';
+import { transformToSuggestions } from '@lib/addressTransforms';
 
 export function useAddressLookup() {
   const [query, setQuery] = useState<string>('');
@@ -47,14 +48,10 @@ export function useAddressLookup() {
       { debounce: true, debounceDelay: 200 }
     )
       .then((results) => {
-        const simplified = results.map((item) => {
+        results.forEach((item) => {
           rawDataRef.current[item.id] = item;
-          return {
-            place_id: item.id,
-            display_name: item.display_name
-          };
         });
-        setSuggestions(simplified);
+        setSuggestions(transformToSuggestions(results));
         setHasFetched(true);
       })
       .catch((err: unknown) => {

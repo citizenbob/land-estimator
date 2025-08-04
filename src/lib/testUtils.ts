@@ -7,6 +7,7 @@ import { expect, vi } from 'vitest';
 import { MOCK_LOCAL_ADDRESSES, TestItem, TestBundle } from './testData';
 import { useAddressLookup } from '@hooks/useAddressLookup';
 import { EventMap, LogOptions } from '@app-types/analytics';
+import { normalizeQuery } from '@lib/addressTransforms';
 
 /**
  * Types and selects a suggestion from an address input field
@@ -429,7 +430,7 @@ export function createMockApiRecord(address: {
     id: address.id,
     display_name: address.full_address,
     region: address.region,
-    normalized: address.full_address.toLowerCase()
+    normalized: normalizeQuery(address.full_address)
   };
 }
 
