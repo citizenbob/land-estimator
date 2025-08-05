@@ -1,7 +1,3 @@
-/**
- * @fileoverview Styled-components utility functions for theme-aware styling and responsive design
- */
-
 import { css } from 'styled-components';
 import tokens from '@tokens/tokens.json';
 import { getToken } from '@tokens/tokenUtils';
@@ -40,10 +36,6 @@ export const getThemeDarkColor = (
   return getToken(theme, darkPath, defaultFallback);
 };
 
-/**
- * Shared utility for generating responsive text color styles
- * that adapt to light/dark themes using prefers-color-scheme
- */
 export const responsiveTextColor = css`
   color: ${({ theme }) =>
     getThemeColor(
@@ -63,10 +55,6 @@ export const responsiveTextColor = css`
   }
 `;
 
-/**
- * Shared utility for generating responsive background color styles
- * that adapt to light/dark themes using prefers-color-scheme
- */
 export const responsiveBackgroundColor = css`
   background-color: ${({ theme }) =>
     getThemeColor(
@@ -86,10 +74,6 @@ export const responsiveBackgroundColor = css`
   }
 `;
 
-/**
- * Shared utility for generating responsive hover background color styles
- * that adapt to light/dark themes using prefers-color-scheme
- */
 export const responsiveHoverColor = css`
   &:hover {
     background-color: ${({ theme }) =>
@@ -113,9 +97,6 @@ export const responsiveHoverColor = css`
   }
 `;
 
-/**
- * Shared utility for generating primary action styles (buttons, links, etc.)
- */
 export const primaryActionStyles = css`
   background-color: ${({ theme }) =>
     getThemeColor(
@@ -154,9 +135,6 @@ export const primaryActionStyles = css`
   }
 `;
 
-/**
- * Shared utility for generating focus ring styles
- */
 export const focusRingStyles = css`
   &:focus {
     box-shadow: 0 0 0 2px
@@ -187,9 +165,6 @@ export const focusRingStyles = css`
   }
 `;
 
-/**
- * Shared utility for generating disabled state styles
- */
 export const disabledStyles = css`
   &[disabled] {
     background-color: ${({ theme }) =>
@@ -214,9 +189,6 @@ export const disabledStyles = css`
   }
 `;
 
-/**
- * Helper function to get semantic color token value safely
- */
 export const getSemanticColor = (
   colorName: 'success' | 'error' | 'warning' | 'info',
   mode: 'light' | 'dark' = 'light'
@@ -227,16 +199,10 @@ export const getSemanticColor = (
   );
 };
 
-/**
- * Helper function to get spacing token value safely
- */
 export const getSpacing = (size: 'sm' | 'base' | 'lg' | 'xl') => {
   return tokens.spacing[size]?.value || tokens.spacing.base.value;
 };
 
-/**
- * Helper function to get border radius token value safely
- */
 export const getBorderRadius = (size: 'default' | 'full') => {
   return tokens.borderRadius[size]?.value || tokens.borderRadius.default.value;
 };

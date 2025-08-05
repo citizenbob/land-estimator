@@ -1,6 +1,5 @@
 import { loadAddressIndexProgressive } from '@services/loadAddressIndex';
 import { devLog, devWarn } from '@lib/logger';
-
 interface PreloadStatus {
   isLoading: boolean;
   isComplete: boolean;
@@ -9,9 +8,6 @@ interface PreloadStatus {
   endTime: number | null;
 }
 
-/**
- * Extend window interface for Fast Refresh-resistant deduplication
- */
 declare global {
   interface Window {
     __addressIndexPreloadStarted?: boolean;
@@ -41,7 +37,6 @@ class BackgroundPreloader {
       return;
     }
 
-    // Use window property for Fast Refresh-resistant deduplication
     if (window.__addressIndexPreloadStarted) {
       devLog(
         '🔄 [Background Preloader] Already started elsewhere, skipping...'
@@ -59,7 +54,6 @@ class BackgroundPreloader {
     this.status.startTime = Date.now();
     this.status.error = null;
 
-    // Small delay to let server warmup complete first (skip in tests)
     if (process.env.NODE_ENV !== 'test') {
       await new Promise((resolve) => setTimeout(resolve, 100));
     }
@@ -116,7 +110,6 @@ class BackgroundPreloader {
       endTime: null
     };
 
-    // Reset the global flag so start() can be called again
     if (typeof window !== 'undefined') {
       window.__addressIndexPreloadStarted = false;
     }

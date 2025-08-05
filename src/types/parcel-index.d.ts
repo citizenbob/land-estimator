@@ -1,27 +1,58 @@
-/**
- * Type definitions for parcel index building and optimization
- */
+export interface ParcelOwner {
+  name: string;
+}
 
-import type { ParcelMetadata } from '@services/parcelMetadata';
+export interface RawParcelCalculations {
+  landarea_sqft: number;
+  building_sqft: number;
+  estimated_landscapable_area_sqft: number;
+  property_type: string;
+}
+
+export interface ProcessedParcelCalculations {
+  landarea: number;
+  building_sqft: number;
+  estimated_landscapable_area: number;
+  property_type: string;
+}
+
+export interface RawParcelData {
+  id: string;
+  primary_full_address: string;
+  latitude: number;
+  longitude: number;
+  region: string;
+  calc: RawParcelCalculations;
+  owner: ParcelOwner;
+  affluence_score: number;
+  source_file?: string;
+  processed_date?: string;
+}
+
+export interface ParcelMetadata {
+  id: string;
+  full_address: string;
+  latitude: number;
+  longitude: number;
+  region: string;
+  calc: ProcessedParcelCalculations;
+  owner: ParcelOwner;
+  affluence_score: number;
+  source_file: string;
+  processed_date: string;
+}
+
+export type ParcelRegion = 'stl_city' | 'stl_county';
 
 declare namespace ParcelIndex {
-  /**
-   * Optimized parcel index structure for static serving
-   */
   interface OptimizedParcelIndex {
     parcels: ParcelMetadata[];
-    /** parcel ID -> array index for fast lookups */
     lookup: Record<string, number>;
     timestamp: string;
     recordCount: number;
     version: string;
     exportMethod: string;
   }
-
-  /**
-   * Ultra-compressed parcel data using single-character keys
-   * to minimize file size while preserving essential data
-   */
   interface UltraCompressedParcel {
     /** id - Parcel identifier */
     i: string;
@@ -46,10 +77,6 @@ declare namespace ParcelIndex {
     /** affluence_score - Calculated affluence score */
     s?: number;
   }
-
-  /**
-   * Ultra-compressed index structure with minimal metadata
-   */
   interface UltraCompressedIndex {
     /** parcels - Array of compressed parcel data */
     p: UltraCompressedParcel[];
@@ -62,10 +89,6 @@ declare namespace ParcelIndex {
     /** version - Data version */
     v: string;
   }
-
-  /**
-   * Compression statistics for reporting
-   */
   interface CompressionStats {
     originalSize: number;
     compressedSize: number;
@@ -74,10 +97,6 @@ declare namespace ParcelIndex {
     gzipRatio: number;
     recordCount: number;
   }
-
-  /**
-   * Build configuration options
-   */
   interface BuildOptions {
     /** Use ultra compression (shorter keys) */
     ultraCompress?: boolean;

@@ -1,66 +1,52 @@
-/**
- * Options for the landscape estimator
- * Configures how the landscape estimate will be calculated
- */
 export interface LandscapeEstimatorOptions {
-  /** Whether this is a commercial project (affects pricing) */
   isCommercial?: boolean;
-
-  /** Array of service types to include in the estimate */
   serviceTypes?: Array<'design' | 'installation' | 'maintenance'>;
-
-  /**
-   * (Deprecated) Single service type
-   * @deprecated Use serviceTypes array instead for more flexibility
-   */
-  serviceType?:
-    | 'design'
-    | 'installation'
-    | 'design_installation'
-    | 'maintenance';
-
-  /** Override the calculated lot size if actual measurements are known */
   overrideLotSizeSqFt?: number;
 }
 
-/**
- * Status of the landscape estimator calculation process
- */
 export type EstimatorStatus = 'idle' | 'calculating' | 'complete' | 'error';
 
-/**
- * Complete price breakdown for a landscape estimate
- * Includes all cost components and address information
- */
+export type ServiceType = 'design' | 'installation' | 'maintenance';
+
+export interface EstimateDisplay {
+  lotSizeSqFt?: number;
+  designFee: number;
+  installationCost: number;
+  maintenanceMonthly: number;
+  finalEstimate: { min: number; max: number };
+}
+
+export interface EstimateLineItemData {
+  key: string;
+  label: string;
+  value: string;
+  show: boolean;
+  isTotal?: boolean;
+}
+
 export interface EstimateResult {
-  /** Address information from the original query */
   address: {
     display_name: string;
     lat: number;
     lon: number;
   };
-
-  /** Size of the property lot in square feet */
   lotSizeSqFt: number;
-
-  /** Base rate per square foot for landscaping work */
   baseRatePerSqFt: { min: number; max: number };
-
-  /** Design fee estimate in USD */
   designFee: number;
-
-  /** Installation cost estimate in USD */
   installationCost: number;
-
-  /** Monthly maintenance cost estimate in USD */
   maintenanceMonthly: number;
-
-  /** Subtotal before minimum service fee application */
   subtotal: { min: number; max: number };
-
-  /** Minimum service fee for any project in USD */
   minimumServiceFee: number;
+  finalEstimate: { min: number; max: number };
+}
 
-  /** Final price range estimate in USD */
+export interface PriceBreakdown {
+  lotSizeSqFt: number;
+  baseRatePerSqFt: { min: number; max: number };
+  designFee: number;
+  installationCost: number;
+  maintenanceMonthly: number;
+  subtotal: { min: number; max: number };
+  minimumServiceFee: number;
   finalEstimate: { min: number; max: number };
 }

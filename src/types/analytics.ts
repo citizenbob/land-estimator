@@ -1,3 +1,6 @@
+import type { EstimateResult } from '@app-types/landscapeEstimatorTypes';
+import type { EnrichedAddressSuggestion } from '@app-types/localAddressTypes';
+
 export interface AddressSelectedEvent {
   query: string;
   address_id: string;
@@ -7,7 +10,6 @@ export interface AddressSelectedEvent {
 export interface EstimateButtonClickedEvent {
   address_id: string;
 }
-
 export interface EstimateGeneratedEvent {
   address_id: string;
   full_address: string;
@@ -49,4 +51,11 @@ export interface EventMap {
 export interface LogOptions {
   toMixpanel?: boolean;
   toFirestore?: boolean;
+}
+
+export interface BILoggingOptions {
+  addressData: EnrichedAddressSuggestion;
+  estimate: EstimateResult;
+  selectedServices: string[];
+  hasCustomLotSize: boolean;
 }

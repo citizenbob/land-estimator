@@ -1,9 +1,6 @@
+import { searchAddresses, resetAddressSearchCache } from './addressSearch';
+import type { AddressLookupRecord } from '@app-types/localAddressTypes';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import {
-  searchAddresses,
-  AddressLookupRecord,
-  resetAddressSearchCache
-} from './addressSearch';
 import { MOCK_ADDRESS_LOOKUP_DATA } from '@lib/testData';
 import { createTestSuite } from '@lib/testUtils';
 import { FLEXSEARCH_SEARCH_OPTIONS } from '@config/flexsearch';
@@ -56,7 +53,7 @@ describe('addressSearch - Client-Only Fast Rebuild Strategy', () => {
       expect(mockLoadAddressIndexProgressive).toHaveBeenCalled();
       expect(mockIndex.search).toHaveBeenCalledWith('riverview', {
         ...FLEXSEARCH_SEARCH_OPTIONS,
-        limit: 10
+        limit: 5
       });
       expect(results).toHaveLength(2);
     });
@@ -75,7 +72,7 @@ describe('addressSearch - Client-Only Fast Rebuild Strategy', () => {
       expect(consoleSpy).toHaveBeenCalledWith(expect.any(Error), {
         operation: 'client_address_search',
         query: 'test',
-        limit: 10
+        limit: 5
       });
     });
 
@@ -96,7 +93,7 @@ describe('addressSearch - Client-Only Fast Rebuild Strategy', () => {
 
       expect(mockIndex.search).toHaveBeenCalledWith('test query', {
         ...FLEXSEARCH_SEARCH_OPTIONS,
-        limit: 10
+        limit: 5
       });
     });
 
@@ -198,7 +195,7 @@ describe('addressSearch - Client-Only Fast Rebuild Strategy', () => {
 
       expect(mockIndex.search).toHaveBeenCalledWith('test query', {
         ...FLEXSEARCH_SEARCH_OPTIONS,
-        limit: 10
+        limit: 5
       });
     });
 
@@ -226,7 +223,7 @@ describe('addressSearch - Client-Only Fast Rebuild Strategy', () => {
 
       expect(mockIndex.search).toHaveBeenCalledWith('riverview mo', {
         ...FLEXSEARCH_SEARCH_OPTIONS,
-        limit: 10
+        limit: 5
       });
     });
   });

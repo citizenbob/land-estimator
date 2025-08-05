@@ -3,9 +3,9 @@ import { MOCK_PARCEL_METADATA } from '@lib/testData';
 import {
   getParcelMetadata,
   getBulkParcelMetadata,
-  createBoundingBoxFromParcel,
-  ParcelMetadata
+  createBoundingBoxFromParcel
 } from './parcelMetadata';
+import type { ParcelMetadata } from '@app-types/parcel-index';
 import { createTestSuite } from '@lib/testUtils';
 
 vi.mock('@workers/versionedBundleLoader', () => ({

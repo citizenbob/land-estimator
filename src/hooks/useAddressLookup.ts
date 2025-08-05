@@ -1,7 +1,11 @@
 import { useState, useRef } from 'react';
-import { searchAddresses, AddressLookupRecord } from '@services/addressSearch';
-import { LocalAddressRecord } from '@app-types/localAddressTypes';
+import type {
+  AddressLookupRecord,
+  LocalAddressRecord
+} from '@app-types/localAddressTypes';
+import { searchAddresses } from '@services/addressSearch';
 import { getErrorMessage, logError } from '@lib/errorUtils';
+import { ParcelMetadataResponse } from '@app-types/apiResponseTypes';
 import { deduplicatedLookup } from '@lib/requestDeduplication';
 import { devLog } from '@lib/logger';
 import { transformToSuggestions } from '@lib/addressTransforms';
@@ -30,7 +34,6 @@ export function useAddressLookup() {
       return;
     }
 
-    // Don't search for queries shorter than 3 characters
     if (value.trim().length < 3) {
       setIsFetching(false);
       return;
@@ -94,9 +97,10 @@ export function useAddressLookup() {
       const response = await fetch(`/api/parcel-metadata/${id}`);
 
       if (response.ok) {
-        const parcelMetadata = await response.json();
+        const apiResponse: ParcelMetadataResponse = await response.json();
 
-        if (parcelMetadata) {
+        if (apiResponse.success && apiResponse.data) {
+          const parcelMetadata = apiResponse.data;
           return {
             id: parcelMetadata.id,
             full_address: record.display_name,
@@ -113,6 +117,15 @@ export function useAddressLookup() {
               parcelMetadata.processed_date || new Date().toISOString()
           };
         }
+      } else {
+        // Handle error response
+        const errorResponse = await response.json();
+        logError(new Error(`API Error: ${response.status}`), {
+          operation: 'parcel_metadata_fetch',
+          parcelId: id,
+          statusCode: response.status,
+          errorResponse
+        });
       }
     } catch (error) {
       logError(error, {

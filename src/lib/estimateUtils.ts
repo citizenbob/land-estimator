@@ -1,44 +1,24 @@
-/**
- * Estimate-specific utilities for consistent display and calculation
- */
-
 import {
   formatCurrency,
   formatSquareFeet,
   formatPriceRange,
   formatMonthlyPrice
-} from './formatUtils';
+} from '@lib/formatUtils';
+import type {
+  EstimateDisplay,
+  ServiceType,
+  EstimateLineItemData
+} from '@app-types/landscapeEstimatorTypes';
+import { ServiceConfig } from '@app-types/configTypes';
 
-/**
- * Estimate result interface for type safety
- */
-export interface EstimateDisplay {
-  lotSizeSqFt?: number;
-  designFee: number;
-  installationCost: number;
-  maintenanceMonthly: number;
-  finalEstimate: { min: number; max: number };
-}
+export const DEFAULT_SERVICES: ServiceType[] = ['design', 'installation'];
 
-/**
- * Service type definitions
- */
-export type ServiceType = 'design' | 'installation' | 'maintenance';
+export const SERVICE_CONFIG: readonly ServiceConfig[] = [
+  { value: 'design', label: 'Design' },
+  { value: 'installation', label: 'Installation' },
+  { value: 'maintenance', label: 'Maintenance' }
+] as const;
 
-/**
- * Estimate line item definition
- */
-export interface EstimateLineItemData {
-  key: string;
-  label: string;
-  value: string;
-  show: boolean;
-  isTotal?: boolean;
-}
-
-/**
- * Generates formatted line items for estimate display
- */
 export function generateEstimateLineItems(
   estimate: EstimateDisplay,
   selectedServices: ServiceType[]
@@ -92,9 +72,6 @@ export function generateEstimateLineItems(
   return items;
 }
 
-/**
- * Calculates estimate summary statistics
- */
 export function getEstimateSummary(estimate: EstimateDisplay) {
   const { finalEstimate } = estimate;
   const average = (finalEstimate.min + finalEstimate.max) / 2;
@@ -110,9 +87,6 @@ export function getEstimateSummary(estimate: EstimateDisplay) {
   };
 }
 
-/**
- * Validates that estimate data is complete
- */
 export function isValidEstimate(
   estimate: unknown
 ): estimate is EstimateDisplay {
@@ -130,17 +104,3 @@ export function isValidEstimate(
     est.finalEstimate.min <= est.finalEstimate.max
   );
 }
-
-/**
- * Default service selection
- */
-export const DEFAULT_SERVICES: ServiceType[] = ['design', 'installation'];
-
-/**
- * Service configuration for UI display
- */
-export const SERVICE_CONFIG = [
-  { value: 'design' as const, label: 'Design' },
-  { value: 'installation' as const, label: 'Installation' },
-  { value: 'maintenance' as const, label: 'Maintenance' }
-] as const;

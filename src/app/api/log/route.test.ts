@@ -41,7 +41,10 @@ describe('/api/log POST handler', () => {
 
     const body = await resp.json();
     expect(resp.status).toBe(200);
-    expect(body).toEqual({ success: true });
+    expect(body).toMatchObject({
+      success: true,
+      timestamp: expect.any(String)
+    });
   });
 
   it('should catch errors and return 500', async () => {
@@ -52,6 +55,15 @@ describe('/api/log POST handler', () => {
 
     const body = await resp.json();
     expect(resp.status).toBe(500);
-    expect(body).toHaveProperty('error', 'fail');
+    expect(body).toMatchObject({
+      success: false,
+      error: {
+        message: 'fail',
+        status: 500,
+        code: 'FIRESTORE_LOG_ERROR',
+        timestamp: expect.any(String)
+      },
+      timestamp: expect.any(String)
+    });
   });
 });

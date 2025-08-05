@@ -1,13 +1,32 @@
 import mixpanel from 'mixpanel-browser';
 import { logError } from '@lib/errorUtils';
+import { MixpanelConfig } from '@app-types/configTypes';
+
+function getMixpanelConfig(): MixpanelConfig | null {
+  const token = process.env.NEXT_PUBLIC_MIXPANEL;
+  if (!token) {
+    return null;
+  }
+
+  return {
+    token,
+    debug: process.env.NODE_ENV === 'development',
+    environment:
+      (process.env.VERCEL_ENV as 'development' | 'production' | 'test') ??
+      (process.env.NODE_ENV as 'development' | 'production' | 'test') ??
+      'development'
+  };
+}
 
 try {
-  if (process.env.NEXT_PUBLIC_MIXPANEL) {
-    mixpanel.init(process.env.NEXT_PUBLIC_MIXPANEL, {
-      debug: process.env.NODE_ENV === 'development'
+  const config = getMixpanelConfig();
+
+  if (config) {
+    mixpanel.init(config.token, {
+      debug: config.debug
     });
     mixpanel.register({
-      env: process.env.VERCEL_ENV ?? process.env.NODE_ENV ?? 'development'
+      env: config.environment
     });
   } else {
     console.warn(

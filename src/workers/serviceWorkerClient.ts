@@ -1,8 +1,3 @@
-/**
- * Service Worker Client
- * Handles registration and communication with the service worker for versioned index preloading
- */
-
 interface ServiceWorkerMessage {
   type: string;
   success?: boolean;
@@ -23,9 +18,6 @@ class ServiceWorkerClient {
       typeof window !== 'undefined' && 'serviceWorker' in navigator;
   }
 
-  /**
-   * Register the service worker
-   */
   async register(): Promise<boolean> {
     if (!this.isSupported) {
       console.log('[SW Client] Service worker not supported');
@@ -51,9 +43,6 @@ class ServiceWorkerClient {
     }
   }
 
-  /**
-   * Preload versioned index files
-   */
   async preloadVersionedIndexes(
     options: PreloadOptions = {}
   ): Promise<boolean> {
@@ -85,9 +74,6 @@ class ServiceWorkerClient {
     }
   }
 
-  /**
-   * Preload static files
-   */
   async preloadStaticFiles(options: PreloadOptions = {}): Promise<boolean> {
     if (!this.isSupported || !this.registration) {
       console.log(
@@ -119,9 +105,6 @@ class ServiceWorkerClient {
     }
   }
 
-  /**
-   * Clear the versioned index cache
-   */
   async clearCache(): Promise<boolean> {
     if (!this.isSupported || !this.registration) {
       console.log('[SW Client] Service worker not available for cache clear');
@@ -146,9 +129,6 @@ class ServiceWorkerClient {
     }
   }
 
-  /**
-   * Get cache status for versioned indexes
-   */
   async getCacheStatus(): Promise<{
     cacheExists: boolean;
     cachedFiles: string[];
@@ -174,9 +154,6 @@ class ServiceWorkerClient {
     }
   }
 
-  /**
-   * Warm up the cache by preloading if needed
-   */
   async warmupCache(): Promise<boolean> {
     const status = await this.getCacheStatus();
 
@@ -193,10 +170,6 @@ class ServiceWorkerClient {
     return true;
   }
 
-  /**
-   * Background preload - starts loading data immediately without blocking
-   * This eliminates cold start delays by preloading before user interaction
-   */
   async backgroundPreload(): Promise<void> {
     if (!this.isSupported) {
       console.log('[SW Client] Background preload skipped - SW not supported');
@@ -222,9 +195,6 @@ class ServiceWorkerClient {
     }
   }
 
-  /**
-   * Force refresh the cache (clear + preload)
-   */
   async refreshCache(): Promise<boolean> {
     console.log('[SW Client] Refreshing cache...');
 
@@ -236,9 +206,6 @@ class ServiceWorkerClient {
     return await this.preloadVersionedIndexes();
   }
 
-  /**
-   * Send a message to the service worker and wait for response
-   */
   private async sendMessage(
     message: Record<string, unknown>,
     timeout: number = 10000
@@ -271,16 +238,10 @@ class ServiceWorkerClient {
     });
   }
 
-  /**
-   * Check if service worker is registered and active
-   */
   isReady(): boolean {
     return this.isSupported && this.registration?.active?.state === 'activated';
   }
 
-  /**
-   * Get service worker registration info
-   */
   getInfo() {
     if (!this.isSupported) {
       return { supported: false };
@@ -294,9 +255,6 @@ class ServiceWorkerClient {
     };
   }
 
-  /**
-   * Check if a specific URL is cached
-   */
   async isCached(url: string): Promise<boolean> {
     if (!this.isSupported) {
       return false;
@@ -312,9 +270,6 @@ class ServiceWorkerClient {
     }
   }
 
-  /**
-   * Prefetch a specific URL if not already cached
-   */
   async prefetchUrl(url: string): Promise<boolean> {
     if (!this.isSupported) {
       return false;
@@ -346,9 +301,6 @@ if (typeof window !== 'undefined') {
     const registered = await serviceWorkerClient.register();
 
     if (registered) {
-      // Disabled: backgroundPreload is handled by dedicated backgroundPreloader.ts
-      // serviceWorkerClient.backgroundPreload();
-
       setTimeout(async () => {
         try {
           await serviceWorkerClient.warmupCache();

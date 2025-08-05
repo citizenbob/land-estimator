@@ -76,6 +76,7 @@ declare module 'flexsearch' {
       index: Index;
       parcelIds: string[];
       addressData: Record<string, string>;
+      regions?: string[];
     }
 
     interface StaticAddressManifest {

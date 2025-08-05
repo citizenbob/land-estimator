@@ -46,7 +46,17 @@ describe('/api/parcel-metadata/[id] route', () => {
       const data = await response.json();
 
       expect(response.status).toBe(500);
-      expect(data).toEqual({ error: 'Failed to fetch parcel metadata' });
+      expect(data).toEqual({
+        success: false,
+        error: expect.objectContaining({
+          message: expect.stringContaining(
+            'Parcel metadata service is disabled'
+          ),
+          code: 'PARCEL_FETCH_ERROR',
+          status: 500
+        }),
+        timestamp: expect.any(String)
+      });
       expect(mockGetParcelMetadata).toHaveBeenCalledWith('test-id');
 
       consoleErrorSpy.mockRestore();
@@ -60,7 +70,15 @@ describe('/api/parcel-metadata/[id] route', () => {
       const data = await response.json();
 
       expect(response.status).toBe(400);
-      expect(data).toEqual({ error: 'Missing parcel id' });
+      expect(data).toEqual({
+        success: false,
+        error: expect.objectContaining({
+          message: 'Missing parcel id',
+          code: 'MISSING_PARCEL_ID',
+          status: 400
+        }),
+        timestamp: expect.any(String)
+      });
       expect(mockGetParcelMetadata).not.toHaveBeenCalled();
     });
 
@@ -82,13 +100,24 @@ describe('/api/parcel-metadata/[id] route', () => {
       const data = await response.json();
 
       expect(response.status).toBe(500);
-      expect(data).toEqual({ error: 'Failed to fetch parcel metadata' });
+      expect(data).toEqual({
+        success: false,
+        error: expect.objectContaining({
+          message: expect.stringContaining(
+            'Parcel metadata service is disabled'
+          ),
+          code: 'PARCEL_FETCH_ERROR',
+          status: 500
+        }),
+        timestamp: expect.any(String)
+      });
       expect(mockGetParcelMetadata).toHaveBeenCalledWith('123');
       expect(consoleErrorSpy).toHaveBeenCalledWith(
-        'Error in parcel metadata API:',
+        '[Error]',
         expect.objectContaining({
           message:
-            'Parcel metadata service is disabled. Use the simplified address lookup instead.'
+            'Parcel metadata service is disabled. Use the simplified address lookup instead.',
+          severity: 'medium'
         })
       );
 
@@ -105,7 +134,15 @@ describe('/api/parcel-metadata/[id] route', () => {
       const data = await response.json();
 
       expect(response.status).toBe(400);
-      expect(data).toEqual({ error: 'Missing parcel id' });
+      expect(data).toEqual({
+        success: false,
+        error: expect.objectContaining({
+          message: 'Missing parcel id',
+          code: 'MISSING_PARCEL_ID',
+          status: 400
+        }),
+        timestamp: expect.any(String)
+      });
     });
   });
 });

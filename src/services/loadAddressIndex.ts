@@ -1,44 +1,13 @@
-/**
- * Static FlexSearch Index Loader - Regional Shard + Fast Rebuild Strategy
- *
- * Works with Vercel Edge Middleware:
- * - Detects user's region shard via cookie (set by middleware)
- * - Loads only that region's index files + lookup table
- * - Rebuilds index once on first use, then caches forever
- * - Client-only operation (no SSR)
- */
-
 import { Index } from 'flexsearch';
+import type { FlexSearchIndexBundle } from 'flexsearch';
+import type {
+  GeographicBounds,
+  GeoShardConfig,
+  GeoGrid
+} from '@app-types/geographic';
 import { devLog, logError } from '@lib/logger';
 import { FLEXSEARCH_CONFIG } from '@config/flexsearch';
-
-// Types
-export interface FlexSearchIndexBundle {
-  index: Index;
-  parcelIds: string[];
-  addressData: Record<string, string>;
-  regions?: string[];
-}
-
-// Geographic sharding configuration
-interface GeographicBounds {
-  north: number;
-  south: number;
-  east: number;
-  west: number;
-}
-
-interface GeoShardConfig {
-  bounds: GeographicBounds;
-  gridSize: number;
-  overlap: number;
-}
-
-export interface GeoGrid {
-  id: string;
-  bounds: GeographicBounds;
-  center: { lat: number; lng: number };
-}
+import { createNetworkError } from '@lib/errorUtils';
 
 export interface ShardManifest {
   regions: Array<{
@@ -54,11 +23,6 @@ export interface ShardManifest {
     total_regions: number;
     source: string;
   };
-}
-
-export interface AddressLookupData {
-  parcelIds: string[];
-  addressData: Record<string, string>;
 }
 
 class ClientOnlyAddressIndexLoader {
@@ -128,7 +92,14 @@ class ClientOnlyAddressIndexLoader {
     try {
       const manifestResponse = await fetch('/search/latest.json');
       if (!manifestResponse.ok) {
-        throw new Error(`Manifest not found: ${manifestResponse.status}`);
+        throw createNetworkError(
+          `Manifest not found: ${manifestResponse.status}`,
+          {
+            url: '/search/latest.json',
+            status: manifestResponse.status,
+            statusText: manifestResponse.statusText
+          }
+        );
       }
 
       const manifest: ShardManifest = await manifestResponse.json();
@@ -148,7 +119,14 @@ class ClientOnlyAddressIndexLoader {
     try {
       const manifestResponse = await fetch('/search/latest.json');
       if (!manifestResponse.ok) {
-        throw new Error(`Manifest not found: ${manifestResponse.status}`);
+        throw createNetworkError(
+          `Manifest not found: ${manifestResponse.status}`,
+          {
+            url: '/search/latest.json',
+            status: manifestResponse.status,
+            statusText: manifestResponse.statusText
+          }
+        );
       }
 
       const manifest: ShardManifest = await manifestResponse.json();
@@ -174,8 +152,14 @@ class ClientOnlyAddressIndexLoader {
       // Load the document file which contains raw address data
       const response = await fetch(`/search/${region.document_file}`);
       if (!response.ok) {
-        throw new Error(
-          `Failed to load ${region.document_file}: ${response.status}`
+        throw createNetworkError(
+          `Failed to load ${region.document_file}: ${response.status}`,
+          {
+            url: `/search/${region.document_file}`,
+            region: region.region,
+            status: response.status,
+            statusText: response.statusText
+          }
         );
       }
 

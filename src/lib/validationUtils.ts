@@ -1,31 +1,15 @@
-/**
- * Common validation utilities used across the application
- */
-
-/**
- * Validates that a value is a non-empty string
- */
 export function isNonEmptyString(value: unknown): value is string {
   return typeof value === 'string' && value.trim().length > 0;
 }
 
-/**
- * Validates that a value is a positive number
- */
 export function isPositiveNumber(value: unknown): value is number {
   return typeof value === 'number' && value > 0 && !isNaN(value);
 }
 
-/**
- * Validates that a value is a valid numeric string
- */
 export function isNumericString(value: string): boolean {
   return /^\d+$/.test(value.trim());
 }
 
-/**
- * Validates that address data has required calculation fields
- */
 export function hasValidCalcData(addressData: {
   calc?: {
     estimated_landscapable_area?: number;
@@ -39,9 +23,6 @@ export function hasValidCalcData(addressData: {
   );
 }
 
-/**
- * Validates coordinate values
- */
 export function areValidCoordinates(lat: unknown, lon: unknown): boolean {
   return (
     typeof lat === 'number' &&
@@ -53,16 +34,10 @@ export function areValidCoordinates(lat: unknown, lon: unknown): boolean {
   );
 }
 
-/**
- * Sanitizes numeric input by removing non-numeric characters
- */
 export function sanitizeNumericInput(value: string): string {
   return value.replace(/[^\d]/g, '');
 }
 
-/**
- * Validates service type arrays
- */
 export function isValidServiceTypes(
   services: unknown
 ): services is Array<'design' | 'installation' | 'maintenance'> {
@@ -74,9 +49,6 @@ export function isValidServiceTypes(
   );
 }
 
-/**
- * Validates bounding box format
- */
 export function isValidBoundingBox(
   box: unknown
 ): box is [string, string, string, string] {

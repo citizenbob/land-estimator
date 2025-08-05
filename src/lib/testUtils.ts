@@ -1,7 +1,3 @@
-/**
- * Testing utilities and helpers for component and integration testing
- */
-
 import { fireEvent, screen, waitFor } from '@testing-library/react';
 import { expect, vi } from 'vitest';
 import { MOCK_LOCAL_ADDRESSES, TestItem, TestBundle } from './testData';
@@ -204,15 +200,8 @@ export const mockJsonSequence = (
   });
 };
 
-/**
- * Alias for createConsoleMocks function for backward compatibility
- */
 export const setupConsoleMocks = createConsoleMocks;
 
-/**
- * Verifies that all suggestions in the dropdown are unique
- * @throws Error if duplicate suggestions are found
- */
 export const verifyUniqueSuggestions = async () => {
   const items = await waitFor(() => screen.getAllByRole('option'));
   const displays = items
@@ -306,9 +295,6 @@ export function createNominatimApiClientMock(
   };
 }
 
-/**
- * Creates a mock search index with common methods
- */
 export function createMockSearchIndex() {
   return {
     add: vi.fn(),
@@ -320,13 +306,7 @@ export function createMockSearchIndex() {
   };
 }
 
-/**
- * Sets up browser environment for tests
- */
 export function setupBrowserEnvironment() {
-  /**
-   * Ensure window object exists (JSDOM should provide this)
-   */
   if (typeof globalThis.window === 'undefined') {
     (globalThis as Record<string, unknown>).window = {
       document: globalThis.document || {},
@@ -337,9 +317,6 @@ export function setupBrowserEnvironment() {
     };
   }
 
-  /**
-   * Ensure window has event listener methods
-   */
   if (typeof globalThis.window?.addEventListener === 'undefined') {
     globalThis.window.addEventListener = vi.fn();
   }
@@ -347,24 +324,15 @@ export function setupBrowserEnvironment() {
     globalThis.window.removeEventListener = vi.fn();
   }
 
-  /**
-   * Ensure navigator exists and has required properties
-   */
   if (typeof globalThis.navigator === 'undefined') {
     (globalThis as Record<string, unknown>).navigator = { userAgent: 'Vitest' };
   }
 
-  /**
-   * Set up fetch mock
-   */
   if (typeof globalThis.fetch === 'undefined') {
     (globalThis as Record<string, unknown>).fetch = vi.fn();
   }
 }
 
-/**
- * Sets up Node.js environment for tests
- */
 export function setupNodeEnvironment() {
   vi.spyOn(process, 'cwd').mockReturnValue('/test/project');
 }
@@ -382,9 +350,6 @@ export function createMockFetch(assignToGlobal = true) {
   return mockFetch;
 }
 
-/**
- * Sets up Firestore admin mocks for API tests
- */
 export function setupFirestoreAdminMocks() {
   const mockAdd = vi.fn();
 
@@ -403,9 +368,6 @@ export function setupFirestoreAdminMocks() {
   return { mockAdd };
 }
 
-/**
- * Sets up Mixpanel mocks for analytics tests
- */
 export function setupMixpanelMocks() {
   const mockMixpanelTrack = vi.fn(() => true);
 
@@ -418,9 +380,6 @@ export function setupMixpanelMocks() {
   return { mockMixpanelTrack };
 }
 
-/**
- * Creates a mock API record from local address data
- */
 export function createMockApiRecord(address: {
   id: string;
   full_address: string;
@@ -492,31 +451,19 @@ export function cleanupGlobalMocks(mocks: Record<string, unknown>) {
   vi.clearAllMocks();
 }
 
-/**
- * Sets up fake timers with a specific date
- */
 export function setupTestTimers(date = new Date(2025, 5, 1, 12, 0, 0)) {
   vi.useFakeTimers();
   vi.setSystemTime(date);
 }
 
-/**
- * Cleans up test timers
- */
 export function cleanupTestTimers() {
   vi.useRealTimers();
 }
 
-/**
- * Creates a standardized test request object for API routes
- */
 export function createTestRequest(data: unknown): Request {
   return { json: async () => data } as Request;
 }
 
-/**
- * Factory function for creating consistent fetch response mocks
- */
 export function createMockResponse(
   data: unknown,
   options: {
@@ -535,23 +482,14 @@ export function createMockResponse(
   };
 }
 
-/**
- * Creates a mock function that resolves with provided data
- */
 export function createResolvedMock<T>(data: T) {
   return vi.fn().mockResolvedValue(data);
 }
 
-/**
- * Creates a mock function that rejects with provided error
- */
 export function createRejectedMock(error: Error) {
   return vi.fn().mockRejectedValue(error);
 }
 
-/**
- * Creates a series of mock responses for sequential calls
- */
 export function createSequentialMocks<T>(responses: T[]) {
   const mock = vi.fn();
   responses.forEach((response) => {
@@ -560,9 +498,6 @@ export function createSequentialMocks<T>(responses: T[]) {
   return mock;
 }
 
-/**
- * Creates a mock that alternates between success and failure
- */
 export function createAlternatingMock<T>(
   successData: T,
   errorData: Error,
@@ -582,9 +517,6 @@ export function createAlternatingMock<T>(
   return mock;
 }
 
-/**
- * Console testing utilities for consistent mock setup
- */
 export function createConsoleMocks() {
   const originalConsole = { ...console };
 
@@ -610,9 +542,6 @@ export function createConsoleMocks() {
   };
 }
 
-/**
- * Temporarily suppress console output during test execution
- */
 export function withSuppressedConsole<T>(fn: () => T): T {
   const mocks = createConsoleMocks();
   try {
@@ -622,9 +551,6 @@ export function withSuppressedConsole<T>(fn: () => T): T {
   }
 }
 
-/**
- * Creates a console spy that captures output for assertion
- */
 export function createConsoleCapture() {
   const messages: string[] = [];
   const spy = vi.spyOn(console, 'log').mockImplementation((message) => {
@@ -641,13 +567,6 @@ export function createConsoleCapture() {
   };
 }
 
-/**
- * Worker-specific test utilities
- */
-
-/**
- * Creates a mock fetch response with consistent structure
- */
 export const createMockFetchResponse = (
   data: unknown,
   ok = true,
@@ -659,9 +578,6 @@ export const createMockFetchResponse = (
   json: () => Promise.resolve(data)
 });
 
-/**
- * Creates standardized cache mocks for service worker testing
- */
 export const createCacheMocks = () => {
   const mockCache = {
     match: vi.fn(),
@@ -674,9 +590,6 @@ export const createCacheMocks = () => {
   return { mockCache, mockCaches };
 };
 
-/**
- * Standard test configuration for versioned bundle loader
- */
 export const createTestConfig = () => ({
   baseFilename: 'address-index',
   createLookupMap: vi.fn(
@@ -695,9 +608,6 @@ export const createTestConfig = () => ({
   )
 });
 
-/**
- * Sets up consistent mock environment for worker tests
- */
 export const setupWorkerMocks = (mockFetch: ReturnType<typeof vi.fn>) => {
   const { mockCache, mockCaches } = createCacheMocks();
 

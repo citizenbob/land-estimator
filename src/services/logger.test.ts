@@ -101,10 +101,7 @@ describe('logEvent', () => {
       '[Error]',
       expect.objectContaining({
         message: 'Mixpanel error',
-        context: expect.objectContaining({
-          operation: 'mixpanel_track',
-          eventName: 'address_selected'
-        })
+        severity: 'medium'
       })
     );
   });
@@ -128,16 +125,8 @@ describe('logEvent', () => {
         message: expect.stringContaining(
           'Error logging event to Firestore via API: 500'
         ),
-        context: expect.objectContaining({
-          operation: 'firestore_log',
-          eventName: 'address_selected'
-        }),
-        type: 'NETWORK_ERROR',
-        isRetryable: true,
-        errorContext: expect.objectContaining({
-          status: 500,
-          statusText: 'Internal Server Error'
-        })
+        category: 'network',
+        severity: 'medium'
       })
     );
   });
@@ -159,10 +148,7 @@ describe('logEvent', () => {
       '[Error]',
       expect.objectContaining({
         message: 'Network failed',
-        context: expect.objectContaining({
-          operation: 'firestore_log',
-          eventName: 'address_selected'
-        })
+        severity: 'medium'
       })
     );
   });

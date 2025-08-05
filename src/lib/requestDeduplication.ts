@@ -1,11 +1,3 @@
-/**
- * @fileoverview Request deduplication and debouncing utilities
- * Prevents duplicate API calls and implements intelligent debouncing
- */
-
-/**
- * Request deduplication cache for preventing duplicate concurrent requests
- */
 class RequestDeduplicator<T> {
   private activeRequests = new Map<string, Promise<T>>();
   private debounceTimers = new Map<string, NodeJS.Timeout>();
@@ -17,17 +9,14 @@ class RequestDeduplicator<T> {
    * @returns Promise resolving to the request result
    */
   async deduplicate(key: string, requestFn: () => Promise<T>): Promise<T> {
-    // If there's already an active request for this key, return it
     const existingRequest = this.activeRequests.get(key);
     if (existingRequest) {
       console.log(`🔄 [Dedup] Reusing active request for: ${key}`);
       return existingRequest;
     }
 
-    // Start new request
     console.log(`🚀 [Dedup] Starting new request for: ${key}`);
     const requestPromise = requestFn().finally(() => {
-      // Clean up after request completes
       this.activeRequests.delete(key);
     });
 
@@ -48,17 +37,14 @@ class RequestDeduplicator<T> {
     delay: number = 300
   ): Promise<T> {
     return new Promise((resolve, reject) => {
-      // Clear existing timer for this key
       const existingTimer = this.debounceTimers.get(key);
       if (existingTimer) {
         clearTimeout(existingTimer);
       }
 
-      // Set new timer
       const timer = setTimeout(async () => {
         this.debounceTimers.delete(key);
         try {
-          // Use deduplication for the actual request
           const result = await this.deduplicate(key, requestFn);
           resolve(result);
         } catch (error) {
@@ -82,32 +68,21 @@ class RequestDeduplicator<T> {
     requestFn: () => Promise<T>,
     delay: number = 300
   ): Promise<T> {
-    // First check if there's an identical active request
     const existingRequest = this.activeRequests.get(key);
     if (existingRequest) {
       console.log(`⚡ [DebouncedDedup] Reusing active request for: ${key}`);
       return existingRequest;
     }
 
-    // Otherwise, debounce the request
     return this.debounce(key, requestFn, delay);
   }
 
-  /**
-   * Clear all active requests and timers
-   */
   clear(): void {
-    // Clear all debounce timers
     this.debounceTimers.forEach((timer) => clearTimeout(timer));
     this.debounceTimers.clear();
-
-    // Note: We don't cancel active requests as they might be needed elsewhere
     this.activeRequests.clear();
   }
 
-  /**
-   * Get statistics about active requests and timers
-   */
   getStats(): {
     activeRequests: number;
     pendingDebounces: number;
@@ -140,9 +115,6 @@ export function createLookupKey(query: string): string {
   return `lookup:${normalized}`;
 }
 
-/**
- * Global request deduplicator for address lookups
- */
 export const addressLookupDeduplicator = new RequestDeduplicator<unknown>();
 
 /**
@@ -164,7 +136,6 @@ export async function deduplicatedLookup<T>(
   const normalizedQuery = normalizeQuery(query);
   const key = createLookupKey(normalizedQuery);
 
-  // Create a type-specific deduplicator for this call
   const deduplicator = new RequestDeduplicator<T>();
   const requestFn = () => lookupFn(normalizedQuery);
 

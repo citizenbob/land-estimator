@@ -1,7 +1,3 @@
-/**
- * @fileoverview Storybook utility functions for consistent story creation and configuration
- */
-
 import React from 'react';
 import type { Meta, StoryObj } from '@storybook/react';
 
@@ -41,18 +37,8 @@ export function createStory(
   };
 }
 
-/**
- * Standard patterns for common story types
- */
 export const STORY_PATTERNS = {
-  /**
-   * Standard documentation description for component stories
-   */
   getDescription: (componentName: string) => `The ${componentName} component.`,
-
-  /**
-   * Common accessibility labels
-   */
   ARIA_LABELS: {
     DISABLED: 'Disabled component',
     CLOSE: 'Close',
@@ -60,9 +46,6 @@ export const STORY_PATTERNS = {
     CANCEL: 'Cancel'
   },
 
-  /**
-   * Common test scenarios
-   */
   SCENARIOS: {
     DEFAULT: 'Default',
     DISABLED: 'Disabled',
@@ -72,9 +55,6 @@ export const STORY_PATTERNS = {
   }
 } as const;
 
-/**
- * Standard export pattern for Storybook stories
- */
 export function exportStories<T extends React.ComponentType<unknown>>(
   meta: Meta<T>,
   stories: Record<string, StoryObj<unknown>>

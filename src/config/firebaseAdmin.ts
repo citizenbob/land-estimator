@@ -3,8 +3,20 @@ import { getFirestore } from 'firebase-admin/firestore';
 import { getStorage } from 'firebase-admin/storage';
 import { validateFirebaseCredentials } from '../lib/envValidation';
 import { logError } from '@lib/errorUtils';
+import { FirebaseConfig } from '@app-types/configTypes';
 
 let firebaseApp: App | null = null;
+
+function getFirebaseConfig(): FirebaseConfig {
+  const privateKey = process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, '\n');
+
+  return {
+    projectId: process.env.FIREBASE_PROJECT_ID!,
+    clientEmail: process.env.FIREBASE_CLIENT_EMAIL!,
+    privateKey: privateKey!,
+    storageBucket: process.env.FIREBASE_STORAGE_BUCKET
+  };
+}
 
 function ensureFirebaseApp(): App {
   if (firebaseApp) {
@@ -12,8 +24,6 @@ function ensureFirebaseApp(): App {
   }
 
   validateFirebaseCredentials();
-
-  const privateKey = process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, '\n');
 
   try {
     const existingApps = getApps();
@@ -23,13 +33,15 @@ function ensureFirebaseApp(): App {
       return firebaseApp;
     }
 
+    const config = getFirebaseConfig();
     firebaseApp = initializeApp({
       credential: cert({
-        projectId: process.env.FIREBASE_PROJECT_ID!,
-        clientEmail: process.env.FIREBASE_CLIENT_EMAIL!,
-        privateKey: privateKey!
+        projectId: config.projectId,
+        clientEmail: config.clientEmail,
+        privateKey: config.privateKey
       }),
-      storageBucket: `${process.env.FIREBASE_PROJECT_ID}.firebasestorage.app`
+      storageBucket:
+        config.storageBucket || `${config.projectId}.firebasestorage.app`
     });
 
     console.log('✅ Firebase Admin SDK initialized successfully');

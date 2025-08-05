@@ -1,15 +1,7 @@
-/**
- * @fileoverview Utility functions for common array operations and reductions
- */
-
-/**
- * Utility functions for array manipulation and filtering
- */
-
 import { filterExactMatches } from '@lib/addressTransforms';
 
-// Re-export for backward compatibility
 export { filterExactMatches };
+
 export function sumByProperty<T>(items: T[], property: keyof T): number {
   return items.reduce((sum, item) => {
     const value = item[property];

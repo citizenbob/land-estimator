@@ -352,7 +352,11 @@ describe('AddressInput', () => {
         display_name: '123 Test St, St. Louis, MO 63101'
       };
 
-      mockJsonResponse(getMockFetch(), mockParcelData);
+      mockJsonResponse(getMockFetch(), {
+        success: true,
+        data: mockParcelData,
+        timestamp: new Date().toISOString()
+      });
 
       const mockLookup = createAddressLookupMock({
         query: '123 Test St',

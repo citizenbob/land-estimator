@@ -1,54 +1,25 @@
-/**
- * Client-Only Address Search - Static FlexSearch Implementation
- *
- * Following canonical instructions:
- * - Load static FlexSearch index once
- * - Pure client-side typeahead search
- * - Zero runtime rebuilds, instant results
- * - No SSR complexity
- *
- * See refactor.instructions.md for pipeline rules
- */
-
-import {
-  loadAddressIndexProgressive,
-  type FlexSearchIndexBundle
-} from '@services/loadAddressIndex';
+import type { FlexSearchIndexBundle } from 'flexsearch';
+import { loadAddressIndexProgressive } from '@services/loadAddressIndex';
 import { logError } from '@lib/errorUtils';
 import {
   FLEXSEARCH_SEARCH_OPTIONS,
   DEFAULT_SEARCH_LIMIT
 } from '@config/flexsearch';
 import { extractRegion, normalizeQuery } from '@lib/addressTransforms';
+import type { AddressLookupRecord } from '@app-types/localAddressTypes';
 
-export interface AddressLookupRecord {
-  id: string;
-  display_name: string;
-  region: string;
-  normalized: string;
-}
-
-// Global cache for client-only operation
 let addressSearchBundle: FlexSearchIndexBundle | null = null;
 
-/**
- * Reset cached search bundle (for testing)
- */
 export function resetAddressSearchCache(): void {
   addressSearchBundle = null;
 }
 
-/**
- * Convert FlexSearch results to standardized address records
- * Updated for Document Mode: searchResults are document IDs, not array indices
- */
 function formatSearchResults(
   searchResults: string[],
   bundle: FlexSearchIndexBundle,
   limit: number
 ): AddressLookupRecord[] {
   return searchResults.slice(0, limit).map((docId) => {
-    // In Document Mode, results are already parcel IDs
     const parcelId = docId;
     const displayName = bundle.addressData[parcelId] || 'Unknown Address';
     const region = extractRegion(displayName);
@@ -80,18 +51,15 @@ export async function searchAddresses(
   query: string,
   limit: number = DEFAULT_SEARCH_LIMIT
 ): Promise<AddressLookupRecord[]> {
-  // Quick validation
   if (!query || query.trim().length < 2) {
     return [];
   }
 
   try {
-    // Load static index on first search (cached thereafter)
     if (!addressSearchBundle) {
       console.log('🔍 Loading static FlexSearch index...');
       const loadStart = performance.now();
 
-      // Use progressive loading for better UX
       addressSearchBundle = await loadAddressIndexProgressive();
 
       const loadTime = performance.now() - loadStart;
@@ -101,12 +69,10 @@ export async function searchAddresses(
       );
     }
 
-    // Perform instant client-side search
     console.log('⚡ Performing instant client-side search');
     const searchStart = performance.now();
 
     const normalizedQuery = normalizeQuery(query);
-    // Document Mode returns document IDs (strings), not indices
     const searchResults = addressSearchBundle.index.search(normalizedQuery, {
       ...FLEXSEARCH_SEARCH_OPTIONS,
       limit

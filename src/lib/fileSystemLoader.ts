@@ -1,11 +1,5 @@
-/**
- * @fileoverview Server-side file system loader for static address index files
- * This module is only imported on the server side to avoid webpack warnings
- */
-
 import fs from 'fs';
 import path from 'path';
-// Import types from flexsearch module declaration
 import type { StaticAddressManifest, AddressLookupData } from 'flexsearch';
 
 /**

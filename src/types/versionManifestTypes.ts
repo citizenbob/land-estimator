@@ -5,10 +5,6 @@ import type {
   NumericBoundingBox
 } from './geographic';
 
-/**
- * Type definitions for version manifest and versioned CDN integration
- */
-
 export interface VersionInfo {
   version: string;
   files: {
@@ -25,9 +21,6 @@ export interface VersionManifest {
   available_versions: string[];
 }
 
-/**
- * Address index structure returned by the ingest pipeline
- */
 export interface AddressIndexData {
   addresses: Array<
     {
@@ -43,9 +36,6 @@ export interface AddressIndexData {
   };
 }
 
-/**
- * Parcel metadata index structure returned by the ingest pipeline
- */
 export interface ParcelMetadataIndex {
   parcels: Array<
     {
@@ -64,9 +54,6 @@ export interface ParcelMetadataIndex {
   };
 }
 
-/**
- * Parcel geometry index structure returned by the ingest pipeline
- */
 export interface ParcelGeometryIndex {
   [parcelId: string]: {
     type: 'Polygon' | 'MultiPolygon';

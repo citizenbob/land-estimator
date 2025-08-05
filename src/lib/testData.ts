@@ -1,17 +1,10 @@
-/**
- * @fileoverview Mock data and test fixtures for testing address lookup and estimation functionality
- */
-
-import type { FlexSearchIndexBundle } from '@services/loadAddressIndex';
+import type { FlexSearchIndexBundle } from 'flexsearch';
 import { vi } from 'vitest';
 import type {
   LocalAddressRecord,
   AddressSuggestion
 } from '@app-types/localAddressTypes';
 
-/**
- * Mock local address records for testing address lookup functionality
- */
 export const MOCK_LOCAL_ADDRESSES: LocalAddressRecord[] = [
   {
     id: '10001000005',
@@ -73,9 +66,6 @@ export const MOCK_LOCAL_ADDRESSES: LocalAddressRecord[] = [
   }
 ];
 
-/**
- * Mock address suggestions for testing autocomplete functionality
- */
 export const MOCK_SUGGESTIONS: AddressSuggestion[] = [
   {
     place_id: '10001000005',
@@ -92,9 +82,6 @@ export const MOCK_SUGGESTIONS: AddressSuggestion[] = [
   }
 ];
 
-/**
- * Test location constants for consistent address testing
- */
 export const TEST_LOCATIONS = {
   FIRST_STREET: '626 1st, St. Louis, MO 63103',
   DUNN_VIEW: '11308 Dunn View Dr., St. Louis County (Unincorporated), MO 63102',
@@ -103,25 +90,16 @@ export const TEST_LOCATIONS = {
   VOLZ_DRIVE: '907 Volz Dr, Crestwood, MO 63126'
 };
 
-/**
- * Test coordinate data corresponding to test locations
- */
 export const TEST_COORDINATES = {
   FIRST_STREET: { lat: 4278231.181849, lon: 744902.380139 },
   DUNN_VIEW: { lat: 4294879.84416, lon: 743862.085717 },
   VOLZ_DRIVE: { lat: 4271623.637581, lon: 728460.487376 }
 };
 
-/**
- * Pre-selected mock address data for consistent testing
- */
 export const MOCK_ADDRESS_DATA = MOCK_LOCAL_ADDRESSES.find(
   (address) => address.id === '25L440198'
 )!;
 
-/**
- * Mock FlexSearch address lookup data
- */
 export const MOCK_ADDRESS_LOOKUP_DATA = [
   {
     id: '19115000300',
@@ -149,9 +127,6 @@ export const MOCK_ADDRESS_LOOKUP_DATA = [
   }
 ];
 
-/**
- * Mock address index precomputed data
- */
 export const MOCK_ADDRESS_INDEX_INDEX_DATA = {
   parcelIds: ['12345', '67890', '11111'],
   searchStrings: [
@@ -165,18 +140,12 @@ export const MOCK_ADDRESS_INDEX_INDEX_DATA = {
   exportMethod: 'index_optimized'
 };
 
-/**
- * Mock address data for address index loader tests
- */
 export const MOCK_ADDRESS_INDEX_ADDRESS_DATA = {
   '12345': '123 Main St, St. Louis City, MO',
   '67890': '456 Oak Ave, St. Louis County, MO',
   '11111': '789 Elm Dr, St. Louis City, MO'
 };
 
-/**
- * Mock landscape estimator test data
- */
 export const MOCK_PRICE_BREAKDOWN = {
   lotSizeSqFt: 10000,
   baseRatePerSqFt: { min: 4.5, max: 12 },
@@ -188,9 +157,6 @@ export const MOCK_PRICE_BREAKDOWN = {
   finalEstimate: { min: 45000, max: 120000 }
 };
 
-/**
- * Mock enriched address data for estimator tests
- */
 export const MOCK_ENRICHED_ADDRESS_DATA = {
   place_id: '12345',
   display_name: '1234 Test Street, City, State, 12345',
@@ -206,9 +172,6 @@ export const MOCK_ENRICHED_ADDRESS_DATA = {
   affluence_score: 75
 };
 
-/**
- * Mock Nominatim fallback data
- */
 export const MOCK_NOMINATIM_FALLBACK_DATA = {
   place_id: '67890',
   display_name: '5678 Another Street, City, State, 12345',
@@ -224,9 +187,6 @@ export const MOCK_NOMINATIM_FALLBACK_DATA = {
   affluence_score: 0
 };
 
-/**
- * Simple mock address record for basic tests
- */
 export const MOCK_SIMPLE_ADDRESS_RECORD = {
   id: '1',
   full_address: '123 Main St',
@@ -247,9 +207,6 @@ export const MOCK_SIMPLE_ADDRESS_RECORD = {
   processed_date: '2025-06-12T00:00:00.000Z'
 };
 
-/**
- * Mock bounding box data for landscape estimator tests
- */
 export const MOCK_BOUNDING_BOXES = {
   ONE_ACRE: {
     lat_min: 38.627,
@@ -271,9 +228,6 @@ export const MOCK_BOUNDING_BOXES = {
   }
 };
 
-/**
- * Mock analytics events for testing
- */
 export const MOCK_ANALYTICS_EVENTS = {
   ADDRESS_SELECTED: {
     query: 'test query',
@@ -285,9 +239,6 @@ export const MOCK_ANALYTICS_EVENTS = {
   }
 };
 
-/**
- * Mock parcel metadata for testing parcel services
- */
 export const MOCK_PARCEL_METADATA = [
   {
     id: 'p1',
@@ -329,9 +280,6 @@ export const MOCK_PARCEL_METADATA = [
   }
 ];
 
-/**
- * Mock estimate data for BI logging tests
- */
 export const MOCK_BI_TEST_DATA = {
   ESTIMATE: {
     address: {
@@ -350,9 +298,6 @@ export const MOCK_BI_TEST_DATA = {
   }
 };
 
-/**
- * Common API response mocks for testing
- */
 export const MOCK_API_RESPONSES = {
   ADDRESS_INDEX: {
     gzipSuccess: {
@@ -387,19 +332,12 @@ export const MOCK_API_RESPONSES = {
   }
 } as const;
 
-/**
- * Mock gzipped data for testing compression/decompression
- */
 export const MOCK_GZIPPED_DATA = new Uint8Array([0x1f, 0x8b, 0x08, 0x00]);
 
-/**
- * Worker-specific test types and data
- */
 export interface TestItem {
   id: string;
   name: string;
 }
-
 export interface TestBundle {
   data: TestItem[];
   lookup: Record<string, TestItem>;
@@ -424,9 +362,6 @@ export const EXPECTED_TEST_BUNDLE: TestBundle = {
   count: 2
 };
 
-/**
- * Mock FlexSearch index bundle for testing
- */
 export const MOCK_FLEXSEARCH_BUNDLE: FlexSearchIndexBundle = {
   index: {
     add: vi.fn(),

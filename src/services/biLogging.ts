@@ -1,24 +1,6 @@
-/**
- * Enhanced Business Intelligence Logging for Lead Follow-up
- *
- * This demonstrates how to capture rich BI data when estimates are generated
- * to enable sophisticated lead scoring and follow-up strategies.
- */
-
 import { logEvent } from '@services/logger';
-import { EstimateResult } from '@app-types/landscapeEstimatorTypes';
-import { EnrichedAddressSuggestion } from '@app-types/localAddressTypes';
+import type { BILoggingOptions } from '@app-types/analytics';
 
-interface BILoggingOptions {
-  addressData: EnrichedAddressSuggestion;
-  estimate: EstimateResult;
-  selectedServices: string[];
-  hasCustomLotSize: boolean;
-}
-
-/**
- * Logs comprehensive business intelligence data for lead analysis
- */
 export function logEstimateForBI({
   addressData,
   estimate,

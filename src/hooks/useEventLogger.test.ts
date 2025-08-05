@@ -86,10 +86,7 @@ describe('useEventLogger', () => {
       '[Error]',
       expect.objectContaining({
         message: 'Test error',
-        context: expect.objectContaining({
-          operation: 'event_logging',
-          eventName: 'estimate_button_clicked'
-        })
+        severity: 'medium'
       })
     );
   });

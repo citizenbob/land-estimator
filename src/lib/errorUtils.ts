@@ -1,10 +1,5 @@
-/**
- * Centralized error handling utilities and patterns
- */
+import { ApiError, OperationResult, LoggedError } from '@app-types/errorTypes';
 
-/**
- * Standard error types used throughout the application
- */
 export enum ErrorType {
   NETWORK = 'NETWORK_ERROR',
   VALIDATION = 'VALIDATION_ERROR',
@@ -13,13 +8,14 @@ export enum ErrorType {
   UNKNOWN = 'UNKNOWN_ERROR'
 }
 
-/**
- * Base error class with additional context
- */
-export class AppError extends Error {
+export class AppError extends Error implements ApiError {
   public readonly type: ErrorType;
   public readonly context?: Record<string, unknown>;
   public readonly isRetryable: boolean;
+  public readonly code?: string;
+  public readonly statusCode?: number;
+  public readonly status: number;
+  public readonly timestamp: string;
 
   constructor(
     message: string,
@@ -28,6 +24,9 @@ export class AppError extends Error {
       context?: Record<string, unknown>;
       isRetryable?: boolean;
       cause?: Error;
+      code?: string;
+      statusCode?: number;
+      status?: number;
     } = {}
   ) {
     super(message);
@@ -35,6 +34,10 @@ export class AppError extends Error {
     this.type = type;
     this.context = options.context;
     this.isRetryable = options.isRetryable ?? false;
+    this.code = options.code;
+    this.statusCode = options.statusCode;
+    this.status = options.status ?? options.statusCode ?? 500;
+    this.timestamp = new Date().toISOString();
 
     if (options.cause) {
       this.cause = options.cause;
@@ -42,9 +45,6 @@ export class AppError extends Error {
   }
 }
 
-/**
- * Creates a standardized error for insufficient data scenarios
- */
 export function createInsufficientDataError(
   context?: Record<string, unknown>
 ): AppError {
@@ -55,9 +55,6 @@ export function createInsufficientDataError(
   );
 }
 
-/**
- * Creates a standardized network error
- */
 export function createNetworkError(
   message: string = 'Network request failed',
   context?: Record<string, unknown>
@@ -68,9 +65,6 @@ export function createNetworkError(
   });
 }
 
-/**
- * Wraps an async function with error handling and optional retry logic
- */
 export async function withErrorHandling<T>(
   operation: () => Promise<T>,
   options: {
@@ -79,7 +73,7 @@ export async function withErrorHandling<T>(
     retries?: number;
     retryDelay?: number;
   } = {}
-): Promise<T> {
+): Promise<OperationResult<T>> {
   const {
     errorType = ErrorType.UNKNOWN,
     context,
@@ -90,15 +84,23 @@ export async function withErrorHandling<T>(
 
   for (let attempt = 0; attempt <= retries; attempt++) {
     try {
-      return await operation();
+      const data = await operation();
+      return { isError: false, data, timestamp: new Date().toISOString() };
     } catch (error) {
       lastError = error instanceof Error ? error : new Error(String(error));
 
       if (attempt === retries) {
-        throw new AppError(lastError.message, errorType, {
+        const appError = new AppError(lastError.message, errorType, {
           context: { ...context, attempts: attempt + 1 },
           cause: lastError
         });
+        return {
+          isError: true,
+          message: appError.message,
+          code: appError.code,
+          details: appError.context,
+          timestamp: appError.timestamp
+        };
       }
 
       if (retryDelay > 0) {
@@ -107,12 +109,19 @@ export async function withErrorHandling<T>(
     }
   }
 
-  throw lastError!;
+  const appError = new AppError(lastError!.message, errorType, {
+    context,
+    cause: lastError!
+  });
+  return {
+    isError: true,
+    message: appError.message,
+    code: appError.code,
+    details: appError.context,
+    timestamp: appError.timestamp
+  };
 }
 
-/**
- * Safely extracts error message from unknown error types
- */
 export function getErrorMessage(error: unknown): string {
   if (error instanceof Error) {
     return error.message;
@@ -123,9 +132,6 @@ export function getErrorMessage(error: unknown): string {
   return 'An unknown error occurred';
 }
 
-/**
- * Determines if an error is retryable
- */
 export function isRetryableError(error: unknown): boolean {
   if (error instanceof AppError) {
     return error.isRetryable;
@@ -140,23 +146,27 @@ export function isRetryableError(error: unknown): boolean {
   return false;
 }
 
-/**
- * Logs error with consistent format and optional context
- */
 export function logError(
   error: unknown,
   context?: Record<string, unknown>
-): void {
+): LoggedError {
   const message = getErrorMessage(error);
-  const errorInfo = {
+  const loggedError: LoggedError = {
     message,
-    context,
+    timestamp: new Date(),
+    severity: 'medium',
+    stack: error instanceof Error ? error.stack : undefined,
+    context: context ? { metadata: context } : undefined,
     ...(error instanceof AppError && {
-      type: error.type,
-      isRetryable: error.isRetryable,
-      errorContext: error.context
+      category:
+        error.type === ErrorType.NETWORK
+          ? 'network'
+          : error.type === ErrorType.VALIDATION
+            ? 'validation'
+            : 'system'
     })
   };
 
-  console.error('[Error]', errorInfo);
+  console.error('[Error]', loggedError);
+  return loggedError;
 }

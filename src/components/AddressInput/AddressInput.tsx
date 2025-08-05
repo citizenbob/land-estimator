@@ -135,21 +135,22 @@ const AddressInput = ({
 
       const rawData = await response.json();
 
-      if (rawData && onAddressSelect) {
+      if (rawData && rawData.data && onAddressSelect) {
+        const parcelData = rawData.data;
         const enrichedData: EnrichedAddressSuggestion = {
           place_id: matched.place_id,
           display_name: matched.display_name,
-          latitude: rawData.latitude,
-          longitude: rawData.longitude,
-          region: rawData.region || 'Unknown',
+          latitude: parcelData.latitude,
+          longitude: parcelData.longitude,
+          region: parcelData.region || 'Unknown',
           calc: {
-            landarea: rawData.calc?.landarea || 0,
-            building_sqft: rawData.calc?.building_sqft || 0,
+            landarea: parcelData.calc?.landarea || 0,
+            building_sqft: parcelData.calc?.building_sqft || 0,
             estimated_landscapable_area:
-              rawData.calc?.estimated_landscapable_area || 0,
-            property_type: rawData.calc?.property_type || 'residential'
+              parcelData.calc?.estimated_landscapable_area || 0,
+            property_type: parcelData.calc?.property_type || 'residential'
           },
-          affluence_score: rawData.affluence_score
+          affluence_score: parcelData.affluence_score
         };
         onAddressSelect(enrichedData);
       }

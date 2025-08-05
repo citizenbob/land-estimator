@@ -1,8 +1,4 @@
 /**
- * Utility functions for consistent formatting across the application
- */
-
-/**
  * Formats a number as currency (USD)
  *
  * @param amount - The amount to format
@@ -18,7 +14,6 @@ export function formatCurrency(
 ): string {
   const { includeSymbol = true, decimalPlaces = 2 } = options;
 
-  // Use Intl.NumberFormat for proper currency formatting with commas
   const formatted = new Intl.NumberFormat('en-US', {
     style: 'currency',
     currency: 'USD',
