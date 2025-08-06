@@ -72,14 +72,6 @@ export const useAddressLookup = () => {
     },
     [locked]
   );
-        setError('Failed to fetch suggestions. Please try again.');
-      } finally {
-        setIsFetching(false);
-        setHasFetched(true);
-      }
-    },
-    [locked]
-  );
 
   useEffect(() => {
     if (locked || !query.trim()) {
