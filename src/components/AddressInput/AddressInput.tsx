@@ -80,9 +80,10 @@ const handleInputKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
 
 interface AddressInputProps {
   mockLookup?: Partial<ReturnType<typeof useAddressLookup>>;
+  onEstimateRequest?: (address: string) => void;
 }
 
-const AddressInput = ({ mockLookup }: AddressInputProps) => {
+const AddressInput = ({ mockLookup, onEstimateRequest }: AddressInputProps) => {
   const defaultLookup = useAddressLookup();
   const {
     query,
@@ -115,6 +116,7 @@ const AddressInput = ({ mockLookup }: AddressInputProps) => {
   const onEstimateClick = () => {
     const matched = selectedSuggestion.current;
     if (!matched) return;
+    
     logEvent({
       eventName: 'Request Estimate',
       data: {
@@ -122,6 +124,11 @@ const AddressInput = ({ mockLookup }: AddressInputProps) => {
         confirmedIntent: true
       }
     });
+
+    // Trigger the estimate calculation with the selected address
+    if (onEstimateRequest) {
+      onEstimateRequest(matched.displayName);
+    }
   };
 
   const uniqueSuggestions = [

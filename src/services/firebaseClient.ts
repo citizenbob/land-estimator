@@ -12,20 +12,30 @@ const firebaseConfig = {
   measurementId: process.env.NEXT_PUBLIC_FB_MAIN_MEASURE
 };
 
-const app = initializeApp(firebaseConfig);
-
+// Only initialize Firebase if we have a projectId
+let app: ReturnType<typeof initializeApp> | null = null;
 let analytics: ReturnType<typeof getAnalytics> | null = null;
-if (typeof window !== 'undefined') {
-  isSupported().then((supported) => {
-    if (supported) {
-      analytics = getAnalytics(app);
-      if (process.env.NODE_ENV === 'development') {
-        console.log('Firebase analytics initialized:', analytics);
-      }
-    }
-  });
-}
+let db: ReturnType<typeof getFirestore> | null = null;
 
-const db = getFirestore(app);
+if (firebaseConfig.projectId) {
+  app = initializeApp(firebaseConfig);
+  
+  if (typeof window !== 'undefined') {
+    isSupported().then((supported) => {
+      if (supported && app) {
+        analytics = getAnalytics(app);
+        if (process.env.NODE_ENV === 'development') {
+          console.log('Firebase analytics initialized:', analytics);
+        }
+      }
+    }).catch((error) => {
+      console.warn('Firebase analytics initialization failed:', error);
+    });
+  }
+
+  db = getFirestore(app);
+} else {
+  console.warn('Firebase not configured - missing projectId');
+}
 
 export { app, analytics, db };

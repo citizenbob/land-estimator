@@ -1,20 +1,21 @@
 // src/app/layout.tsx
 import React from 'react';
 import type { Metadata } from 'next';
-import { Geist, Geist_Mono } from 'next/font/google';
+// import { Geist, Geist_Mono } from 'next/font/google';
 import './globals.css';
 import { getThemeClass } from '@tokens/theme';
 import Analytics from '@components/PageAnalytics/PageAnalytics';
 
-const geistSans = Geist({
-  variable: '--font-geist-sans',
-  subsets: ['latin']
-});
+// Temporarily disabled due to network connectivity issues
+// const geistSans = Geist({
+//   variable: '--font-geist-sans',
+//   subsets: ['latin']
+// });
 
-const geistMono = Geist_Mono({
-  variable: '--font-geist-mono',
-  subsets: ['latin']
-});
+// const geistMono = Geist_Mono({
+//   variable: '--font-geist-mono',
+//   subsets: ['latin']
+// });
 
 export const metadata: Metadata = {
   title: 'Land Estimator',
@@ -46,7 +47,7 @@ export default function RootLayout({
       <html lang="en" className={getThemeClass(clientTheme)}>
         <head></head>
         <body
-          className={`${geistSans.variable} ${geistMono.variable} antialiased`}
+          className="antialiased"
         >
           <Analytics />
           {children}
@@ -57,7 +58,7 @@ export default function RootLayout({
   return (
     <html lang="en" className={getThemeClass(clientTheme)}>
       <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased`}
+        className="antialiased"
       >
         <Analytics />
         {children}

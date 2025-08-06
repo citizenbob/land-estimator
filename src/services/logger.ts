@@ -1,8 +1,6 @@
 import mixpanel from 'mixpanel-browser';
 import { getFirestore, collection, addDoc } from 'firebase/firestore';
-import { app } from './firebaseClient';
-
-const db = getFirestore(app);
+import { app, db } from './firebaseClient';
 
 export async function logEvent({
   eventName,
@@ -17,14 +15,17 @@ export async function logEvent({
     console.error('Error logging event to Mixpanel:', error);
   }
 
-  try {
-    await addDoc(collection(db, 'landscapeEstimates'), {
-      eventName,
-      data,
-      timestamp: new Date().toISOString()
-    });
-  } catch (error) {
-    console.error('Error logging event to Firestore:', error);
+  // Only try to log to Firestore if Firebase is available
+  if (db && app) {
+    try {
+      await addDoc(collection(db, 'landscapeEstimates'), {
+        eventName,
+        data,
+        timestamp: new Date().toISOString()
+      });
+    } catch (error) {
+      console.error('Error logging event to Firestore:', error);
+    }
   }
 }
 

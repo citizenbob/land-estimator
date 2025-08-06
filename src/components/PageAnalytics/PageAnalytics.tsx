@@ -9,7 +9,13 @@ export default function PageAnalytics() {
   const pathname = usePathname();
 
   useEffect(() => {
-    mixpanel.track('Page Viewed', { path: pathname });
+    try {
+      if (mixpanel && process.env.NEXT_PUBLIC_MIXPANEL) {
+        mixpanel.track('Page Viewed', { path: pathname });
+      }
+    } catch (error) {
+      console.warn('Analytics tracking failed:', error);
+    }
   }, [pathname]);
 
   return null;

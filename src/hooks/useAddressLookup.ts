@@ -1,6 +1,7 @@
 // src/hooks/useAddressLookup.ts
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { getNominatimSuggestions } from '@services/nominatimGeoCode';
+import { getAvailableAddresses } from '@services/parcelEstimationService';
 
 export const useAddressLookup = () => {
   const [query, setQuery] = useState<string>('');
@@ -24,10 +25,53 @@ export const useAddressLookup = () => {
       setIsFetching(true);
       setError(null);
       try {
+        // Try external API first
         const results = await getNominatimSuggestions(value);
-        setSuggestions(results || []);
+        if (results && results.length > 0) {
+          setSuggestions(results);
+        } else {
+          // Fall back to mock data
+          const mockAddresses = getAvailableAddresses();
+          const filteredMock = mockAddresses
+            .filter(address => 
+              address.toLowerCase().includes(value.toLowerCase())
+            )
+            .slice(0, 5)
+            .map(address => ({
+              displayName: address,
+              label: address,
+              value: address,
+              latitude: 38.6272,
+              longitude: -90.1978
+            }));
+          setSuggestions(filteredMock);
+        }
       } catch {
-        setSuggestions([]);
+        // Fall back to mock data on error
+        const mockAddresses = getAvailableAddresses();
+        const filteredMock = mockAddresses
+          .filter(address => 
+            address.toLowerCase().includes(value.toLowerCase())
+          )
+          .slice(0, 5)
+          .map(address => ({
+            displayName: address,
+            label: address,
+            value: address,
+            latitude: 38.6272,
+            longitude: -90.1978
+          }));
+        setSuggestions(filteredMock);
+        if (filteredMock.length === 0) {
+          setError('No addresses found. Try one of our sample addresses.');
+        }
+      } finally {
+        setIsFetching(false);
+        setHasFetched(true);
+      }
+    },
+    [locked]
+  );
         setError('Failed to fetch suggestions. Please try again.');
       } finally {
         setIsFetching(false);
