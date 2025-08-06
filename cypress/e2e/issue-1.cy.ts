@@ -1,153 +1,90 @@
-/// <reference types="cypress" />
-export {};
-
-declare global {
-  interface Window {
-    logEvent: {
-      (event: { eventName: string; data: Record<string, unknown> }): void;
-      (eventName: string, data: Record<string, unknown>): void;
-    };
-  }
-}
-
-describe('Enter Address & Receive Instant Estimate', () => {
+describe('Capture Address Inquiries and Log Shopper Behavior', () => {
   beforeEach(() => {
-    cy.intercept(
-      'GET',
-      'https://nominatim.openstreetmap.org/search?*',
-      (req) => {
-        req.reply({
-          statusCode: 200,
-          body: [
-            {
-              lat: '33.123',
-              lon: '-111.123',
-              display_name:
-                '2323, East Highland Avenue, Biltmore, Phoenix, Maricopa County, Arizona, 85016, United States',
-              address: {
-                house_number: '2323',
-                road: 'East Highland Avenue',
-                neighborhood: 'Biltmore',
-                city: 'Phoenix',
-                county: 'Maricopa County',
-                state: 'Arizona',
-                postcode: '85016',
-                country: 'United States'
-              }
-            }
-          ]
-        });
-      }
-    ).as('getNominatimSuggestions');
+    cy.visit('/');
 
-    cy.visit('/', {
-      onBeforeLoad(win) {
-        win.logEvent = () => {};
-      }
-    }).then((win) => {
-      cy.stub(win, 'logEvent').as('logEventSpy');
+    cy.window({ timeout: 15000 }).should(
+      'have.property',
+      'addressIndexBothRegionsReady',
+      true
+    );
+  });
+
+  /**
+   * Scenario: User enters an address and receives suggested matches
+   * GIVEN the user is on the landing page
+   * WHEN they start typing their address
+   * THEN address suggestions are displayed from a local, static dataset
+   */
+  it('Shopper enters a St. Louis City address and receives suggested matches', () => {
+    cy.get('input[placeholder="Enter address"]').clear().type('621 Market St');
+
+    cy.get('ul[role="listbox"]', { timeout: 10000 }).should('be.visible');
+
+    cy.get('li[role="option"]').first().click();
+
+    cy.wait('@globalLogApi').then((interception) => {
+      expect(interception.request.body.eventName).to.equal('address_selected');
+      expect(interception.request.body.data.query).to.equal('621 Market St');
+      expect(interception.request.body.data.address_id).to.be.a('string');
+      expect(interception.request.body.data.position_in_results).to.equal(0);
     });
   });
 
-  it('fetches address suggestions as user types', () => {
-    cy.get('input[placeholder="Enter address"]')
-      .clear()
-      .type('2323 E Highland Ave');
-    cy.wait('@getNominatimSuggestions');
-    cy.get('ul', { timeout: 5000 }).should(
-      'contain.text',
-      '2323, East Highland Avenue, Biltmore, Phoenix, Maricopa County, Arizona, 85016, United States'
-    );
-  });
+  /**
+   * Scenario: User selects an address and requests an estimate
+   * GIVEN the user has selected a suggestion
+   * WHEN they click "Get Instant Estimate"
+   * THEN the system logs an "estimate_button_clicked" event with address_id
+   */
+  it('Shopper clears their selected suggestion', () => {
+    cy.get('input[placeholder="Enter address"]').clear().type('701 Market St');
 
-  it('handles API failures gracefully', () => {
-    cy.intercept('GET', 'https://nominatim.openstreetmap.org/search?*', {
-      statusCode: 500
-    }).as('getNominatimSuggestionsFail');
+    cy.get('ul[role="listbox"]').should('be.visible');
+    cy.get('li[role="option"]').first().click();
+    cy.wait('@globalLogApi');
 
-    cy.get('input[placeholder="Enter address"]')
-      .clear()
-      .type('2323 E Highland Ave');
-    cy.wait('@getNominatimSuggestionsFail');
-    cy.get('ul').should('not.exist');
-    cy.get('[role="alert"]').should(
-      'contain.text',
-      'Error fetching suggestions'
-    );
-  });
-
-  it('clears suggestions when input is empty', () => {
-    cy.get('input[placeholder="Enter address"]')
-      .clear()
-      .type('2323 E Highland Ave');
-    cy.wait('@getNominatimSuggestions');
-    cy.get('ul', { timeout: 5000 }).should(
-      'contain.text',
-      '2323, East Highland Avenue, Biltmore, Phoenix, Maricopa County, Arizona, 85016, United States'
-    );
-    cy.get('input[placeholder="Enter address"]').clear();
-    cy.wait(600);
-    cy.get('ul').should('not.exist');
-  });
-
-  it('selects a suggestion and logs the suggestion event', () => {
-    cy.get('input[placeholder="Enter address"]')
-      .clear()
-      .type('2323 E Highland Ave');
-    cy.wait('@getNominatimSuggestions');
-    cy.contains(
-      'ul li',
-      '2323, East Highland Avenue, Biltmore, Phoenix, Maricopa County, Arizona, 85016, United States'
-    )
-      .should('be.visible')
-      .click();
-    cy.get('input[placeholder="Enter address"]').should(
-      'have.value',
-      '2323, East Highland Avenue, Biltmore, Phoenix, Maricopa County, Arizona, 85016, United States'
-    );
-    cy.get('@logEventSpy').should('have.been.calledWith', {
-      eventName: 'Address Matched',
-      data: {
-        latitude: '33.123',
-        longitude: '-111.123',
-        displayName:
-          '2323, East Highland Avenue, Biltmore, Phoenix, Maricopa County, Arizona, 85016, United States',
-        label:
-          '2323, East Highland Avenue, Biltmore, Phoenix, Maricopa County, Arizona, 85016, United States',
-        value: '33.123,-111.123',
-        confirmedIntent: false
-      }
-    });
-  });
-
-  it('logs the intent to buy when "Get Instant Estimate" is clicked', () => {
-    cy.get('input[placeholder="Enter address"]')
-      .clear()
-      .type('2323 E Highland Ave');
-    cy.wait('@getNominatimSuggestions');
-    cy.contains(
-      'ul li',
-      '2323, East Highland Avenue, Biltmore, Phoenix, Maricopa County, Arizona, 85016, United States'
-    )
-      .should('be.visible')
-      .click();
-    cy.get('@logEventSpy').invoke('resetHistory');
     cy.get('button')
       .contains(/get instant estimate/i)
       .should('be.visible')
       .click();
-    cy.get('@logEventSpy').should('have.been.calledWith', {
-      eventName: 'Request Estimate',
-      data: {
-        latitude: '33.123',
-        longitude: '-111.123',
-        displayName:
-          '2323, East Highland Avenue, Biltmore, Phoenix, Maricopa County, Arizona, 85016, United States',
-        label:
-          '2323, East Highland Avenue, Biltmore, Phoenix, Maricopa County, Arizona, 85016, United States',
-        value: '33.123,-111.123',
-        confirmedIntent: true
-      }
+
+    cy.wait('@globalLogApi').then((interception) => {
+      expect(interception.request.body.eventName).to.equal(
+        'estimate_button_clicked'
+      );
+      expect(interception.request.body.data.address_id).to.be.a('string');
+    });
+  });
+
+  /**
+   * Scenario: User enters a different address and receives estimate
+   * GIVEN a user enters a St. Louis County address
+   * WHEN they select a suggestion and click for an estimate
+   * THEN both address_selected and estimate_button_clicked events are logged
+   * THEN enhanced BI data for lead follow-up is logged
+   */
+  it('Shopper enters a St. Louis County address and receives suggested matches', () => {
+    cy.get('input[placeholder="Enter address"]').clear().type('1195 Dunn Rd');
+
+    cy.get('ul[role="listbox"]', { timeout: 10000 }).should('be.visible');
+
+    cy.get('li[role="option"]').first().click();
+
+    cy.wait('@globalLogApi').then((interception) => {
+      expect(interception.request.body.eventName).to.equal('address_selected');
+      expect(interception.request.body.data.address_id).to.be.a('string');
+    });
+
+    cy.get('button')
+      .contains(/get instant estimate/i)
+      .should('be.visible')
+      .click();
+
+    cy.wait('@globalLogApi').then((interception) => {
+      expect(interception.request.body.eventName).to.equal(
+        'estimate_button_clicked'
+      );
+      expect(interception.request.body.data.address_id).to.be.a('string');
     });
   });
 });

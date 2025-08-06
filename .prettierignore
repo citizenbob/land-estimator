@@ -1,0 +1,30 @@
+# Dependencies
+node_modules/
+.next/
+out/
+dist/
+build/
+coverage/
+
+# Data files
+src/data/
+**/saint_louis_city/
+**/saint_louis_county/
+**/*.csv
+**/*.geojson
+**/*.json
+**/*.py
+**/__pycache__/
+
+# Generated files
+storybook-static/
+cypress/screenshots/
+cypress/videos/
+
+# Third-party libraries
+public/flexsearch.bundle.js
+**/flexsearch.bundle.js
+
+# Logs
+logs/
+*.log

@@ -25,10 +25,7 @@
 # misc
 .DS_Store
 *.pem
-<<<<<<< HEAD
 logs/
-=======
->>>>>>> 1c5df74 (Initial commit from Create Next App)
 
 # debug
 npm-debug.log*
@@ -63,4 +60,86 @@ next-env.d.ts
 .vscode/
 .idea/
 
+# Python virtual environments
+venv/
+.venv/
+env/
+.env/
+
 *storybook.log*
+
+# Large data files - track compressed versions only
+# Generated uncompressed files - exclude (we only need .gz versions)
+/public/parcel-metadata.json
+/public/address-index.json
+/public/address-index.backup.json
+/public/parcel-metadata.backup.json
+
+# FlexSearch indexes - only track compressed versions
+**/flexsearch-index.json
+**/store/flexsearch/*.json
+!**/store/flexsearch/*.json.gz
+
+# Symlinked data directory: ignore its contents, allow the symlink
+/src/data/*
+!/src/data
+# (actual data files live in ../land-estimator-data LFS repo)
+
+## (Large data files are symlinked into /data; no deeper ignores required)
+# Experiment data files (large datasets, generated files)
+src/exp/**/store/
+src/exp/**/store/**
+src/exp/**/*-entries.json
+src/exp/**/address-entries.json
+
+# Python cache and temporary files
+__pycache__/
+*/__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.so
+
+# Ingest pipeline temporary files
+src/config/scripts/temp/
+src/config/scripts/raw/
+src/config/scripts/*.json
+src/config/scripts/*.gz
+src/config/scripts/*.csv
+src/config/scripts/*.shp
+src/config/scripts/*.shx
+src/config/scripts/*.dbf
+src/config/scripts/*.prj
+src/config/scripts/*.cpg
+
+# Shapefile data (all formats)
+*.shp
+*.shx
+*.dbf
+*.prj
+*.cpg
+*.xml
+*.fbn
+*.fbx
+*.ain
+*.aih
+*.ixs
+*.mxs
+*.atx
+*.shp.xml
+
+# Compressed data archives  
+*.tar.gz
+*.tar.gz.enc
+shapefiles.tar.gz*
+
+# Data processing outputs
+*-processed.json
+*-metadata-*.json
+parcel-geometry*.json
+backup-manifest*.json
+
+# Emergency backup files
+/public/*-backup.json
+/public/emergency-backup/

@@ -1,142 +1,203 @@
 'use client';
 
-import React, { useRef } from 'react';
+import React, { useRef, createRef, useEffect, useState } from 'react';
 import { useAddressLookup } from '@hooks/useAddressLookup';
-// Define the Suggestion type locally if it's not exported from the module
-type Suggestion = {
-  displayName: string;
-  label?: string;
-  [key: string]: unknown;
-};
+import { useEventLogger } from '@hooks/useEventLogger';
+import { useSuggestionNavigation } from '@hooks/useSuggestionNavigation';
+import { useInputState } from '@hooks/useInputState';
+import InputField from '@components/InputField/InputField';
+import IconButton from '@components/IconButton/IconButton';
+import Button from '@components/Button/Button';
+import SuggestionsList from '@components/SuggestionsList/SuggestionsList';
+import Alert from '@components/Alert/Alert';
+import { Form } from '@components/AddressInput/AddressInput.styles';
 import {
-  Form,
-  Input,
-  IconButton,
-  Button,
-  SuggestionsList,
-  SuggestionItem
-} from './AddressInput.styles';
-import { logEvent as importedLogEvent } from '@services/logger';
-
-if (typeof window !== 'undefined') {
-  window.logEvent = (
-    eventOrEventName:
-      | { eventName: string; data: Record<string, unknown> }
-      | string,
-    data?: Record<string, unknown>
-  ) => {
-    if (typeof eventOrEventName === 'string' && data) {
-      importedLogEvent({ eventName: eventOrEventName, data });
-    } else if (typeof eventOrEventName === 'object') {
-      importedLogEvent(eventOrEventName);
-    }
-  };
-}
-
-// Local logEvent helper that calls window.logEvent with a single object.
-const logEvent = (event: {
-  eventName: string;
-  data: Record<string, unknown>;
-}) => {
-  window.logEvent({ eventName: event.eventName, data: event.data });
-};
-
-const getSuggestionElements = (): HTMLElement[] =>
-  Array.from(document.querySelectorAll('[data-display]')) as HTMLElement[];
-
-const handleSuggestionKeyDown = (
-  e: React.KeyboardEvent<HTMLLIElement>,
-  index: number,
-  onSelect: (address: string) => void
-) => {
-  e.preventDefault();
-  const items = getSuggestionElements();
-  if (e.key === 'ArrowDown') {
-    const next = (index + 1) % items.length;
-    items[next].focus();
-  } else if (e.key === 'ArrowUp') {
-    const prev = (index - 1 + items.length) % items.length;
-    items[prev].focus();
-  } else if (e.key === 'Enter') {
-    onSelect(items[index].getAttribute('data-display') || '');
-  } else if (e.key === 'Tab') {
-    const input = document.querySelector(
-      'input[placeholder="Enter address"]'
-    ) as HTMLElement;
-    input?.focus();
-  }
-};
-
-const handleInputKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-  if (e.key === 'ArrowDown') {
-    e.preventDefault();
-    const items = getSuggestionElements();
-    if (items.length > 0) {
-      items[0].focus();
-    }
-    e.stopPropagation();
-  }
-};
+  AddressSuggestion,
+  EnrichedAddressSuggestion
+} from '@app-types/localAddressTypes';
+import {
+  AddressSelectedEvent,
+  EstimateButtonClickedEvent,
+  EventMap,
+  LogOptions
+} from '@app-types/analytics';
+import { motion } from 'framer-motion';
 
 interface AddressInputProps {
-  mockLookup?: Partial<ReturnType<typeof useAddressLookup>>;
+  onAddressSelect?: (payload: EnrichedAddressSuggestion) => void;
+  mockLookup?: Partial<ReturnType<typeof useAddressLookup>> & {
+    logEvent?: <T extends keyof EventMap>(
+      eventName: T,
+      data: EventMap[T],
+      options?: LogOptions
+    ) => void;
+    selectedSuggestion?: AddressSuggestion;
+  };
+  logEvent?: <T extends keyof EventMap>(
+    eventName: T,
+    data: EventMap[T],
+    options?: LogOptions
+  ) => void;
 }
 
-const AddressInput = ({ mockLookup }: AddressInputProps) => {
+const AddressInput = ({
+  mockLookup,
+  logEvent: logEventProp,
+  onAddressSelect
+}: AddressInputProps) => {
   const defaultLookup = useAddressLookup();
   const {
     query,
     suggestions,
     handleChange,
     handleSelect,
+    handleClear,
     isFetching,
     locked,
-    hasFetched
+    hasFetched,
+    getSuggestionData,
+    selectedSuggestion: mockSelectedSuggestion
   } = { ...defaultLookup, ...mockLookup };
 
-  const inputRef = useRef<HTMLInputElement>(null);
-  const selectedSuggestion = useRef<Suggestion | null>(null);
+  const { logEvent: logEventHook } = useEventLogger();
+  const logEvent = logEventProp || logEventHook;
 
-  const onSelect = (address: string) => {
-    handleSelect(address);
-    const matchedSuggestion = suggestions.find(
-      (s) => s.displayName === address
+  const inputRef = useRef<HTMLInputElement | null>(null);
+  const suggestionRefs = useRef<React.RefObject<HTMLLIElement>[]>([]);
+
+  const selectedSuggestion = useRef<AddressSuggestion | null>(
+    mockSelectedSuggestion || null
+  );
+
+  // Loading state for the estimate button
+  const [isEstimateLoading, setIsEstimateLoading] = useState(false);
+
+  const {
+    showLoading,
+    showErrorAlert,
+    showSuggestions,
+    showClearButton,
+    showEstimateButton,
+    uniqueSuggestions
+  } = useInputState(query, suggestions, isFetching, hasFetched, locked);
+
+  const logAddressEvent = (
+    suggestion: AddressSuggestion,
+    eventType: 'address_selected' | 'estimate_button_clicked'
+  ) => {
+    if (logEvent && suggestion) {
+      if (eventType === 'address_selected') {
+        const addressSelectedEvent: AddressSelectedEvent = {
+          query: query,
+          address_id: suggestion.place_id.toString(),
+          position_in_results: suggestions.findIndex(
+            (s) => s.place_id === suggestion.place_id
+          )
+        };
+        logEvent('address_selected', addressSelectedEvent);
+      } else if (eventType === 'estimate_button_clicked') {
+        const estimateEvent: EstimateButtonClickedEvent = {
+          address_id: suggestion.place_id.toString()
+        };
+        logEvent('estimate_button_clicked', estimateEvent);
+      }
+    }
+  };
+
+  const onSelect = (suggestion: AddressSuggestion) => {
+    handleSelect(suggestion.display_name);
+    selectedSuggestion.current = suggestion;
+    logAddressEvent(suggestion, 'address_selected');
+  };
+
+  const onEstimateClick = async () => {
+    let matched = selectedSuggestion.current;
+    if (!matched && suggestions.length > 0) {
+      matched =
+        suggestions.find((s) => s.display_name === query) || suggestions[0];
+      selectedSuggestion.current = matched;
+    }
+
+    if (!matched) {
+      return;
+    }
+
+    logAddressEvent(matched, 'estimate_button_clicked');
+
+    setIsEstimateLoading(true);
+
+    try {
+      const response = await fetch(`/api/parcel-metadata/${matched.place_id}`);
+
+      if (!response.ok) {
+        throw new Error(`Failed to fetch parcel data: ${response.status}`);
+      }
+
+      const rawData = await response.json();
+
+      if (rawData && rawData.data && onAddressSelect) {
+        const parcelData = rawData.data;
+        const enrichedData: EnrichedAddressSuggestion = {
+          place_id: matched.place_id,
+          display_name: matched.display_name,
+          latitude: parcelData.latitude,
+          longitude: parcelData.longitude,
+          region: parcelData.region || 'Unknown',
+          calc: {
+            landarea: parcelData.calc?.landarea || 0,
+            building_sqft: parcelData.calc?.building_sqft || 0,
+            estimated_landscapable_area:
+              parcelData.calc?.estimated_landscapable_area || 0,
+            property_type: parcelData.calc?.property_type || 'residential'
+          },
+          affluence_score: parcelData.affluence_score
+        };
+        onAddressSelect(enrichedData);
+      }
+    } catch (error) {
+      console.error('Error fetching parcel metadata:', error);
+      const rawData = await getSuggestionData(matched.place_id);
+      if (rawData && onAddressSelect) {
+        const enrichedData: EnrichedAddressSuggestion = {
+          place_id: matched.place_id,
+          display_name: matched.display_name,
+          latitude: rawData.latitude,
+          longitude: rawData.longitude,
+          region: rawData.region || 'Unknown',
+          calc: {
+            landarea: rawData.calc?.landarea || 0,
+            building_sqft: rawData.calc?.building_sqft || 0,
+            estimated_landscapable_area:
+              rawData.calc?.estimated_landscapable_area || 0,
+            property_type: rawData.calc?.property_type || 'residential'
+          },
+          affluence_score: rawData.affluence_score
+        };
+        onAddressSelect(enrichedData);
+      }
+    } finally {
+      setIsEstimateLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    suggestionRefs.current = uniqueSuggestions.map(
+      (_, i) => suggestionRefs.current[i] ?? createRef<HTMLLIElement>()
     );
-    selectedSuggestion.current = matchedSuggestion || null;
-    logEvent({
-      eventName: 'Address Matched',
-      data: {
-        ...matchedSuggestion,
-        confirmedIntent: false
-      }
-    });
+  }, [uniqueSuggestions]);
+
+  const { handleInputKeyDown, handleSuggestionKeyDown } =
+    useSuggestionNavigation(inputRef, onSelect, suggestionRefs.current);
+
+  const handleSubmit = (e: React.FormEvent) => {
+    // Prevent form submission and page refresh
+    e.preventDefault();
   };
-
-  const onEstimateClick = () => {
-    const matched = selectedSuggestion.current;
-    if (!matched) return;
-    logEvent({
-      eventName: 'Request Estimate',
-      data: {
-        ...matched,
-        confirmedIntent: true
-      }
-    });
-  };
-
-  const uniqueSuggestions = [
-    ...new Map(suggestions.map((s) => [s.displayName, s])).values()
-  ];
-
-  const showSuggestions =
-    query.trim() !== '' &&
-    uniqueSuggestions.length > 0 &&
-    !uniqueSuggestions.some((s) => s.displayName === query);
 
   return (
-    <Form>
+    <Form onSubmit={handleSubmit}>
       <div className="relative input-group">
-        <Input
+        <InputField
           ref={inputRef}
           type="text"
           placeholder="Enter address"
@@ -144,40 +205,51 @@ const AddressInput = ({ mockLookup }: AddressInputProps) => {
           onChange={(e) => handleChange(e.target.value)}
           onKeyDown={handleInputKeyDown}
         />
-        {locked && (
+        {showLoading && (
+          <motion.div
+            className="absolute right-3 top-1/2 transform -translate-y-1/2 w-5 h-5 border-2 border-blue-500 border-t-transparent rounded-full"
+            animate={{ rotate: 360 }}
+            transition={{ repeat: Infinity, ease: 'linear', duration: 0.8 }}
+          />
+        )}
+        {showClearButton && (
           <IconButton
+            type="button"
             aria-label="Change Address"
-            onClick={() => handleChange('')}
+            onClick={() => {
+              handleClear();
+              selectedSuggestion.current = null;
+            }}
           >
             ×
           </IconButton>
         )}
       </div>
-      {isFetching && <div role="status">Fetching suggestions</div>}
-      {!isFetching &&
-        hasFetched &&
-        !locked &&
-        query.trim() !== '' &&
-        suggestions.length === 0 && (
-          <div role="alert">Error fetching suggestions</div>
-        )}
-      {showSuggestions && (
-        <SuggestionsList>
-          {uniqueSuggestions.map((s, index) => (
-            <SuggestionItem
-              key={`${s.displayName}-${index}`}
-              data-display={s.displayName}
-              tabIndex={0}
-              onClick={() => onSelect(s.displayName)}
-              onKeyDown={(e) => handleSuggestionKeyDown(e, index, onSelect)}
-            >
-              {s.label || s.displayName || 'Unknown Location'}
-            </SuggestionItem>
-          ))}
-        </SuggestionsList>
+      {showErrorAlert && (
+        <Alert role="alert" type="error">
+          Error fetching suggestions
+        </Alert>
       )}
-      {locked && (
-        <Button onClick={onEstimateClick}>Get Instant Estimate</Button>
+      {showSuggestions && (
+        <SuggestionsList
+          suggestions={uniqueSuggestions}
+          onSelect={onSelect}
+          suggestionRefs={suggestionRefs.current}
+          onSuggestionKeyDown={handleSuggestionKeyDown}
+        />
+      )}
+      {showEstimateButton && (
+        <div className="flex justify-start">
+          <Button
+            type="button"
+            onClick={onEstimateClick}
+            loading={isEstimateLoading}
+            disabled={isEstimateLoading}
+            aria-label="Get Instant Estimate"
+          >
+            {isEstimateLoading ? 'Calculating...' : 'Get Instant Estimate'}
+          </Button>
+        </div>
       )}
     </Form>
   );

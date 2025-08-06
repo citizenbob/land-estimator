@@ -1,0 +1,19 @@
+{
+  "id": "NULL_AREA",
+  "full_address": "789 Missing Area St., St. Louis, MO 63101",
+  "latitude": 38.627,
+  "longitude": -90.1994,
+  "region": "St. Louis City",
+  "calc": {
+    "landarea": 0,
+    "building_sqft": 1200,
+    "estimated_landscapable_area": null,
+    "property_type": "residential"
+  },
+  "owner": {
+    "name": "Test Owner"
+  },
+  "affluence_score": 50,
+  "source_file": "test",
+  "processed_date": "2023-01-01"
+}

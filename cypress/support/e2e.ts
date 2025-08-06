@@ -1,17 +1,11 @@
-// ***********************************************************
-// This example support/e2e.ts is processed and
-// loaded automatically before your test files.
-//
-// This is a great place to put global configuration and
-// behavior that modifies Cypress.
-//
-// You can change the location of this file or turn off
-// automatically serving support files with the
-// 'supportFile' configuration option.
-//
-// You can read more here:
-// https://on.cypress.io/configuration
-// ***********************************************************
-
-// Import commands.js using ES2015 syntax:
 import './commands';
+
+// Allow real API calls for E2E tests to work with actual data
+// Only intercept logging API calls to prevent noise
+
+beforeEach(() => {
+  cy.intercept('POST', '**/api/log**', {
+    statusCode: 201,
+    body: { success: true, message: 'Log event stored', id: 'mock-doc-id' }
+  }).as('globalLogApi');
+});

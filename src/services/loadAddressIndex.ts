@@ -1,0 +1,633 @@
+import { Index } from 'flexsearch';
+import type { FlexSearchIndexBundle } from 'flexsearch';
+import type {
+  GeographicBounds,
+  GeoShardConfig,
+  GeoGrid
+} from '@app-types/geographic';
+import { devLog, logError } from '@lib/logger';
+import { FLEXSEARCH_CONFIG } from '@config/flexsearch';
+import { createNetworkError } from '@lib/errorUtils';
+
+export interface ShardManifest {
+  regions: Array<{
+    region: string;
+    version: string;
+    document_file: string;
+    grids: GeoGrid[];
+    lookup_file: string;
+  }>;
+  metadata: {
+    generated_at: string;
+    version: string;
+    total_regions: number;
+    source: string;
+  };
+}
+
+class ClientOnlyAddressIndexLoader {
+  private static instance: ClientOnlyAddressIndexLoader | null = null;
+  private bundle: FlexSearchIndexBundle | null = null;
+  private loadingPromise: Promise<FlexSearchIndexBundle> | null = null;
+
+  private constructor() {
+    if (typeof window !== 'undefined') {
+      devLog('🌐 Client-only address index loader initialized');
+    }
+  }
+
+  static getInstance(): ClientOnlyAddressIndexLoader {
+    if (!ClientOnlyAddressIndexLoader.instance) {
+      ClientOnlyAddressIndexLoader.instance =
+        new ClientOnlyAddressIndexLoader();
+    }
+    return ClientOnlyAddressIndexLoader.instance;
+  }
+
+  async loadAddressIndex(): Promise<FlexSearchIndexBundle> {
+    if (this.bundle) {
+      devLog('⚡ Using cached static address index');
+      return this.bundle;
+    }
+    if (this.loadingPromise) {
+      devLog('⏳ Waiting for static index load...');
+      return this.loadingPromise;
+    }
+
+    devLog('🚀 Loading static FlexSearch index...');
+    this.loadingPromise = this._loadStaticIndex();
+
+    try {
+      this.bundle = await this.loadingPromise;
+      devLog('✅ Static FlexSearch index loaded and cached');
+      return this.bundle;
+    } finally {
+      this.loadingPromise = null;
+    }
+  }
+
+  async loadAddressIndexProgressive(): Promise<FlexSearchIndexBundle> {
+    if (this.bundle) {
+      devLog('⚡ Using cached static address index');
+      return this.bundle;
+    }
+    if (this.loadingPromise) {
+      devLog('⏳ Waiting for static index load...');
+      return this.loadingPromise;
+    }
+
+    devLog('🚀 Loading static FlexSearch index (progressive mode)...');
+    this.loadingPromise = this._loadStaticIndexProgressive();
+
+    try {
+      this.bundle = await this.loadingPromise;
+      devLog('✅ Static FlexSearch index loaded with progressive enhancement');
+      return this.bundle;
+    } finally {
+      this.loadingPromise = null;
+    }
+  }
+
+  private async _loadStaticIndex(): Promise<FlexSearchIndexBundle> {
+    try {
+      const manifestResponse = await fetch('/search/latest.json');
+      if (!manifestResponse.ok) {
+        throw createNetworkError(
+          `Manifest not found: ${manifestResponse.status}`,
+          {
+            url: '/search/latest.json',
+            status: manifestResponse.status,
+            statusText: manifestResponse.statusText
+          }
+        );
+      }
+
+      const manifest: ShardManifest = await manifestResponse.json();
+      devLog(
+        `📊 Found manifest v${manifest.metadata.version} with ${manifest.metadata.total_regions} regions`
+      );
+
+      // Load both city and county regions
+      return await this._loadBothRegions(manifest);
+    } catch (error) {
+      logError('❌ Static index loading failed:', error);
+      throw error;
+    }
+  }
+
+  private async _loadStaticIndexProgressive(): Promise<FlexSearchIndexBundle> {
+    try {
+      const manifestResponse = await fetch('/search/latest.json');
+      if (!manifestResponse.ok) {
+        throw createNetworkError(
+          `Manifest not found: ${manifestResponse.status}`,
+          {
+            url: '/search/latest.json',
+            status: manifestResponse.status,
+            statusText: manifestResponse.statusText
+          }
+        );
+      }
+
+      const manifest: ShardManifest = await manifestResponse.json();
+      devLog(
+        `📊 Found manifest v${manifest.metadata.version} with ${manifest.metadata.total_regions} regions`
+      );
+
+      // Load both regions progressively
+      return await this._loadBothRegionsProgressive(manifest);
+    } catch (error) {
+      logError('❌ Progressive static index loading failed:', error);
+      throw error;
+    }
+  }
+
+  private async _loadFromDocumentFile(
+    region: ShardManifest['regions'][0],
+    progressiveLoad = false
+  ): Promise<FlexSearchIndexBundle | null> {
+    try {
+      devLog(`📤 Loading document file for region ${region.region}...`);
+
+      // Load the document file which contains raw address data
+      const response = await fetch(`/search/${region.document_file}`);
+      if (!response.ok) {
+        throw createNetworkError(
+          `Failed to load ${region.document_file}: ${response.status}`,
+          {
+            url: `/search/${region.document_file}`,
+            region: region.region,
+            status: response.status,
+            statusText: response.statusText
+          }
+        );
+      }
+
+      const addresses = await response.json();
+
+      if (progressiveLoad) {
+        return this._buildProgressiveIndex(addresses, region.region);
+      }
+
+      return this._buildFullIndex(addresses, region.region);
+    } catch (error) {
+      devLog(`⚠️ Document loading failed: ${error}`);
+      return null;
+    }
+  }
+
+  private _buildFullIndex(
+    addresses: Array<{ id: string; full_address: string }>,
+    regionName: string
+  ): FlexSearchIndexBundle {
+    // Create new FlexSearch index
+    const searchIndex = new Index(FLEXSEARCH_CONFIG);
+
+    // Process the raw address data
+    const parcelIds: string[] = [];
+    const addressData: Record<string, string> = {};
+
+    addresses.forEach((addr) => {
+      const parcelId = addr.id;
+      const fullAddress = addr.full_address;
+
+      parcelIds.push(parcelId);
+      addressData[parcelId] = fullAddress;
+
+      // Add to FlexSearch index using parcel ID as document ID
+      searchIndex.add(parcelId, fullAddress);
+    });
+
+    devLog(
+      `  ✅ Built FlexSearch index with ${parcelIds.length} addresses for ${regionName}`
+    );
+
+    return {
+      index: searchIndex,
+      parcelIds,
+      addressData
+    };
+  }
+
+  private _buildProgressiveIndex(
+    addresses: Array<{ id: string; full_address: string }>,
+    regionName: string
+  ): FlexSearchIndexBundle {
+    // Sort addresses by popularity/importance (you could add this data)
+    // For now, prioritize numbered streets which are more commonly searched
+    const sortedAddresses = addresses.sort((a, b) => {
+      const aHasNumber = /^\d+/.test(a.full_address);
+      const bHasNumber = /^\d+/.test(b.full_address);
+      if (aHasNumber && !bHasNumber) return -1;
+      if (!aHasNumber && bHasNumber) return 1;
+      return 0;
+    });
+
+    // Start with first 50K addresses for instant search
+    const initialBatch = sortedAddresses.slice(0, 50000);
+    const searchIndex = new Index(FLEXSEARCH_CONFIG);
+    const parcelIds: string[] = [];
+    const addressData: Record<string, string> = {};
+
+    initialBatch.forEach((addr) => {
+      const parcelId = addr.id;
+      const fullAddress = addr.full_address;
+
+      parcelIds.push(parcelId);
+      addressData[parcelId] = fullAddress;
+      searchIndex.add(parcelId, fullAddress);
+    });
+
+    devLog(
+      `  ⚡ Built initial FlexSearch index with ${parcelIds.length} priority addresses for ${regionName}`
+    );
+
+    // Load remaining addresses in background
+    setTimeout(() => {
+      this._loadRemainingAddresses(
+        sortedAddresses.slice(50000),
+        searchIndex,
+        parcelIds,
+        addressData
+      );
+    }, 100);
+
+    return {
+      index: searchIndex,
+      parcelIds,
+      addressData
+    };
+  }
+
+  private _loadRemainingAddresses(
+    remainingAddresses: Array<{ id: string; full_address: string }>,
+    searchIndex: Index,
+    parcelIds: string[],
+    addressData: Record<string, string>
+  ) {
+    const batchSize = 5000;
+    let currentIndex = 0;
+
+    const loadBatch = () => {
+      const batch = remainingAddresses.slice(
+        currentIndex,
+        currentIndex + batchSize
+      );
+
+      batch.forEach((addr) => {
+        const parcelId = addr.id;
+        const fullAddress = addr.full_address;
+
+        parcelIds.push(parcelId);
+        addressData[parcelId] = fullAddress;
+        searchIndex.add(parcelId, fullAddress);
+      });
+
+      currentIndex += batchSize;
+
+      if (currentIndex < remainingAddresses.length) {
+        // Load next batch after a small delay to avoid blocking
+        setTimeout(loadBatch, 10);
+      } else {
+        devLog(
+          `  ✅ Completed loading all ${parcelIds.length} addresses in background`
+        );
+      }
+    };
+
+    loadBatch();
+  }
+
+  private _getRegionShardFromCookie(): string {
+    const match = document.cookie
+      .split('; ')
+      .find((row) => row.startsWith('regionShard='));
+    const region = match?.split('=')[1];
+
+    // Map cookie values (with hyphens) to manifest keys (with underscores)
+    if (region === 'stl-city') return 'stl_city';
+    if (region === 'stl-county') return 'stl_county';
+
+    // Default fallback
+    return 'stl_county';
+  }
+
+  clearCache(): void {
+    this.bundle = null;
+    this.loadingPromise = null;
+    devLog('🗑️ Static address index cache cleared');
+  }
+
+  async loadAddressIndexByLocation(userLocation?: {
+    lat: number;
+    lng: number;
+  }): Promise<FlexSearchIndexBundle> {
+    if (!userLocation) {
+      // Fallback to progressive behavior if no location provided
+      return this.loadAddressIndexProgressive();
+    }
+
+    // Check if we have a cached bundle for this location
+    const gridId = GeographicSharding.getGridIdForLocation(
+      userLocation.lat,
+      userLocation.lng
+    );
+
+    devLog(`🌎 Loading addresses near user location (grid: ${gridId})`);
+
+    // For now, load the full region progressively and filter - in production you'd have pre-built grid files
+    const fullBundle = await this.loadAddressIndexProgressive();
+    return this._filterBundleByLocation(fullBundle, userLocation);
+  }
+
+  private _filterBundleByLocation(
+    bundle: FlexSearchIndexBundle,
+    userLocation: { lat: number; lng: number }
+  ): FlexSearchIndexBundle {
+    const gridIds = GeographicSharding.getNeighboringGrids(
+      GeographicSharding.getGridIdForLocation(
+        userLocation.lat,
+        userLocation.lng
+      )
+    );
+
+    devLog(`🗺️ Filtering addresses for grids: ${gridIds.join(', ')}`);
+
+    // Create new filtered index
+    const filteredIndex = new Index(FLEXSEARCH_CONFIG);
+    const filteredParcelIds: string[] = [];
+    const filteredAddressData: Record<string, string> = {};
+
+    // Filter addresses by proximity (this is a simplified version)
+    // In production, you'd have latitude/longitude data for each address
+    bundle.parcelIds.forEach((parcelId) => {
+      const address = bundle.addressData[parcelId];
+      if (address) {
+        // For now, include all addresses - you'd add lat/lng filtering here
+        filteredParcelIds.push(parcelId);
+        filteredAddressData[parcelId] = address;
+        filteredIndex.add(parcelId, address);
+      }
+    });
+
+    devLog(`🎯 Filtered to ${filteredParcelIds.length} nearby addresses`);
+
+    return {
+      index: filteredIndex,
+      parcelIds: filteredParcelIds,
+      addressData: filteredAddressData
+    };
+  }
+
+  private async _loadBothRegions(
+    manifest: ShardManifest
+  ): Promise<FlexSearchIndexBundle> {
+    const cityRegion = manifest.regions.find((r) => r.region === 'stl_city');
+    const countyRegion = manifest.regions.find(
+      (r) => r.region === 'stl_county'
+    );
+
+    if (!cityRegion || !countyRegion) {
+      throw new Error('Missing city or county region data');
+    }
+
+    devLog('🌎 Loading county first for instant search, city in background');
+
+    // Load county first (bigger dataset, more addresses)
+    const countyBundle = await this._loadFromDocumentFile(countyRegion, false);
+    if (!countyBundle) {
+      throw new Error('Failed to load county region');
+    }
+
+    devLog(
+      `⚡ County loaded (${countyBundle.parcelIds.length} addresses), starting city background load`
+    );
+
+    // Start city loading in background, but return county immediately
+    setTimeout(async () => {
+      try {
+        const cityBundle = await this._loadFromDocumentFile(cityRegion, false);
+        if (cityBundle) {
+          // Merge city data into existing index
+          this._mergeIntoExistingIndex(cityBundle, 'stl_city');
+        }
+      } catch (error) {
+        devLog(`⚠️ Background city loading failed: ${error}`);
+      }
+    }, 100);
+
+    return {
+      ...countyBundle,
+      regions: ['stl_county']
+    };
+  }
+
+  private async _loadBothRegionsProgressive(
+    manifest: ShardManifest
+  ): Promise<FlexSearchIndexBundle> {
+    const cityRegion = manifest.regions.find((r) => r.region === 'stl_city');
+    const countyRegion = manifest.regions.find(
+      (r) => r.region === 'stl_county'
+    );
+
+    if (!cityRegion || !countyRegion) {
+      throw new Error('Missing city or county region data');
+    }
+
+    devLog('🌎 Loading county progressively first, city in background');
+
+    // Load county progressively first
+    const countyBundle = await this._loadFromDocumentFile(countyRegion, true);
+    if (!countyBundle) {
+      throw new Error('Failed to load county region progressively');
+    }
+
+    devLog('⚡ County loaded progressively, starting city background load');
+
+    // Start city loading in background
+    setTimeout(async () => {
+      try {
+        const cityBundle = await this._loadFromDocumentFile(cityRegion, true);
+        if (cityBundle) {
+          this._mergeIntoExistingIndex(cityBundle, 'stl_city');
+          // Set flag when both regions are fully loaded
+          if (typeof window !== 'undefined') {
+            (
+              window as unknown as { addressIndexBothRegionsReady: boolean }
+            ).addressIndexBothRegionsReady = true;
+          }
+        }
+      } catch (error) {
+        devLog(`⚠️ Background city loading failed: ${error}`);
+      }
+    }, 500);
+
+    // Set flag when county is ready (progressive loading first phase complete)
+    if (typeof window !== 'undefined') {
+      (window as unknown as { addressIndexReady: boolean }).addressIndexReady =
+        true;
+    }
+
+    return {
+      ...countyBundle,
+      regions: ['stl_county']
+    };
+  }
+
+  private _mergeIndexes(
+    bundles: FlexSearchIndexBundle[],
+    regions: string[]
+  ): FlexSearchIndexBundle {
+    const mergedIndex = new Index(FLEXSEARCH_CONFIG);
+    const mergedParcelIds: string[] = [];
+    const mergedAddressData: Record<string, string> = {};
+
+    bundles.forEach((bundle, index) => {
+      const regionName = regions[index];
+      bundle.parcelIds.forEach((parcelId) => {
+        mergedParcelIds.push(parcelId);
+        mergedAddressData[parcelId] = bundle.addressData[parcelId];
+        mergedIndex.add(parcelId, bundle.addressData[parcelId]);
+      });
+      devLog(
+        `  ✅ Merged ${bundle.parcelIds.length} addresses from ${regionName}`
+      );
+    });
+
+    devLog(
+      `🔗 Combined index contains ${mergedParcelIds.length} total addresses`
+    );
+
+    return {
+      index: mergedIndex,
+      parcelIds: mergedParcelIds,
+      addressData: mergedAddressData,
+      regions
+    };
+  }
+
+  private _mergeIntoExistingIndex(
+    cityBundle: FlexSearchIndexBundle,
+    regionName: string
+  ): void {
+    if (!this.bundle) {
+      devLog('⚠️ No existing bundle to merge into');
+      return;
+    }
+
+    // Add city addresses to existing county index
+    cityBundle.parcelIds.forEach((parcelId) => {
+      this.bundle!.parcelIds.push(parcelId);
+      this.bundle!.addressData[parcelId] = cityBundle.addressData[parcelId];
+      this.bundle!.index.add(parcelId, cityBundle.addressData[parcelId]);
+    });
+
+    // Update regions array
+    if (this.bundle.regions) {
+      this.bundle.regions.push(regionName);
+    } else {
+      this.bundle.regions = ['stl_county', regionName];
+    }
+
+    devLog(
+      `🔗 Merged ${cityBundle.parcelIds.length} addresses from ${regionName} into existing index`
+    );
+    devLog(`📊 Total addresses now: ${this.bundle.parcelIds.length}`);
+  }
+}
+
+export async function loadAddressIndex(): Promise<FlexSearchIndexBundle> {
+  const loader = ClientOnlyAddressIndexLoader.getInstance();
+  return loader.loadAddressIndex();
+}
+
+export async function loadAddressIndexProgressive(): Promise<FlexSearchIndexBundle> {
+  const loader = ClientOnlyAddressIndexLoader.getInstance();
+  return loader.loadAddressIndexProgressive();
+}
+
+export async function loadAddressIndexByLocation(userLocation?: {
+  lat: number;
+  lng: number;
+}): Promise<FlexSearchIndexBundle> {
+  const loader = ClientOnlyAddressIndexLoader.getInstance();
+  return loader.loadAddressIndexByLocation(userLocation);
+}
+
+export async function loadAddressIndexWithGeolocation(): Promise<FlexSearchIndexBundle> {
+  const userLocation = await GeographicSharding.getUserLocation();
+  return loadAddressIndexByLocation(userLocation || undefined);
+}
+
+export function clearAddressIndexCache(): void {
+  const loader = ClientOnlyAddressIndexLoader.getInstance();
+  loader.clearCache();
+}
+
+// Geographic utilities
+class GeographicSharding {
+  private static readonly GEO_CONFIG: GeoShardConfig = {
+    bounds: {
+      north: 38.8,
+      south: 38.4,
+      east: -90.0,
+      west: -90.6
+    },
+    // Approximately 3.5 miles per grid cell
+    gridSize: 0.05,
+    // Overlap between grids for boundary addresses
+    overlap: 0.01
+  };
+
+  static getGridIdForLocation(lat: number, lng: number): string {
+    const config = this.GEO_CONFIG;
+    const gridLat = Math.floor((lat - config.bounds.south) / config.gridSize);
+    const gridLng = Math.floor((lng - config.bounds.west) / config.gridSize);
+    return `grid_${gridLat}_${gridLng}`;
+  }
+
+  static getGridBounds(gridId: string): GeographicBounds {
+    const [, latIndex, lngIndex] = gridId.split('_').map(Number);
+    const config = this.GEO_CONFIG;
+
+    return {
+      south: config.bounds.south + latIndex * config.gridSize - config.overlap,
+      north:
+        config.bounds.south + (latIndex + 1) * config.gridSize + config.overlap,
+      west: config.bounds.west + lngIndex * config.gridSize - config.overlap,
+      east:
+        config.bounds.west + (lngIndex + 1) * config.gridSize + config.overlap
+    };
+  }
+
+  static getNeighboringGrids(centerGridId: string): string[] {
+    const [, latIndex, lngIndex] = centerGridId.split('_').map(Number);
+    const grids: string[] = [];
+
+    // Include center grid and 8 surrounding grids
+    for (let latOffset = -1; latOffset <= 1; latOffset++) {
+      for (let lngOffset = -1; lngOffset <= 1; lngOffset++) {
+        grids.push(`grid_${latIndex + latOffset}_${lngIndex + lngOffset}`);
+      }
+    }
+
+    return grids;
+  }
+
+  static async getUserLocation(): Promise<{ lat: number; lng: number } | null> {
+    if (!navigator.geolocation) return null;
+
+    return new Promise((resolve) => {
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          resolve({
+            lat: position.coords.latitude,
+            lng: position.coords.longitude
+          });
+        },
+        () => resolve(null),
+        { timeout: 5000, enableHighAccuracy: false }
+      );
+    });
+  }
+}

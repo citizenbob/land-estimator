@@ -1,9 +1,8 @@
-// src/components/PageAnalytics.tsx
 'use client';
 
 import { useEffect } from 'react';
 import { usePathname } from 'next/navigation';
-import mixpanel from '@services/mixpanelClient';
+import mixpanel from '@config/mixpanelClient';
 
 export default function PageAnalytics() {
   const pathname = usePathname();

@@ -1,0 +1,12 @@
+{
+  "query": "123 Test",
+  "results": [
+    {
+      "id": "RES_BASELINE",
+      "display_name": "123 Test St., St. Louis, MO 63101",
+      "region": "St. Louis City",
+      "normalized": "123 test st st louis mo 63101"
+    }
+  ],
+  "count": 1
+}

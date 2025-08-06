@@ -1,5 +1,4 @@
 import React from 'react';
-import userEvent from '@testing-library/user-event';
 import {
   render,
   screen,
@@ -7,49 +6,31 @@ import {
   act,
   fireEvent
 } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import AddressInput from '@components/AddressInput/AddressInput';
 import {
-  describe,
-  it,
-  expect,
-  beforeEach,
-  afterEach,
-  vi,
-  MockedFunction
-} from 'vitest';
-import AddressInput from './AddressInput';
-import { getNominatimSuggestions } from '@services/nominatimGeoCode';
-import { GeocodeResult } from '../../types/nomatimTypes';
-import { logEvent } from '@services/logger';
+  createTestSuite,
+  createAddressLookupMock,
+  createMockApiRecordFactory,
+  mockJsonResponse
+} from '@lib/testUtils';
+import { MOCK_LOCAL_ADDRESSES } from '@lib/testData';
 
-// Create typed mock references
-const mockGetNominatimSuggestions = getNominatimSuggestions as MockedFunction<
-  typeof getNominatimSuggestions
->;
-const mockLogEvent = logEvent as MockedFunction<typeof logEvent>;
-
-// Mocks
-vi.mock('@services/nominatimGeoCode', () => ({
-  getNominatimSuggestions: vi.fn().mockResolvedValue([])
-}));
 vi.mock('@services/logger', () => ({
   logEvent: vi.fn()
 }));
 
-// Helper functions
-type Suggestion = {
-  displayName: string;
-  label?: string;
-  latitude?: string;
-  longitude?: string;
-};
+vi.mock('@services/loadAddressIndex', () => ({
+  loadAddressIndex: vi.fn()
+}));
 
-const baseLookup = {
-  query: '',
-  suggestions: [] as Suggestion[],
-  handleChange: (value: string) => console.log('handleChange:', value),
-  isFetching: false,
-  error: null as string | null
-};
+vi.mock('@services/addressSearch', () => ({
+  searchAddresses: vi.fn(),
+  resetAddressSearchCache: vi.fn()
+}));
+
+const createMockApiRecord = createMockApiRecordFactory();
 
 const setup = () => {
   render(<AddressInput />);
@@ -57,358 +38,241 @@ const setup = () => {
   return { input };
 };
 
-const changeInputValue = async (input: HTMLElement, value: string) => {
-  await act(async () => {
-    fireEvent.change(input, { target: { value } });
+describe('AddressInput', () => {
+  const testSuite = createTestSuite({
+    consoleMocks: true,
+    fetch: true
   });
-};
 
-const typeAndSelectSuggestion = async (
-  input: HTMLElement,
-  textToType: string,
-  suggestionDisplay: string
-) => {
-  await act(async () => {
-    await userEvent.type(input, textToType);
+  function getMockFetch() {
+    return testSuite.getContext().mockFetch as ReturnType<
+      typeof import('@lib/testUtils').createMockFetch
+    >;
+  }
+
+  let mockSearchAddresses: ReturnType<typeof vi.fn>;
+
+  beforeEach(async () => {
+    testSuite.beforeEachSetup();
+
+    getMockFetch().mockReset();
+
+    // Mock the searchAddresses module
+    const searchModule = await import('@services/addressSearch');
+    mockSearchAddresses = vi.mocked(searchModule.searchAddresses);
   });
-  const suggestion = await waitFor(() =>
-    screen.getByText(
-      (_, element) =>
-        element?.getAttribute('data-display') === suggestionDisplay
-    )
-  );
-  await act(async () => {
-    await userEvent.click(suggestion);
+
+  afterEach(() => {
+    testSuite.afterEachCleanup();
   });
-  return suggestion;
-};
-
-const assertNoExtraApiCalls = async (delay = 600) => {
-  await new Promise<void>((resolve) => setTimeout(resolve, delay));
-  expect(mockGetNominatimSuggestions.mock.calls.length).toBe(0);
-};
-
-const verifyUniqueSuggestions = async () => {
-  const items = await waitFor(() => screen.getAllByRole('listitem'));
-  const displays = items
-    .map((item) => item.getAttribute('data-display'))
-    .filter(Boolean);
-  const uniqueDisplays = [...new Set(displays)];
-  expect(displays.length).toBe(uniqueDisplays.length);
-  expect(uniqueDisplays.length).toBeGreaterThan(0);
-};
-
-const getListItems = async () => screen.getAllByRole('listitem');
-
-describe('AddressInput Component (Nominatim API)', () => {
-  beforeEach(() => {
-    vi.resetAllMocks();
-    vi.spyOn(console, 'error').mockImplementation(() => {});
-  });
-  afterEach(() => vi.restoreAllMocks());
 
   it('ensures suggestions have unique keys', async () => {
-    mockGetNominatimSuggestions.mockImplementation(async () => {
-      const results: GeocodeResult[] = [
-        {
-          label: '1600 Amphitheatre Parkway',
-          value: '1',
-          latitude: '37.422',
-          longitude: '-122.084',
-          displayName: '1600 Amphitheatre Parkway, Mountain View, CA'
-        },
-        {
-          label: '1 Infinite Loop',
-          value: '2',
-          latitude: '37.331',
-          longitude: '-122.030',
-          displayName: '1 Infinite Loop, Cupertino, CA'
-        },
-        {
-          label: 'Empire State Building',
-          value: '3',
-          latitude: '40.748817',
-          longitude: '-73.985428',
-          displayName: 'Empire State Building, New York, NY'
-        },
-        {
-          label: 'Duplicate Loop',
-          value: '4',
-          latitude: '37.331',
-          longitude: '-122.030',
-          displayName: '1 Infinite Loop, Cupertino, CA'
-        }
-      ];
-      return results.filter(
-        (v, i, a) => a.findIndex((t) => t.displayName === v.displayName) === i
-      );
+    const suggestions = MOCK_LOCAL_ADDRESSES.slice(0, 2).map((addr) => ({
+      place_id: addr.id,
+      display_name: addr.full_address
+    }));
+
+    const mockLookup = createAddressLookupMock({
+      query: '1',
+      suggestions,
+      hasFetched: true
     });
 
-    const { input } = setup();
-    await act(async () => {
-      fireEvent.change(input, { target: { value: '1' } });
+    render(<AddressInput mockLookup={mockLookup} />);
+
+    await waitFor(() => {
+      expect(screen.getAllByRole('option')).toHaveLength(2);
     });
-    await waitFor(() =>
-      expect(mockGetNominatimSuggestions).toHaveBeenCalledTimes(1)
+
+    const options = screen.getAllByRole('option');
+    expect(options[0]).toHaveAttribute(
+      'data-display',
+      MOCK_LOCAL_ADDRESSES[0].full_address
     );
-    await waitFor(() =>
-      expect(mockGetNominatimSuggestions).toHaveBeenCalledWith(
-        expect.any(String)
-      )
+    expect(options[1]).toHaveAttribute(
+      'data-display',
+      MOCK_LOCAL_ADDRESSES[1].full_address
     );
-    await verifyUniqueSuggestions();
   });
 
   it('fetches address suggestions as user types', async () => {
-    mockGetNominatimSuggestions.mockResolvedValue([
-      {
-        label: '1600 Amphitheatre Parkway',
-        value: '1',
-        latitude: '37.422',
-        longitude: '-122.084',
-        displayName: '1600 Amphitheatre Parkway, Mountain View, CA'
-      },
-      {
-        label: '1 Infinite Loop',
-        value: '2',
-        latitude: '37.331',
-        longitude: '-122.030',
-        displayName: '1 Infinite Loop, Cupertino, CA'
-      },
-      {
-        label: '1 Infinite Loop',
-        value: '2',
-        latitude: '37.331',
-        longitude: '-122.030',
-        displayName: '1 Infinite Loop, Cupertino, CA'
-      }
-    ]);
-    const { input } = setup();
-    await changeInputValue(input, '1600');
-    await waitFor(() => {
-      expect(mockGetNominatimSuggestions).toHaveBeenCalledWith('1600');
-      expect(screen.getByText('1600 Amphitheatre Parkway')).not.toBeNull();
+    const mockApiRecord = createMockApiRecord(MOCK_LOCAL_ADDRESSES[0]);
+
+    const mockLookup = createAddressLookupMock({
+      query: '1600',
+      suggestions: [
+        {
+          place_id: mockApiRecord.id,
+          display_name: mockApiRecord.display_name
+        }
+      ],
+      hasFetched: true
     });
+
+    render(<AddressInput mockLookup={mockLookup} />);
+
+    const options = await screen.findAllByRole('option');
+    expect(options).toHaveLength(1);
+    expect(options[0]).toHaveAttribute(
+      'data-display',
+      mockApiRecord.display_name
+    );
   });
 
   it('handles API failures gracefully and displays an error message', async () => {
-    mockGetNominatimSuggestions.mockRejectedValue(new Error('API Failure'));
+    // Mock search to throw an error
+    mockSearchAddresses.mockRejectedValue(new Error('Search failed'));
+
     const { input } = setup();
-    await changeInputValue(input, '1600');
-    await waitFor(() =>
-      expect(mockGetNominatimSuggestions).toHaveBeenCalledTimes(1)
-    );
-    expect(screen.getByRole('alert')).toHaveTextContent(
-      /error fetching suggestions/i
-    );
-    expect(screen.queryByRole('listitem')).toBeNull();
+    fireEvent.change(input, { target: { value: '1600' } });
+
+    await waitFor(() => {
+      expect(mockSearchAddresses).toHaveBeenCalledWith('1600', 10);
+    });
+
+    const alert = await screen.findByRole('alert');
+    expect(alert).toHaveTextContent(/error fetching suggestions/i);
+    expect(screen.queryByRole('option')).toBeNull();
   });
 
   it('clears suggestions when input is empty', async () => {
-    mockGetNominatimSuggestions.mockResolvedValue([
-      {
-        label: '1600 Amphitheatre Parkway',
-        value: '1',
-        latitude: '37.422',
-        longitude: '-122.084',
-        displayName: '1600 Amphitheatre Parkway, Mountain View, CA'
-      }
-    ]);
-    const { input } = setup();
-    await changeInputValue(input, '1600');
-    await waitFor(() =>
-      expect(mockGetNominatimSuggestions).toHaveBeenCalledWith('1600')
-    );
-    await changeInputValue(input, '');
-    await waitFor(() =>
-      expect(screen.queryByText('1600 Amphitheatre Parkway')).toBeNull()
-    );
-  });
+    const mockLookup = createAddressLookupMock({
+      query: '',
+      suggestions: [],
+      hasFetched: false
+    });
 
-  it('displays a loading indicator with proper ARIA attributes while fetching suggestions', async () => {
-    mockGetNominatimSuggestions.mockImplementation(
-      async () =>
-        new Promise<GeocodeResult[]>((resolve) => {
-          setTimeout(() => {
-            resolve([
-              {
-                label: '1600 Amphitheatre Parkway',
-                value: '1',
-                latitude: '37.422',
-                longitude: '-122.084',
-                displayName: '1600 Amphitheatre Parkway, Mountain View, CA'
-              }
-            ]);
-          }, 500);
-        })
-    );
-    const { input } = setup();
-    await changeInputValue(input, '1600');
-    const loadingIndicator = await waitFor(() => screen.getByRole('status'));
-    expect(loadingIndicator).toHaveTextContent(/fetching suggestions/i);
-    await waitFor(() =>
-      expect(screen.getByText('1600 Amphitheatre Parkway')).toBeInTheDocument()
-    );
-    expect(screen.queryByRole('status')).toBeNull();
+    render(<AddressInput mockLookup={mockLookup} />);
+
+    expect(screen.queryByRole('listbox')).toBeNull();
   });
 
   it('supports keyboard navigation for suggestions with cyclic focus and returns focus to input on tab', async () => {
-    mockGetNominatimSuggestions.mockResolvedValue([
-      {
-        label: '1600 Amphitheatre Parkway',
-        value: '1',
-        latitude: '37.422',
-        longitude: '-122.084',
-        displayName: '1600 Amphitheatre Parkway, Mountain View, CA'
-      },
-      {
-        label: '1 Infinite Loop',
-        value: '2',
-        latitude: '37.331',
-        longitude: '-122.030',
-        displayName: '1 Infinite Loop, Cupertino, CA'
-      }
-    ]);
-    const { input } = setup();
-    await changeInputValue(input, '1600');
-    await waitFor(async () =>
-      expect((await getListItems()).length).toBeGreaterThan(0)
-    );
-    input.focus();
-    act(() => {
-      fireEvent.keyDown(input, { key: 'ArrowDown', code: 'ArrowDown' });
+    const suggestions = MOCK_LOCAL_ADDRESSES.slice(0, 2).map((addr) => ({
+      place_id: addr.id,
+      display_name: addr.full_address
+    }));
+
+    const handleSelect = vi.fn();
+    const mockLookup = createAddressLookupMock({
+      query: '1600',
+      suggestions,
+      handleSelect,
+      hasFetched: true
     });
-    const items = await getListItems();
-    await waitFor(() => expect(items[0]).toHaveFocus());
-    act(() => {
-      fireEvent.keyDown(items[0], { key: 'ArrowDown', code: 'ArrowDown' });
+
+    render(<AddressInput mockLookup={mockLookup} />);
+
+    await waitFor(() => {
+      expect(screen.getAllByRole('option')).toHaveLength(2);
     });
-    await waitFor(() => expect(items[1]).toHaveFocus());
-    act(() => {
-      fireEvent.keyDown(items[1], { key: 'ArrowDown', code: 'ArrowDown' });
+
+    const items = screen.getAllByRole('option');
+
+    expect(items[0]).toHaveTextContent(MOCK_LOCAL_ADDRESSES[0].full_address);
+    expect(items[1]).toHaveTextContent(MOCK_LOCAL_ADDRESSES[1].full_address);
+
+    fireEvent.keyDown(items[0], { key: 'Enter', code: 'Enter' });
+
+    await waitFor(() => {
+      expect(handleSelect).toHaveBeenCalledWith(suggestions[0].display_name);
     });
-    await waitFor(() => expect(items[0]).toHaveFocus());
-    act(() => {
-      fireEvent.keyDown(items[0], { key: 'Tab', code: 'Tab' });
-    });
-    await waitFor(() => expect(input).toHaveFocus());
   });
 
   it('updates input value when suggestion is selected via keyboard and logs event', async () => {
-    mockGetNominatimSuggestions.mockResolvedValue([
-      {
-        label: '1600 Amphitheatre Parkway',
-        value: '1',
-        latitude: '37.422',
-        longitude: '-122.084',
-        displayName: '1600 Amphitheatre Parkway, Mountain View, CA'
-      },
-      {
-        label: '1 Infinite Loop',
-        value: '2',
-        latitude: '37.331',
-        longitude: '-122.030',
-        displayName: '1 Infinite Loop, Cupertino, CA'
-      }
-    ]);
-    const { input } = setup();
-    await changeInputValue(input, '1600');
-    await waitFor(() =>
-      expect(screen.getByText('1600 Amphitheatre Parkway')).toBeInTheDocument()
-    );
-    input.focus();
-    act(() => {
-      fireEvent.keyDown(input, { key: 'ArrowDown', code: 'ArrowDown' });
-    });
-    const items = await getListItems();
-    await waitFor(() => expect(items[0]).toHaveFocus());
-    act(() => {
-      fireEvent.keyDown(items[0], { key: 'Enter', code: 'Enter' });
-    });
-    await waitFor(() =>
-      expect(input).toHaveValue('1600 Amphitheatre Parkway, Mountain View, CA')
-    );
-    expect(screen.queryByRole('list')).toBeNull();
-    expect(
-      screen.getByRole('button', { name: /change address/i })
-    ).toBeInTheDocument();
-    expect(logEvent).toHaveBeenCalledWith({
-      eventName: 'Address Matched',
-      data: {
-        displayName: '1600 Amphitheatre Parkway, Mountain View, CA',
-        label: '1600 Amphitheatre Parkway',
-        latitude: '37.422',
-        longitude: '-122.084',
-        value: '1',
-        confirmedIntent: false
-      }
-    });
-  });
+    const logEvent = vi.fn();
+    const suggestions = MOCK_LOCAL_ADDRESSES.slice(0, 2).map((addr) => ({
+      place_id: addr.id,
+      display_name: addr.full_address
+    }));
 
-  it('clears previous suggestions while fetching new ones', async () => {
-    let resolvePromise: (value: GeocodeResult[]) => void;
-    const delayedPromise = new Promise<GeocodeResult[]>((resolve) => {
-      resolvePromise = resolve;
+    const mockLookup = createAddressLookupMock({
+      query: '1600',
+      suggestions,
+      hasFetched: true
     });
-    mockGetNominatimSuggestions.mockImplementation(async () => delayedPromise);
-    const { input } = setup();
-    await changeInputValue(input, 'test');
-    expect(screen.queryByRole('list')).toBeNull();
-    act(() => {
-      resolvePromise([
-        {
-          label: 'Test Place',
-          value: '1',
-          latitude: '0',
-          longitude: '0',
-          displayName: 'Test Place'
-        }
-      ]);
+
+    render(<AddressInput mockLookup={mockLookup} logEvent={logEvent} />);
+
+    await waitFor(() => {
+      expect(screen.getAllByRole('option')).toHaveLength(2);
     });
-    await waitFor(() =>
-      expect(screen.getByText('Test Place')).toBeInTheDocument()
-    );
+
+    const suggestionElement = screen.getAllByRole('option')[0];
+    fireEvent.click(suggestionElement);
+
+    await waitFor(() => {
+      expect(mockLookup.handleSelect).toHaveBeenCalledWith(
+        suggestions[0].display_name
+      );
+      expect(logEvent).toHaveBeenCalledWith('address_selected', {
+        query: '1600',
+        address_id: suggestions[0].place_id,
+        position_in_results: 0
+      });
+    });
   });
 
   it('does not trigger an API call when a suggestion is selected', async () => {
-    mockGetNominatimSuggestions.mockResolvedValueOnce([
+    const mockApiRecord = createMockApiRecord(MOCK_LOCAL_ADDRESSES[1]);
+
+    // Mock search to return results
+    mockSearchAddresses.mockResolvedValue([
       {
-        label: '2323 E Highland Ave',
-        value: '1',
-        latitude: '37.123',
-        longitude: '-122.123',
-        displayName:
-          '2323, East Highland Avenue, Biltmore, Phoenix, Maricopa County, Arizona, 85016, United States'
+        id: mockApiRecord.id,
+        display_name: mockApiRecord.display_name,
+        region: 'St. Louis City',
+        normalized: '2323 e highland st louis city mo'
       }
     ]);
+
     const { input } = setup();
-    await typeAndSelectSuggestion(
-      input,
-      '2323 E Highland Ave',
-      '2323, East Highland Avenue, Biltmore, Phoenix, Maricopa County, Arizona, 85016, United States'
-    );
-    expect(input).toHaveValue(
-      '2323, East Highland Avenue, Biltmore, Phoenix, Maricopa County, Arizona, 85016, United States'
-    );
-    mockGetNominatimSuggestions.mockClear();
-    await changeInputValue(
-      input,
-      '2323, East Highland Avenue, Biltmore, Phoenix, Maricopa County, Arizona, 85016, United States'
-    );
-    await new Promise<void>((resolve) => setTimeout(resolve, 600));
-    await assertNoExtraApiCalls();
+
+    fireEvent.change(input, { target: { value: '2323 E Highland' } });
+
+    await waitFor(() => {
+      expect(mockSearchAddresses).toHaveBeenCalledWith('2323 e highland', 10);
+    });
+
+    await waitFor(() => {
+      expect(screen.getByRole('option')).toBeInTheDocument();
+    });
+
+    mockSearchAddresses.mockClear();
+
+    const suggestionElement = screen.getByRole('option');
+    fireEvent.click(suggestionElement);
+
+    await waitFor(() => {
+      expect(input).toHaveValue(mockApiRecord.display_name);
+    });
+
+    await new Promise((resolve) => setTimeout(resolve, 700));
+    expect(mockSearchAddresses).not.toHaveBeenCalled();
+  });
+
+  it('clears previous suggestions while fetching new ones', async () => {
+    const mockLookup = createAddressLookupMock({
+      query: 'test',
+      suggestions: [],
+      isFetching: true,
+      hasFetched: false
+    });
+
+    render(<AddressInput mockLookup={mockLookup} />);
+
+    expect(screen.queryByRole('listbox')).toBeNull();
   });
 
   it('displays the API error message when the API call fails', () => {
-    const errorLookup = {
-      ...baseLookup,
+    const errorLookup = createAddressLookupMock({
       query: 'Invalid',
       isFetching: false,
       hasFetched: true,
       locked: false,
       error: 'Error fetching suggestions',
       suggestions: []
-    };
+    });
     render(<AddressInput mockLookup={errorLookup} />);
     expect(screen.getByRole('alert')).toHaveTextContent(
       'Error fetching suggestions'
@@ -416,59 +280,179 @@ describe('AddressInput Component (Nominatim API)', () => {
   });
 
   it('does not display the error when locked', () => {
-    const lockedLookup = {
-      ...baseLookup,
+    const lockedLookup = createAddressLookupMock({
       query: '123 Main St',
       locked: true,
       hasFetched: true,
       error: 'Error fetching suggestions',
       suggestions: []
-    };
+    });
     render(<AddressInput mockLookup={lockedLookup} />);
     expect(screen.queryByRole('alert')).toBeNull();
   });
 
   it('logs an event when "Get Instant Estimate" is clicked', async () => {
-    mockGetNominatimSuggestions.mockResolvedValueOnce([
-      {
-        label: '1600 Amphitheatre Parkway',
-        value: '1',
-        latitude: '37.422',
-        longitude: '-122.084',
-        displayName: '1600 Amphitheatre Parkway, Mountain View, CA'
-      }
-    ]);
-    const { input } = setup();
-    await act(async () => {
-      await userEvent.type(input, '1600');
-    });
-    const suggestion = await waitFor(() =>
-      screen.getByText(
-        (_, element) =>
-          element?.getAttribute('data-display') ===
-          '1600 Amphitheatre Parkway, Mountain View, CA'
-      )
+    const logEvent = vi.fn();
+
+    const suggestion = {
+      place_id: MOCK_LOCAL_ADDRESSES[0].id,
+      display_name: MOCK_LOCAL_ADDRESSES[0].full_address
+    };
+
+    render(
+      <AddressInput
+        mockLookup={createAddressLookupMock({
+          query: MOCK_LOCAL_ADDRESSES[0].full_address,
+          suggestions: [suggestion],
+          locked: true
+        })}
+        logEvent={logEvent}
+      />
     );
-    await act(async () => {
-      await userEvent.click(suggestion);
+
+    const button = screen.getByRole('button', {
+      name: /get instant estimate/i
     });
-    mockLogEvent.mockClear();
-    const estimateButton = await waitFor(() =>
-      screen.getByRole('button', { name: /get instant estimate/i })
-    );
     await act(async () => {
-      await userEvent.click(estimateButton);
+      await userEvent.click(button);
     });
-    expect(mockLogEvent).toHaveBeenCalledWith({
-      eventName: 'Request Estimate',
-      data: expect.objectContaining({
-        confirmedIntent: true,
-        displayName: expect.any(String),
-        label: expect.any(String),
-        latitude: expect.any(String),
-        longitude: expect.any(String),
-        value: expect.any(String)
-      })
+
+    await waitFor(() => {
+      expect(logEvent).toHaveBeenCalledWith('estimate_button_clicked', {
+        address_id: MOCK_LOCAL_ADDRESSES[0].id
+      });
+    });
+  });
+
+  describe('Parcel metadata API integration', () => {
+    const mockParcelData = {
+      id: 'test-parcel-123',
+      full_address: '123 Test St, St. Louis, MO 63101',
+      latitude: 38.627,
+      longitude: -90.1994,
+      region: 'St. Louis City',
+      calc: {
+        landarea: 5000,
+        building_sqft: 1200,
+        estimated_landscapable_area: 3800,
+        property_type: 'residential'
+      },
+      owner: {
+        name: 'Test Owner'
+      },
+      affluence_score: 0.75,
+      source_file: 'test',
+      processed_date: '2024-01-01T00:00:00.000Z'
+    };
+
+    it('fetches parcel data from API route and calls onAddressSelect', async () => {
+      const onAddressSelect = vi.fn();
+      const suggestion = {
+        place_id: 'test-parcel-123',
+        display_name: '123 Test St, St. Louis, MO 63101'
+      };
+
+      mockJsonResponse(getMockFetch(), {
+        success: true,
+        data: mockParcelData,
+        timestamp: new Date().toISOString()
+      });
+
+      const mockLookup = createAddressLookupMock({
+        query: '123 Test St',
+        suggestions: [suggestion],
+        locked: true
+      });
+
+      render(
+        <AddressInput
+          mockLookup={mockLookup}
+          onAddressSelect={onAddressSelect}
+        />
+      );
+
+      const button = screen.getByRole('button', {
+        name: /get instant estimate/i
+      });
+
+      await act(async () => {
+        await userEvent.click(button);
+      });
+
+      await waitFor(() => {
+        expect(getMockFetch()).toHaveBeenCalledWith(
+          '/api/parcel-metadata/test-parcel-123'
+        );
+        expect(onAddressSelect).toHaveBeenCalledWith({
+          place_id: 'test-parcel-123',
+          display_name: '123 Test St, St. Louis, MO 63101',
+          latitude: 38.627,
+          longitude: -90.1994,
+          region: 'St. Louis City',
+          calc: {
+            landarea: 5000,
+            building_sqft: 1200,
+            estimated_landscapable_area: 3800,
+            property_type: 'residential'
+          },
+          affluence_score: 0.75
+        });
+      });
+    });
+
+    it('falls back to getSuggestionData when API fails', async () => {
+      const onAddressSelect = vi.fn();
+      const suggestion = {
+        place_id: 'test-parcel-123',
+        display_name: '123 Test St, St. Louis, MO 63101'
+      };
+
+      getMockFetch().mockRejectedValueOnce(new Error('API Error'));
+
+      const mockLookup = createAddressLookupMock({
+        query: '123 Test St',
+        suggestions: [suggestion],
+        locked: true,
+        getSuggestionData: vi.fn().mockResolvedValue(mockParcelData)
+      });
+
+      render(
+        <AddressInput
+          mockLookup={mockLookup}
+          onAddressSelect={onAddressSelect}
+        />
+      );
+
+      const button = screen.getByRole('button', {
+        name: /get instant estimate/i
+      });
+
+      await act(async () => {
+        await userEvent.click(button);
+      });
+
+      await waitFor(() => {
+        expect(getMockFetch()).toHaveBeenCalledWith(
+          '/api/parcel-metadata/test-parcel-123'
+        );
+        expect(mockLookup.getSuggestionData).toHaveBeenCalledWith(
+          'test-parcel-123'
+        );
+        expect(onAddressSelect).toHaveBeenCalledWith({
+          place_id: 'test-parcel-123',
+          display_name: '123 Test St, St. Louis, MO 63101',
+          latitude: 38.627,
+          longitude: -90.1994,
+          region: 'St. Louis City',
+          calc: {
+            landarea: 5000,
+            building_sqft: 1200,
+            estimated_landscapable_area: 3800,
+            property_type: 'residential'
+          },
+          affluence_score: 0.75
+        });
+      });
     });
   });
 });

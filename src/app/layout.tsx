@@ -1,10 +1,11 @@
-// src/app/layout.tsx
 import React from 'react';
 import type { Metadata } from 'next';
 import { Geist, Geist_Mono } from 'next/font/google';
 import './globals.css';
 import { getThemeClass } from '@tokens/theme';
 import Analytics from '@components/PageAnalytics/PageAnalytics';
+import ServiceWorkerRegistration from '@components/ServiceWorkerRegistration/ServiceWorkerRegistration';
+import BackgroundPreloadStatus from '@components/BackgroundPreloadStatus/BackgroundPreloadStatus';
 
 const geistSans = Geist({
   variable: '--font-geist-sans',
@@ -44,11 +45,13 @@ export default function RootLayout({
   if (typeof window === 'undefined') {
     return (
       <html lang="en" className={getThemeClass(clientTheme)}>
-        <head></head>
+        <head>{}</head>
         <body
           className={`${geistSans.variable} ${geistMono.variable} antialiased`}
         >
           <Analytics />
+          <ServiceWorkerRegistration />
+          <BackgroundPreloadStatus />
           {children}
         </body>
       </html>
@@ -56,10 +59,13 @@ export default function RootLayout({
   }
   return (
     <html lang="en" className={getThemeClass(clientTheme)}>
+      <head>{}</head>
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
         <Analytics />
+        <ServiceWorkerRegistration />
+        <BackgroundPreloadStatus />
         {children}
       </body>
     </html>

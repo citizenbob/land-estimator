@@ -1,0 +1,19 @@
+{
+  "id": "MALFORMED_BOUNDS",
+  "full_address": "999 Broken Bounds St., St. Louis, MO 63101",
+  "latitude": null,
+  "longitude": null,
+  "region": "St. Louis City",
+  "calc": {
+    "landarea": 5000,
+    "building_sqft": 1500,
+    "estimated_landscapable_area": 3000,
+    "property_type": "residential"
+  },
+  "owner": {
+    "name": "Test Owner"
+  },
+  "affluence_score": 50,
+  "source_file": "test",
+  "processed_date": "2023-01-01"
+}

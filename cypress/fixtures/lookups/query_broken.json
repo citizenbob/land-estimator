@@ -1,0 +1,12 @@
+{
+  "query": "999 Broken",
+  "results": [
+    {
+      "id": "MALFORMED_BOUNDS",
+      "display_name": "999 Broken Bounds St., St. Louis, MO 63101",
+      "region": "St. Louis City",
+      "normalized": "999 broken bounds st st louis mo 63101"
+    }
+  ],
+  "count": 1
+}

@@ -1,0 +1,12 @@
+{
+  "query": "456 Business",
+  "results": [
+    {
+      "id": "COM_AFFLUENT",
+      "display_name": "456 Business Ave., St. Louis, MO 63103",
+      "region": "St. Louis City",
+      "normalized": "456 business ave st louis mo 63103"
+    }
+  ],
+  "count": 1
+}

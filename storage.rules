@@ -1,0 +1,23 @@
+rules_version = '2';
+
+// Firebase Storage Security Rules
+service firebase.storage {
+  match /b/{bucket}/o {
+    // Allow read access to everyone for CDN files
+    match /cdn/{allPaths=**} {
+      allow read: if true;
+      allow write: if false; // Only allow writes through admin SDK
+    }
+    
+    // Allow read access to everyone for search files
+    match /search/{allPaths=**} {
+      allow read: if true;
+      allow write: if false; // Only allow writes through admin SDK
+    }
+    
+    // Deny all other access
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}

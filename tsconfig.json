@@ -23,20 +23,47 @@
       "@app/*": ["app/*"],
       "@components/*": ["components/*"],
       "@config/*": ["config/*"],
+      "@data/*": ["data/*"],
+      "@hocs/*": ["hocs/*"],
       "@hooks/*": ["hooks/*"],
       "@lib/*": ["lib/*"],
       "@services/*": ["services/*"],
       "@store/*": ["store/*"],
-      "@tokens/*": ["tokens/*"]
+      "@tokens/*": ["tokens/*"],
+      "@app-types/*": ["types/*"],
+      "@workers/*": ["workers/*"]
     },
-    "types": ["cypress"]
+    "types": [
+      "cypress",
+      "vitest/globals",
+      "vitest",
+      "@testing-library/jest-dom"
+    ]
   },
   "include": [
     "next-env.d.ts",
     "src/types/**/*.d.ts",
-    "**/*.ts",
-    "**/*.tsx",
+    "src/**/*.ts",
+    "src/**/*.tsx",
     ".next/types/**/*.ts"
   ],
-  "exclude": ["node_modules"]
+  "exclude": [
+    "node_modules",
+    "src/data/**/*.json",
+    "src/data/**/*.csv",
+    "src/data/**/*.geojson",
+    "src/data/**/*.py",
+    "src/data/**/__pycache__/**",
+    "src/data/**/logs/**",
+    "public/**/*",
+    "storybook-static/**/*",
+    "cypress/**/*",
+    "**/*.json",
+    "**/*.csv",
+    "**/*.geojson",
+    "**/*.py",
+    "**/__pycache__/**",
+    "**/logs/**",
+    "validate_zip_codes.js"
+  ]
 }

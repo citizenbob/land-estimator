@@ -1,0 +1,22 @@
+{
+  "regions": [
+    {
+      "region": "stl_city",
+      "version": "1.0.0",
+      "document_file": "stl_city-document.json",
+      "lookup_file": "stl_city-document.json"
+    },
+    {
+      "region": "stl_county",
+      "version": "1.0.0",
+      "document_file": "stl_county-document.json",
+      "lookup_file": "stl_county-document.json"
+    }
+  ],
+  "metadata": {
+    "generated_at": "2025-07-18T23:36:56.629364",
+    "version": "1.0.0",
+    "total_regions": 2,
+    "source": "Document Mode Pipeline"
+  }
+}
