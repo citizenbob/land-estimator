@@ -1,27 +1,29 @@
 'use client';
 
-import React, { useRef, createRef, useEffect, useState } from 'react';
+import React, { useRef, useState, useEffect, useCallback } from 'react';
 import { useAddressLookup } from '@hooks/useAddressLookup';
 import { useEventLogger } from '@hooks/useEventLogger';
+import { useAddressEventLogger } from '@hooks/useAddressEventLogger';
 import { useSuggestionNavigation } from '@hooks/useSuggestionNavigation';
+import { useSuggestionRefs } from '@hooks/useSuggestionRefs';
 import { useInputState } from '@hooks/useInputState';
 import InputField from '@components/InputField/InputField';
 import IconButton from '@components/IconButton/IconButton';
 import Button from '@components/Button/Button';
 import SuggestionsList from '@components/SuggestionsList/SuggestionsList';
 import Alert from '@components/Alert/Alert';
+import { LoadingSpinner } from '@components/LoadingSpinner/LoadingSpinner';
 import { Form } from '@components/AddressInput/AddressInput.styles';
 import {
   AddressSuggestion,
   EnrichedAddressSuggestion
 } from '@app-types/localAddressTypes';
+import { EventMap, LogOptions } from '@app-types/analytics';
+import { AnimatePresence } from 'framer-motion';
 import {
-  AddressSelectedEvent,
-  EstimateButtonClickedEvent,
-  EventMap,
-  LogOptions
-} from '@app-types/analytics';
-import { motion } from 'framer-motion';
+  createEnrichedAddressSuggestion,
+  fetchParcelMetadata
+} from '@lib/addressDataUtils';
 
 interface AddressInputProps {
   onAddressSelect?: (payload: EnrichedAddressSuggestion) => void;
@@ -63,13 +65,11 @@ const AddressInput = ({
   const logEvent = logEventProp || logEventHook;
 
   const inputRef = useRef<HTMLInputElement | null>(null);
-  const suggestionRefs = useRef<React.RefObject<HTMLLIElement>[]>([]);
-
+  const containerRef = useRef<HTMLFormElement | null>(null);
   const selectedSuggestion = useRef<AddressSuggestion | null>(
     mockSelectedSuggestion || null
   );
 
-  // Loading state for the estimate button
   const [isEstimateLoading, setIsEstimateLoading] = useState(false);
 
   const {
@@ -81,33 +81,57 @@ const AddressInput = ({
     uniqueSuggestions
   } = useInputState(query, suggestions, isFetching, hasFetched, locked);
 
-  const logAddressEvent = (
-    suggestion: AddressSuggestion,
-    eventType: 'address_selected' | 'estimate_button_clicked'
-  ) => {
-    if (logEvent && suggestion) {
-      if (eventType === 'address_selected') {
-        const addressSelectedEvent: AddressSelectedEvent = {
-          query: query,
-          address_id: suggestion.place_id.toString(),
-          position_in_results: suggestions.findIndex(
-            (s) => s.place_id === suggestion.place_id
-          )
-        };
-        logEvent('address_selected', addressSelectedEvent);
-      } else if (eventType === 'estimate_button_clicked') {
-        const estimateEvent: EstimateButtonClickedEvent = {
-          address_id: suggestion.place_id.toString()
-        };
-        logEvent('estimate_button_clicked', estimateEvent);
-      }
+  // Close suggestions function
+  const closeSuggestions = useCallback(() => {
+    if (showSuggestions) {
+      handleSelect(query);
     }
-  };
+  }, [showSuggestions, query, handleSelect]);
+
+  // Handle click outside to close suggestions
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (
+        containerRef.current &&
+        !containerRef.current.contains(event.target as Node) &&
+        showSuggestions
+      ) {
+        closeSuggestions();
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [showSuggestions, closeSuggestions]);
+
+  const { suggestionRefs, getSuggestionRefs } =
+    useSuggestionRefs(uniqueSuggestions);
+  const { logAddressEvent } = useAddressEventLogger(
+    logEvent,
+    query,
+    suggestions
+  );
 
   const onSelect = (suggestion: AddressSuggestion) => {
     handleSelect(suggestion.display_name);
     selectedSuggestion.current = suggestion;
     logAddressEvent(suggestion, 'address_selected');
+  };
+
+  const { handleInputKeyDown: originalInputKeyDown, handleSuggestionKeyDown } =
+    useSuggestionNavigation(inputRef, onSelect, getSuggestionRefs);
+
+  // Enhanced keyboard handling for input with Escape support
+  const handleInputKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Escape' && showSuggestions) {
+      e.preventDefault();
+      closeSuggestions();
+      return;
+    }
+
+    originalInputKeyDown(e);
   };
 
   const onEstimateClick = async () => {
@@ -118,84 +142,45 @@ const AddressInput = ({
       selectedSuggestion.current = matched;
     }
 
-    if (!matched) {
+    if (!matched || !onAddressSelect) {
       return;
     }
 
     logAddressEvent(matched, 'estimate_button_clicked');
-
     setIsEstimateLoading(true);
 
     try {
-      const response = await fetch(`/api/parcel-metadata/${matched.place_id}`);
+      // Try to fetch from API first
+      const parcelData = await fetchParcelMetadata(matched.place_id);
 
-      if (!response.ok) {
-        throw new Error(`Failed to fetch parcel data: ${response.status}`);
+      if (parcelData) {
+        const enrichedData = createEnrichedAddressSuggestion(
+          matched,
+          parcelData
+        );
+        onAddressSelect(enrichedData);
+        return;
       }
 
-      const rawData = await response.json();
-
-      if (rawData && rawData.data && onAddressSelect) {
-        const parcelData = rawData.data;
-        const enrichedData: EnrichedAddressSuggestion = {
-          place_id: matched.place_id,
-          display_name: matched.display_name,
-          latitude: parcelData.latitude,
-          longitude: parcelData.longitude,
-          region: parcelData.region || 'Unknown',
-          calc: {
-            landarea: parcelData.calc?.landarea || 0,
-            building_sqft: parcelData.calc?.building_sqft || 0,
-            estimated_landscapable_area:
-              parcelData.calc?.estimated_landscapable_area || 0,
-            property_type: parcelData.calc?.property_type || 'residential'
-          },
-          affluence_score: parcelData.affluence_score
-        };
+      // Fallback to local suggestion data
+      const rawData = await getSuggestionData(matched.place_id);
+      if (rawData) {
+        const enrichedData = createEnrichedAddressSuggestion(matched, rawData);
         onAddressSelect(enrichedData);
       }
     } catch (error) {
-      console.error('Error fetching parcel metadata:', error);
-      const rawData = await getSuggestionData(matched.place_id);
-      if (rawData && onAddressSelect) {
-        const enrichedData: EnrichedAddressSuggestion = {
-          place_id: matched.place_id,
-          display_name: matched.display_name,
-          latitude: rawData.latitude,
-          longitude: rawData.longitude,
-          region: rawData.region || 'Unknown',
-          calc: {
-            landarea: rawData.calc?.landarea || 0,
-            building_sqft: rawData.calc?.building_sqft || 0,
-            estimated_landscapable_area:
-              rawData.calc?.estimated_landscapable_area || 0,
-            property_type: rawData.calc?.property_type || 'residential'
-          },
-          affluence_score: rawData.affluence_score
-        };
-        onAddressSelect(enrichedData);
-      }
+      console.error('Error in onEstimateClick:', error);
     } finally {
       setIsEstimateLoading(false);
     }
   };
 
-  useEffect(() => {
-    suggestionRefs.current = uniqueSuggestions.map(
-      (_, i) => suggestionRefs.current[i] ?? createRef<HTMLLIElement>()
-    );
-  }, [uniqueSuggestions]);
-
-  const { handleInputKeyDown, handleSuggestionKeyDown } =
-    useSuggestionNavigation(inputRef, onSelect, suggestionRefs.current);
-
   const handleSubmit = (e: React.FormEvent) => {
-    // Prevent form submission and page refresh
     e.preventDefault();
   };
 
   return (
-    <Form onSubmit={handleSubmit}>
+    <Form ref={containerRef} onSubmit={handleSubmit}>
       <div className="relative input-group">
         <InputField
           ref={inputRef}
@@ -205,17 +190,12 @@ const AddressInput = ({
           onChange={(e) => handleChange(e.target.value)}
           onKeyDown={handleInputKeyDown}
         />
-        {showLoading && (
-          <motion.div
-            className="absolute right-3 top-1/2 transform -translate-y-1/2 w-5 h-5 border-2 border-blue-500 border-t-transparent rounded-full"
-            animate={{ rotate: 360 }}
-            transition={{ repeat: Infinity, ease: 'linear', duration: 0.8 }}
-          />
-        )}
+        <AnimatePresence>{showLoading && <LoadingSpinner />}</AnimatePresence>
         {showClearButton && (
           <IconButton
             type="button"
             aria-label="Change Address"
+            tabIndex={0}
             onClick={() => {
               handleClear();
               selectedSuggestion.current = null;
@@ -234,7 +214,7 @@ const AddressInput = ({
         <SuggestionsList
           suggestions={uniqueSuggestions}
           onSelect={onSelect}
-          suggestionRefs={suggestionRefs.current}
+          suggestionRefs={suggestionRefs}
           onSuggestionKeyDown={handleSuggestionKeyDown}
         />
       )}

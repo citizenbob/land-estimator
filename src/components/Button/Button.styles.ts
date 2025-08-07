@@ -40,8 +40,7 @@ export const ButtonStyles = styled.button
     shouldForwardProp: (prop) => prop !== 'loading'
   })
   .attrs(() => ({
-    className:
-      'rounded-md px-4 py-2 font-semibold focus:outline-none focus:ring focus:border-primary'
+    className: 'rounded-md px-4 py-2 font-semibold'
   }))<{ loading?: boolean }>`
   padding: 0.75rem 1rem;
   background-color: ${({ theme }) =>
@@ -52,6 +51,12 @@ export const ButtonStyles = styled.button
   position: relative;
   overflow: hidden;
   transition: all 0.2s ease-in-out;
+
+  &:focus {
+    outline: 2px solid ${({ theme }) =>
+      getToken(theme, 'colors.primary.value', tokens.colors.primary.value)};
+    outline-offset: 2px;
+  }
 
   /* Apply loading styles when loading */
   ${({ loading }) => loading && loadingStyles}

@@ -10,4 +10,9 @@ export const IconButtonStyles = styled.button.attrs(() => ({
 }))`
   ${responsiveBackgroundColor}
   ${responsiveTextColor}
+  
+  &:focus {
+    outline: 2px solid #00a897;
+    outline-offset: 2px;
+  }
 `;

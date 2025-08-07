@@ -22,7 +22,11 @@ describe('useSuggestionNavigation', () => {
     const mockSuggestionRefs: React.RefObject<HTMLLIElement>[] = [];
 
     const { result } = renderHook(() =>
-      useSuggestionNavigation(mockInputRef, mockOnSelect, mockSuggestionRefs)
+      useSuggestionNavigation(
+        mockInputRef,
+        mockOnSelect,
+        () => mockSuggestionRefs
+      )
     );
 
     const mockEvent = {
@@ -50,7 +54,11 @@ describe('useSuggestionNavigation', () => {
     );
 
     const { result } = renderHook(() =>
-      useSuggestionNavigation(mockInputRef, mockOnSelect, mockSuggestionRefs)
+      useSuggestionNavigation(
+        mockInputRef,
+        mockOnSelect,
+        () => mockSuggestionRefs
+      )
     );
 
     const mockEvent = {
@@ -79,7 +87,11 @@ describe('useSuggestionNavigation', () => {
     );
 
     const { result } = renderHook(() =>
-      useSuggestionNavigation(mockInputRef, mockOnSelect, mockSuggestionRefs)
+      useSuggestionNavigation(
+        mockInputRef,
+        mockOnSelect,
+        () => mockSuggestionRefs
+      )
     );
 
     const mockEventDown = {
@@ -122,7 +134,11 @@ describe('useSuggestionNavigation', () => {
     ];
 
     const { result } = renderHook(() =>
-      useSuggestionNavigation(mockInputRef, mockOnSelect, mockSuggestionRefs)
+      useSuggestionNavigation(
+        mockInputRef,
+        mockOnSelect,
+        () => mockSuggestionRefs
+      )
     );
 
     const mockEvent = {
@@ -144,7 +160,11 @@ describe('useSuggestionNavigation', () => {
     const mockSuggestionRefs: React.RefObject<HTMLLIElement>[] = [];
 
     const { result } = renderHook(() =>
-      useSuggestionNavigation(mockInputRef, mockOnSelect, mockSuggestionRefs)
+      useSuggestionNavigation(
+        mockInputRef,
+        mockOnSelect,
+        () => mockSuggestionRefs
+      )
     );
 
     const mockEvent = {
@@ -167,7 +187,11 @@ describe('useSuggestionNavigation', () => {
     ];
 
     const { result } = renderHook(() =>
-      useSuggestionNavigation(mockInputRef, mockOnSelect, mockSuggestionRefs)
+      useSuggestionNavigation(
+        mockInputRef,
+        mockOnSelect,
+        () => mockSuggestionRefs
+      )
     );
 
     const mockEvent = {
@@ -195,7 +219,11 @@ describe('useSuggestionNavigation', () => {
     );
 
     const { result } = renderHook(() =>
-      useSuggestionNavigation(mockInputRef, mockOnSelect, mockSuggestionRefs)
+      useSuggestionNavigation(
+        mockInputRef,
+        mockOnSelect,
+        () => mockSuggestionRefs
+      )
     );
 
     const mockEventUp = {
@@ -228,7 +256,11 @@ describe('useSuggestionNavigation', () => {
     );
 
     const { result } = renderHook(() =>
-      useSuggestionNavigation(mockInputRef, mockOnSelect, mockSuggestionRefs)
+      useSuggestionNavigation(
+        mockInputRef,
+        mockOnSelect,
+        () => mockSuggestionRefs
+      )
     );
 
     const mockEventDown = {
