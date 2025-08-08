@@ -3,27 +3,32 @@ import tokens from '@tokens/tokens.json';
 import { getToken } from '@tokens/tokenUtils';
 
 export const PriceTiersContainer = styled.div`
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  display: flex;
   gap: ${({ theme }) =>
-    getToken(theme, 'spacing.base.value', tokens.spacing.base.value)};
-  margin-bottom: ${({ theme }) =>
-    getToken(theme, 'spacing.xl.value', tokens.spacing.xl.value)};
+    getToken(theme, 'spacing.lg.value', tokens.spacing.lg.value)};
+  justify-content: center;
+  align-items: stretch;
+  width: 100%;
   max-width: 1200px;
   margin: 0 auto;
-  padding: 0
-    ${({ theme }) =>
-      getToken(theme, 'spacing.base.value', tokens.spacing.base.value)};
+  padding: ${({ theme }) =>
+    getToken(theme, 'spacing.base.value', tokens.spacing.base.value)};
 
-  @media (max-width: 768px) {
+  @media (min-width: 1024px) {
+    flex-direction: row;
+  }
+
+  @media (max-width: 1023px) {
     display: none;
   }
 `;
 
 export const SwipeContainer = styled.div`
-  display: none;
+  @media (min-width: 1024px) {
+    display: none;
+  }
 
-  @media (max-width: 768px) {
+  @media (max-width: 1023px) {
     display: block;
     width: 100%;
   }
@@ -69,18 +74,23 @@ export const LoadingCard = styled.div`
       tokens.borderRadius.default.value
     )};
   text-align: center;
-  min-width: 280px;
-  min-height: 200px;
   display: flex;
   flex-direction: column;
   justify-content: center;
   align-items: center;
 
-  @media (max-width: 768px) {
+  @media (min-width: 1024px) {
+    flex: 1;
+    min-width: 280px;
+    min-height: 200px;
+  }
+
+  @media (max-width: 1023px) {
     scroll-snap-align: center;
     flex-shrink: 0;
     width: calc(100% - 2rem);
     min-width: calc(100% - 2rem);
+    min-height: 200px;
   }
 
   @media (prefers-color-scheme: dark) {
@@ -144,10 +154,20 @@ export const PriceTierCard = styled.div<{
   transition: all 0.2s ease-in-out;
   text-align: center;
 
-  @media (max-width: 768px) {
+  /* Desktop: equal width cards in row */
+  @media (min-width: 1024px) {
+    flex: 1;
+    min-width: 280px;
+    max-width: 350px;
+  }
+
+  /* Mobile: full width cards for swipe */
+  @media (max-width: 1023px) {
     scroll-snap-align: center;
     flex-shrink: 0;
     width: 100%;
+    min-width: 100%;
+    max-width: 100%;
     min-height: 200px;
   }
 

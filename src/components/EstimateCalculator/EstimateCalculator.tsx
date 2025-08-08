@@ -7,6 +7,7 @@ import { Checkbox } from '@components/Checkbox/Checkbox';
 import { EstimateLineItem } from '@components/EstimateLineItem/EstimateLineItem';
 import { AreaAdjuster } from '@components/AreaAdjuster/AreaAdjuster';
 import { useElementRefs } from '@hooks/useElementRefs';
+import { useKeyboardNavigation } from '@hooks/useKeyboardNavigation';
 import {
   formatCurrency,
   formatSquareFeet,
@@ -43,7 +44,6 @@ export function EstimateCalculator({
     Array<'design' | 'installation' | 'maintenance'>
   >(['design', 'installation']);
   const [lotSizeSqFt, setLotSizeSqFt] = useState<string>('');
-  const [showDetails, setShowDetails] = useState<boolean>(false);
   const { estimate, calculateEstimate, status, error } =
     useLandscapeEstimator();
 
@@ -51,17 +51,54 @@ export function EstimateCalculator({
     services.length
   );
 
-  // Ref to store timeout for debounced analytics
+  const calculatorContainerRef = useRef<HTMLDivElement>(null);
+  const areaAdjusterRef = useRef<HTMLInputElement>(null);
+
+  const totalElements = 1 + services.length;
+  const { elementRefs: allElementRefs } =
+    useElementRefs<HTMLElement>(totalElements);
+
+  const handleElementSelect = useCallback(
+    (index: number) => {
+      if (index === 0) {
+        if (areaAdjusterRef.current) {
+          areaAdjusterRef.current.focus();
+        }
+      } else {
+        const checkboxIndex = index - 1;
+        if (checkboxRefs[checkboxIndex]?.current) {
+          checkboxRefs[checkboxIndex].current?.focus();
+        }
+      }
+    },
+    [checkboxRefs]
+  );
+
+  const { handleTriggerKeyDown, handleElementKeyDown } = useKeyboardNavigation(
+    calculatorContainerRef,
+    handleElementSelect,
+    () => allElementRefs
+  );
+
+  useEffect(() => {
+    if (areaAdjusterRef.current) {
+      allElementRefs[0].current = areaAdjusterRef.current;
+    }
+
+    checkboxRefs.forEach((ref, index) => {
+      if (ref.current && allElementRefs[index + 1]) {
+        allElementRefs[index + 1].current = ref.current;
+      }
+    });
+  }, [allElementRefs, checkboxRefs, areaAdjusterRef]);
+
   const analyticsTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Debounced analytics function
   const logAnalyticsDebounced = useCallback(() => {
-    // Clear existing timeout
     if (analyticsTimeoutRef.current) {
       clearTimeout(analyticsTimeoutRef.current);
     }
 
-    // Set new timeout
     analyticsTimeoutRef.current = setTimeout(() => {
       if (status === 'complete' && estimate && addressData.place_id) {
         const avgEstimate =
@@ -137,7 +174,6 @@ export function EstimateCalculator({
     logAnalyticsDebounced();
   }, [logAnalyticsDebounced]);
 
-  // Cleanup timeout on unmount
   useEffect(() => {
     return () => {
       if (analyticsTimeoutRef.current) {
@@ -162,13 +198,20 @@ export function EstimateCalculator({
   };
 
   return (
-    <CalculatorContainer>
+    <CalculatorContainer
+      ref={calculatorContainerRef}
+      tabIndex={-1}
+      onKeyDown={handleTriggerKeyDown}
+    >
       <Title>Customize Your Landscaping Services</Title>
 
       <AreaAdjuster
+        ref={areaAdjusterRef}
         addressData={addressData}
         onAreaChange={handleAreaChange}
         initialPercentage={80}
+        onKeyDown={(e) => handleElementKeyDown?.(e, 0)}
+        currentEstimate={estimate?.finalEstimate}
       />
 
       <ServiceSelection>
@@ -185,6 +228,7 @@ export function EstimateCalculator({
                 service.value as 'design' | 'installation' | 'maintenance'
               )
             }
+            onKeyDown={(e) => handleElementKeyDown?.(e, index + 1)}
             id={`service-${service.value}`}
           />
         ))}
@@ -249,147 +293,6 @@ export function EstimateCalculator({
             <strong>Total Estimate:</strong>
             <span>{formatPriceRange(estimate.finalEstimate)}</span>
           </Total>
-
-          <div className="flex justify-start mt-4">
-            <button
-              type="button"
-              onClick={() => setShowDetails(!showDetails)}
-              className="inline-flex items-center px-2.5 py-1 text-xs font-medium text-gray-700 bg-gray-100 border border-gray-300 rounded-full hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-1 transition-colors"
-              aria-label={
-                showDetails
-                  ? 'Hide calculation details'
-                  : 'Show calculation details'
-              }
-            >
-              {showDetails ? 'Hide Details' : 'Show Details'}
-            </button>
-          </div>
-
-          {showDetails && (
-            <div className="mt-4 pt-4 border-t border-gray-200 space-y-2">
-              <h3 className="font-semibold mb-3">Calculation Details</h3>
-
-              <EstimateLineItem
-                label="Property Type"
-                value={addressData.calc?.property_type || 'Unknown'}
-                show={!!addressData.calc?.property_type}
-              />
-
-              <EstimateLineItem
-                label="Building Size"
-                value={formatSquareFeet(addressData.calc?.building_sqft || 0)}
-                show={
-                  !!addressData.calc?.building_sqft &&
-                  addressData.calc.building_sqft > 0
-                }
-              />
-
-              <EstimateLineItem
-                label="Total Land Area"
-                value={formatSquareFeet(addressData.calc?.landarea || 0)}
-                show={
-                  !!addressData.calc?.landarea && addressData.calc.landarea > 0
-                }
-              />
-
-              <EstimateLineItem
-                label="Landscapable Area"
-                value={formatSquareFeet(
-                  addressData.calc?.estimated_landscapable_area || 0
-                )}
-                show={
-                  !!addressData.calc?.estimated_landscapable_area &&
-                  addressData.calc.estimated_landscapable_area > 0
-                }
-              />
-
-              <EstimateLineItem
-                label="Base Rate (per sq ft)"
-                value={`${formatCurrency(estimate.baseRatePerSqFt.min)} - ${formatCurrency(estimate.baseRatePerSqFt.max)}`}
-                show={!!estimate.baseRatePerSqFt}
-              />
-
-              <EstimateLineItem
-                label="Subtotal"
-                value={formatPriceRange(estimate.subtotal)}
-                show={!!estimate.subtotal}
-              />
-
-              <EstimateLineItem
-                label="Minimum Service Fee"
-                value={formatCurrency(estimate.minimumServiceFee)}
-                show={
-                  !!estimate.minimumServiceFee && estimate.minimumServiceFee > 0
-                }
-              />
-
-              <EstimateLineItem
-                label="Affluence Score"
-                value={`${addressData.affluence_score || 0}/100`}
-                show={typeof addressData.affluence_score === 'number'}
-              />
-
-              {typeof addressData.affluence_score === 'number' && (
-                <div className="mt-3 p-3 bg-gray-50 rounded-md text-sm">
-                  <h4 className="font-semibold mb-2">
-                    How Affluence Score Affects Pricing:
-                  </h4>
-                  <div className="space-y-1 text-gray-700">
-                    <div>
-                      • Score 0-50: Base rate × 0.85-1.0 (lower pricing)
-                    </div>
-                    <div>• Score 50: Base rate × 1.0 (standard pricing)</div>
-                    <div>
-                      • Score 51-100: Base rate × 1.0-1.25 (premium pricing)
-                    </div>
-                  </div>
-                  <div className="mt-2 text-xs text-gray-600">
-                    Current multiplier:{' '}
-                    {(() => {
-                      const score = addressData.affluence_score || 50;
-                      const clampedScore = Math.max(0, Math.min(100, score));
-                      let multiplier;
-                      if (clampedScore <= 50) {
-                        const ratio = clampedScore / 50;
-                        multiplier = 0.85 + (1.0 - 0.85) * ratio;
-                      } else {
-                        const ratio = (clampedScore - 50) / (100 - 50);
-                        multiplier = 1.0 + (1.25 - 1.0) * ratio;
-                      }
-                      return `×${multiplier.toFixed(2)}`;
-                    })()}
-                  </div>
-
-                  <div className="mt-3 pt-3 border-t border-gray-300">
-                    <h5 className="font-semibold mb-2 text-xs">
-                      How Affluence Score is Calculated:
-                    </h5>
-                    <div className="space-y-1 text-xs text-gray-600">
-                      <div>
-                        • <strong>Property Assessment:</strong> Total assessed
-                        value compared to regional median
-                      </div>
-                      <div>
-                        • <strong>Land Value Ratio:</strong> Proportion of land
-                        value to total assessment
-                      </div>
-                      <div>
-                        • <strong>Regional Context:</strong> Percentile ranking
-                        within St. Louis City/County
-                      </div>
-                      <div>
-                        • <strong>Score Range:</strong> 0-100 (higher = more
-                        affluent area)
-                      </div>
-                    </div>
-                    <div className="mt-2 text-xs text-gray-500">
-                      Based on county assessor data and regional market analysis
-                    </div>
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
 
           <Disclaimer>
             Estimate range is based on typical landscaping costs in your area.

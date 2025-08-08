@@ -46,23 +46,24 @@ describe('PriceTiers', () => {
   it('displays all three tiers', () => {
     renderWithTheme(<PriceTiers tiers={mockTiers} />);
 
-    expect(screen.getByText('Curb Appeal')).toBeInTheDocument();
-    expect(screen.getByText('Full Lawn')).toBeInTheDocument();
-    expect(screen.getByText('Dream Lawn')).toBeInTheDocument();
+    expect(screen.getAllByText('Curb Appeal')).toHaveLength(2);
+    expect(screen.getAllByText('Full Lawn')).toHaveLength(2);
+    expect(screen.getAllByText('Dream Lawn')).toHaveLength(2);
   });
 
   it('displays pricing for each tier', () => {
     renderWithTheme(<PriceTiers tiers={mockTiers} />);
 
-    expect(screen.getByText('$2,750')).toBeInTheDocument();
-    expect(screen.getByText('$4,800')).toBeInTheDocument();
-    expect(screen.getByText('$7,200')).toBeInTheDocument();
+    expect(screen.getAllByText(/\$/).length).toBeGreaterThanOrEqual(6);
+    expect(screen.getAllByText(/2,750/)).toHaveLength(2);
+    expect(screen.getAllByText(/4,800/)).toHaveLength(2);
+    expect(screen.getAllByText(/7,200/)).toHaveLength(2);
   });
 
   it('shows "Most Popular" badge for full lawn tier', () => {
     renderWithTheme(<PriceTiers tiers={mockTiers} />);
 
-    expect(screen.getByText('Most Popular')).toBeInTheDocument();
+    expect(screen.getAllByText('Most Popular')).toHaveLength(2);
   });
 
   it('calls onTierSelect when a tier is clicked', () => {
@@ -72,10 +73,10 @@ describe('PriceTiers', () => {
       <PriceTiers tiers={mockTiers} onTierSelect={mockOnTierSelect} />
     );
 
-    const curbAppealCard = screen.getByLabelText(
-      'Select Curb Appeal pricing tier'
+    const curbAppealCards = screen.getAllByLabelText(
+      'Select Curb Appeal pricing tier, $2,750'
     );
-    fireEvent.click(curbAppealCard);
+    fireEvent.click(curbAppealCards[0]);
 
     expect(mockOnTierSelect).toHaveBeenCalledWith('curb_appeal');
   });
@@ -87,8 +88,10 @@ describe('PriceTiers', () => {
       <PriceTiers tiers={mockTiers} onTierSelect={mockOnTierSelect} />
     );
 
-    const fullLawnCard = screen.getByLabelText('Select Full Lawn pricing tier');
-    fireEvent.keyDown(fullLawnCard, { key: 'Enter' });
+    const fullLawnCards = screen.getAllByLabelText(
+      'Select Full Lawn pricing tier, $4,800, most popular option'
+    );
+    fireEvent.keyDown(fullLawnCards[0], { key: 'Enter' });
 
     expect(mockOnTierSelect).toHaveBeenCalledWith('full_lawn');
   });
@@ -96,9 +99,10 @@ describe('PriceTiers', () => {
   it('displays rate per square foot when lotSizeSqFt is provided', () => {
     renderWithTheme(<PriceTiers tiers={mockTiers} lotSizeSqFt={500} />);
 
-    expect(screen.getByText(/\$4.5\/sq ft/)).toBeInTheDocument();
-    expect(screen.getByText(/\$8\/sq ft/)).toBeInTheDocument();
-    expect(screen.getByText(/\$12\/sq ft/)).toBeInTheDocument();
+    // Both desktop and mobile versions are rendered
+    expect(screen.getAllByText(/\$4.5\/sq ft/)).toHaveLength(2);
+    expect(screen.getAllByText(/\$8\/sq ft/)).toHaveLength(2);
+    expect(screen.getAllByText(/\$12\/sq ft/)).toHaveLength(2);
   });
 
   it('renders null when no tiers provided', () => {
@@ -109,7 +113,10 @@ describe('PriceTiers', () => {
   it('marks selected tier correctly', () => {
     renderWithTheme(<PriceTiers tiers={mockTiers} selectedTier="full_lawn" />);
 
-    const fullLawnCard = screen.getByLabelText('Select Full Lawn pricing tier');
-    expect(fullLawnCard).toHaveAttribute('aria-pressed', 'true');
+    const fullLawnCards = screen.getAllByLabelText(
+      'Select Full Lawn pricing tier, $4,800, most popular option, currently selected'
+    );
+    expect(fullLawnCards[0]).toHaveAttribute('aria-pressed', 'true');
+    expect(fullLawnCards[1]).toHaveAttribute('aria-pressed', 'true');
   });
 });

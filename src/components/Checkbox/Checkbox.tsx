@@ -40,18 +40,16 @@ export const Checkbox = forwardRef<HTMLInputElement, CheckboxProps>(
     };
 
     const handleKeyDown = (event: React.KeyboardEvent<HTMLInputElement>) => {
-      // Call external onKeyDown first (for navigation)
-      onKeyDown?.(event);
-
-      // If event wasn't prevented, handle our internal logic
       if (
-        !event.defaultPrevented &&
         !disabled &&
         (event.key === ' ' || event.key === 'Spacebar' || event.key === 'Enter')
       ) {
         event.preventDefault();
         onChange(!checked);
+        return;
       }
+
+      onKeyDown?.(event);
     };
 
     return (
@@ -64,6 +62,7 @@ export const Checkbox = forwardRef<HTMLInputElement, CheckboxProps>(
           onKeyDown={handleKeyDown}
           disabled={disabled}
           id={id}
+          tabIndex={0}
           aria-describedby={id ? `${id}-label` : undefined}
         />
         <CheckboxBox

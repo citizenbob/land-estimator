@@ -38,7 +38,10 @@ export const PriceTiers: React.FC<PriceTiersProps> = ({
   onTierSelect,
   tiers: propTiers,
   lotSizeSqFt: propLotSizeSqFt,
-  isLoading: propIsLoading
+  isLoading: propIsLoading,
+  elementRefs,
+  onElementKeyDown,
+  onSwipe
 }) => {
   const swipeRef = useRef<HTMLDivElement>(null);
   const [translateX, setTranslateX] = useState(0);
@@ -83,14 +86,8 @@ export const PriceTiers: React.FC<PriceTiersProps> = ({
   const handleTouchEnd = () => {
     setIsDragging(false);
     if (Math.abs(translateX) > 50) {
-      if (swipeRef.current) {
-        const cardWidth = 320 + 16;
-        const direction = translateX > 0 ? -1 : 1;
-        swipeRef.current.scrollBy({
-          left: direction * cardWidth,
-          behavior: 'smooth'
-        });
-      }
+      const direction = translateX > 0 ? 'right' : 'left';
+      onSwipe?.(direction);
     }
     setTranslateX(0);
   };
@@ -135,26 +132,36 @@ export const PriceTiers: React.FC<PriceTiersProps> = ({
     }
   };
 
-  const renderTierCard = (tier: PriceTier) => {
+  const renderTierCard = (tier: PriceTier, index: number) => {
     const details = tierDetails[tier.tier];
     const isSelected = selectedTier === tier.tier;
+
+    const priceText = `$${tier.finalEstimate.toLocaleString()}`;
+    const rateText = lotSizeSqFt ? ` at $${tier.rate} per square foot` : '';
+    const popularText = details.popular ? ', most popular option' : '';
+    const selectedText = isSelected ? ', currently selected' : '';
+
+    const ariaLabel = `Select ${details.title} pricing tier, ${priceText}${rateText}${popularText}${selectedText}`;
 
     return (
       <PriceTierCard
         key={tier.tier}
+        ref={elementRefs?.[index]}
+        data-tier={tier.tier}
         $isSelected={isSelected}
         $isPopular={details.popular}
         onClick={() => handleTierClick(tier.tier)}
         role="button"
         tabIndex={0}
         onKeyDown={(e) => {
+          onElementKeyDown?.(e, index);
           if (e.key === 'Enter' || e.key === ' ') {
             e.preventDefault();
             handleTierClick(tier.tier);
           }
         }}
         aria-pressed={isSelected}
-        aria-label={`Select ${details.title} pricing tier`}
+        aria-label={ariaLabel}
       >
         {details.popular && <TierPopular>Most Popular</TierPopular>}
         <TierTitle>{details.title}</TierTitle>

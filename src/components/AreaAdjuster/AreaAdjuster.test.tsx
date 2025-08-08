@@ -43,8 +43,9 @@ describe('AreaAdjuster', () => {
 
     expect(screen.getByText('Adjust Landscapable Area')).toBeInTheDocument();
     expect(screen.getByText('4,800')).toBeInTheDocument();
-    expect(screen.getByText('sq ft')).toBeInTheDocument();
-    expect(screen.getByText('(80% of landscapable area)')).toBeInTheDocument();
+    expect(screen.getAllByText(/sq ft/)).toHaveLength(3);
+    expect(screen.getByText(/80%/)).toBeInTheDocument();
+    expect(screen.getByText(/of available parcel/)).toBeInTheDocument();
   });
 
   it('calls onAreaChange when slider is moved', () => {
@@ -73,7 +74,8 @@ describe('AreaAdjuster', () => {
     fireEvent.change(slider, { target: { value: '50' } });
 
     expect(screen.getByText('3,000')).toBeInTheDocument();
-    expect(screen.getByText('(50% of landscapable area)')).toBeInTheDocument();
+    expect(screen.getByText(/50%/)).toBeInTheDocument();
+    expect(screen.getByText(/of available parcel/)).toBeInTheDocument();
   });
 
   it('respects custom initial percentage', () => {
@@ -86,7 +88,8 @@ describe('AreaAdjuster', () => {
     );
 
     expect(screen.getByText('5,400')).toBeInTheDocument();
-    expect(screen.getByText('(90% of landscapable area)')).toBeInTheDocument();
+    expect(screen.getByText(/90%/)).toBeInTheDocument();
+    expect(screen.getByText(/of available parcel/)).toBeInTheDocument();
   });
 
   it('works correctly with smaller landscapable area', () => {
@@ -108,7 +111,8 @@ describe('AreaAdjuster', () => {
     );
 
     expect(screen.getByText('3,600')).toBeInTheDocument();
-    expect(screen.getByText('(80% of landscapable area)')).toBeInTheDocument();
+    expect(screen.getByText(/80%/)).toBeInTheDocument();
+    expect(screen.getByText(/of available parcel/)).toBeInTheDocument();
   });
 
   it('shows range labels correctly', () => {

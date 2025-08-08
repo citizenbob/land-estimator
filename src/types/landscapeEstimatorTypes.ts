@@ -61,10 +61,16 @@ export interface PriceTiersProps {
   addressData?: EnrichedAddressSuggestion;
   selectedTier?: PriceTierType;
   onTierSelect?: (tier: PriceTierType) => void;
-  // For testing/stories
   tiers?: PriceTier[];
   lotSizeSqFt?: number;
   isLoading?: boolean;
+  elementRefs?: React.RefObject<HTMLDivElement>[];
+  onElementKeyDown?: (
+    e: React.KeyboardEvent<HTMLDivElement>,
+    index: number
+  ) => void;
+  containerRef?: React.RefObject<HTMLDivElement>;
+  onSwipe?: (direction: 'left' | 'right') => void;
 }
 
 export interface EstimateDisplay {
