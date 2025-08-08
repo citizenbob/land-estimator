@@ -23,8 +23,8 @@
   --colors-light-error: #f44336;
   --colors-light-warning: #ff9800;
   --colors-light-info: #bdbdbd;
-  --colors-light-reverse-text: rgba(255,255,255,0.8);
-  --colors-light-shimmer: rgba(255,255,255,0.3);
+  --colors-light-reverse-text: rgba(255, 255, 255, 0.8);
+  --colors-light-shimmer: rgba(255, 255, 255, 0.3);
   --colors-dark-text: #e5e7eb;
   --colors-dark-background: #0a0a0a;
   --colors-dark-hover: #374151;
@@ -42,8 +42,8 @@
   --colors-dark-error: #e57373;
   --colors-dark-warning: #ffb74d;
   --colors-dark-info: #6b7280;
-  --colors-dark-reverse-text: rgba(0,0,0,0.8);
-  --colors-dark-shimmer: rgba(0,0,0,0.3);
+  --colors-dark-reverse-text: rgba(0, 0, 0, 0.8);
+  --colors-dark-shimmer: rgba(0, 0, 0, 0.3);
   --spacing-sm: 0.5rem;
   --spacing-base: 1rem;
   --spacing-lg: 1.5rem;
