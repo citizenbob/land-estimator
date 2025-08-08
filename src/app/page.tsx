@@ -1,25 +1,135 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useCallback, useRef, useMemo } from 'react';
 import AddressInput from '@components/AddressInput/AddressInput';
 import { EnrichedAddressSuggestion } from '@app-types/localAddressTypes';
 import { EstimateCalculator } from '@components/EstimateCalculator/EstimateCalculator';
+import { PriceTiers } from '@components/PriceTiers/PriceTiers';
+import IsoPreview from '@components/IsoPreview/IsoPreview';
 import Icon from '@components/Icon/Icon';
+import { useKeyboardNavigation } from '@hooks/useKeyboardNavigation';
+import { useElementRefs } from '@hooks/useElementRefs';
 
 export default function Home() {
   const [addressData, setAddressData] =
     useState<EnrichedAddressSuggestion | null>(null);
+  const [selectedTier, setSelectedTier] = useState<
+    'curb_appeal' | 'full_lawn' | 'dream_lawn'
+  >('full_lawn');
+  const [adjustedAreaSqFt, setAdjustedAreaSqFt] = useState<number | null>(null);
+
+  const tierOrder: Array<'curb_appeal' | 'full_lawn' | 'dream_lawn'> = useMemo(
+    () => ['curb_appeal', 'full_lawn', 'dream_lawn'],
+    []
+  );
+  const tierContainerRef = useRef<HTMLDivElement>(null);
+  const { elementRefs } = useElementRefs<HTMLDivElement>(tierOrder.length);
+
+  const handleTierSelect = (index: number) => {
+    setSelectedTier(tierOrder[index]);
+  };
+
+  const { handleTriggerKeyDown, handleElementKeyDown } = useKeyboardNavigation(
+    tierContainerRef,
+    handleTierSelect,
+    () => elementRefs
+  );
+
+  // Touch/swipe navigation
+  const handleSwipeNavigation = useCallback(
+    (direction: 'left' | 'right') => {
+      const currentIndex = tierOrder.indexOf(selectedTier);
+      let newIndex: number;
+
+      if (direction === 'left') {
+        newIndex = Math.min(currentIndex + 1, tierOrder.length - 1);
+      } else {
+        newIndex = Math.max(currentIndex - 1, 0);
+      }
+
+      if (newIndex !== currentIndex) {
+        setSelectedTier(tierOrder[newIndex]);
+      }
+    },
+    [selectedTier, tierOrder]
+  );
+
+  const handleAddressSelect = (address: EnrichedAddressSuggestion | null) => {
+    setAddressData(address);
+    setAdjustedAreaSqFt(null);
+  };
 
   const currentYear = new Date().getFullYear();
 
   return (
-    <div className="grid grid-rows-[20px_1fr_auto] items-center justify-items-center min-h-screen p-8 pb-4 gap-16 sm:p-20 font-[family-name:var(--font-geist-sans)]">
-      <main className="flex flex-col gap-8 row-start-2 items-center sm:items-start w-full max-w-2xl">
-        <AddressInput onAddressSelect={setAddressData} />
-        {addressData && <EstimateCalculator addressData={addressData} />}
-      </main>
+    <div className="min-h-screen flex flex-col p-4 pb-4 gap-6 sm:p-8 lg:p-0 font-[family-name:var(--font-geist-sans)]">
+      <div className="flex-1 flex flex-col items-center justify-center gap-8">
+        {addressData && (
+          <div
+            className="w-full"
+            ref={tierContainerRef}
+            tabIndex={0}
+            onKeyDown={handleTriggerKeyDown}
+          >
+            <div className="block lg:hidden lg:mb-8">
+              <IsoPreview
+                activeTier={selectedTier}
+                useIntersectionObserver={true}
+                onTierInView={setSelectedTier}
+              />
+              <p className="text-xs text-gray-500 text-center mt-3 font-medium">
+                Swipe for preview
+              </p>
+            </div>
 
-      <footer className="row-start-3 w-full border-t border-gray-200 mt-12 pt-6 pb-4">
+            <div className="hidden lg:flex lg:flex-col lg:gap-8 lg:items-center">
+              <div className="lg:w-full lg:max-w-2xl">
+                <IsoPreview
+                  activeTier={selectedTier}
+                  useIntersectionObserver={false}
+                />
+                <p className="text-xs text-gray-500 text-center mt-3 font-medium">
+                  Click a plan below for preview
+                </p>
+              </div>
+              <div className="lg:w-full lg:max-w-4xl">
+                <PriceTiers
+                  addressData={addressData}
+                  selectedTier={selectedTier}
+                  onTierSelect={setSelectedTier}
+                  lotSizeSqFt={adjustedAreaSqFt ?? undefined}
+                  elementRefs={elementRefs}
+                  onElementKeyDown={handleElementKeyDown}
+                  onSwipe={handleSwipeNavigation}
+                />
+              </div>
+            </div>
+
+            <div className="block lg:hidden mobile-pricing-tiers">
+              <PriceTiers
+                addressData={addressData}
+                selectedTier={selectedTier}
+                onTierSelect={setSelectedTier}
+                lotSizeSqFt={adjustedAreaSqFt ?? undefined}
+                elementRefs={elementRefs}
+                onElementKeyDown={handleElementKeyDown}
+                onSwipe={handleSwipeNavigation}
+              />
+            </div>
+          </div>
+        )}
+        <div className="w-full max-w-2xl flex flex-col gap-8 items-center sm:items-start">
+          <AddressInput onAddressSelect={handleAddressSelect} />
+          {addressData && (
+            <EstimateCalculator
+              addressData={addressData}
+              onAreaChange={setAdjustedAreaSqFt}
+            />
+          )}
+        </div>
+      </div>
+
+      <footer className="w-full border-t border-gray-200 mt-12 pt-6 pb-4">
         <div className="max-w-6xl mx-auto px-4">
           <div className="flex flex-col md:flex-row justify-between items-center gap-4">
             <div className="flex flex-col items-center md:items-start">

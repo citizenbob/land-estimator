@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import type {
   AddressLookupRecord,
   LocalAddressRecord
@@ -6,12 +6,12 @@ import type {
 import { searchAddresses } from '@services/addressSearch';
 import { getErrorMessage, logError } from '@lib/errorUtils';
 import { ParcelMetadataResponse } from '@app-types/apiResponseTypes';
-import { deduplicatedLookup } from '@lib/requestDeduplication';
 import { devLog } from '@lib/logger';
 import { transformToSuggestions } from '@lib/addressTransforms';
 
 export function useAddressLookup() {
   const [query, setQuery] = useState<string>('');
+  const [debouncedQuery, setDebouncedQuery] = useState<string>('');
   const [suggestions, setSuggestions] = useState<
     { place_id: string; display_name: string }[]
   >([]);
@@ -21,55 +21,87 @@ export function useAddressLookup() {
   const [error, setError] = useState<string | null>(null);
 
   const rawDataRef = useRef<Record<string, AddressLookupRecord>>({});
+  const debounceTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const currentSearchRef = useRef<string>('');
+
+  useEffect(() => {
+    if (debounceTimerRef.current) {
+      clearTimeout(debounceTimerRef.current);
+    }
+
+    debounceTimerRef.current = setTimeout(() => {
+      setDebouncedQuery(query);
+    }, 150);
+
+    return () => {
+      if (debounceTimerRef.current) {
+        clearTimeout(debounceTimerRef.current);
+      }
+    };
+  }, [query]);
+
+  useEffect(() => {
+    if (!debouncedQuery || debouncedQuery.trim().length < 3 || locked) {
+      setIsFetching(false);
+      setSuggestions([]);
+      setError(null);
+      setHasFetched(false);
+      return;
+    }
+
+    if (currentSearchRef.current === debouncedQuery) {
+      return;
+    }
+
+    currentSearchRef.current = debouncedQuery;
+    setIsFetching(true);
+    setError(null);
+
+    const performSearch = async () => {
+      try {
+        const results = await searchAddresses(debouncedQuery, 10);
+        devLog('📥 Client search results:', results);
+
+        if (currentSearchRef.current === debouncedQuery) {
+          results.forEach((item) => {
+            rawDataRef.current[item.id] = item;
+          });
+          setSuggestions(transformToSuggestions(results));
+          setHasFetched(true);
+        }
+      } catch (err: unknown) {
+        if (currentSearchRef.current === debouncedQuery) {
+          logError(err, {
+            operation: 'address_lookup',
+            query: debouncedQuery
+          });
+          const errorMessage = getErrorMessage(err);
+          setError(errorMessage);
+          setSuggestions([]);
+          setHasFetched(true);
+        }
+      } finally {
+        if (currentSearchRef.current === debouncedQuery) {
+          setIsFetching(false);
+        }
+      }
+    };
+
+    performSearch();
+  }, [debouncedQuery, locked]);
 
   const handleChange = (value: string) => {
     setQuery(value);
+    setLocked(false);
+
     setSuggestions([]);
     setError(null);
     setHasFetched(false);
-    setLocked(false);
 
-    if (!value) {
+    if (!value || value.trim().length < 3) {
       setIsFetching(false);
-      return;
+      currentSearchRef.current = '';
     }
-
-    if (value.trim().length < 3) {
-      setIsFetching(false);
-      return;
-    }
-
-    setIsFetching(true);
-
-    deduplicatedLookup(
-      value,
-      async (normalizedQuery) => {
-        const results = await searchAddresses(normalizedQuery, 10);
-        devLog('📥 Client search results:', results);
-        return results;
-      },
-      { debounce: true, debounceDelay: 200 }
-    )
-      .then((results) => {
-        results.forEach((item) => {
-          rawDataRef.current[item.id] = item;
-        });
-        setSuggestions(transformToSuggestions(results));
-        setHasFetched(true);
-      })
-      .catch((err: unknown) => {
-        logError(err, {
-          operation: 'address_lookup',
-          query: value
-        });
-        const errorMessage = getErrorMessage(err);
-        setError(errorMessage);
-        setSuggestions([]);
-        setHasFetched(true);
-      })
-      .finally(() => {
-        setIsFetching(false);
-      });
   };
 
   const handleSelect = (selected: string) => {
@@ -118,7 +150,6 @@ export function useAddressLookup() {
           };
         }
       } else {
-        // Handle error response
         const errorResponse = await response.json();
         logError(new Error(`API Error: ${response.status}`), {
           operation: 'parcel_metadata_fetch',

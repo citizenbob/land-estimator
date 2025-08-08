@@ -1,68 +1,17 @@
 import { useState, useCallback } from 'react';
 import { EnrichedAddressSuggestion } from '@app-types/localAddressTypes';
-import { estimateLandscapingPrice } from '@services/landscapeEstimator';
+import { BoundingBox } from '@app-types/geographic';
+import {
+  estimateLandscapingPrice,
+  estimateLandscapingPriceTiers
+} from '@services/landscapeEstimator';
+import {
+  TieredEstimateResult,
+  LandscapeEstimatorOptions,
+  EstimatorStatus,
+  EstimateResult
+} from '@app-types/landscapeEstimatorTypes';
 import { createInsufficientDataError, getErrorMessage } from '@lib/errorUtils';
-
-/**
- * Options for the landscape estimator hook
- */
-export interface LandscapeEstimatorOptions {
-  /** Whether this is a commercial project (affects pricing) */
-  isCommercial?: boolean;
-
-  /** Allow multiple landscaping services in one estimate */
-  serviceTypes?: Array<'design' | 'installation' | 'maintenance'>;
-  /** (Deprecated) Single service type for backward compatibility */
-  serviceType?:
-    | 'design'
-    | 'installation'
-    | 'design_installation'
-    | 'maintenance';
-
-  /** Override the calculated lot size if actual measurements are known */
-  overrideLotSizeSqFt?: number;
-}
-
-/**
- * Status of the landscape estimator
- */
-export type EstimatorStatus = 'idle' | 'calculating' | 'complete' | 'error';
-
-/**
- * Extended price breakdown with address information
- */
-export interface EstimateResult {
-  /** Address information */
-  address: {
-    display_name: string;
-    lat: number;
-    lon: number;
-  };
-
-  /** Size of the property lot in square feet */
-  lotSizeSqFt: number;
-
-  /** Base rate per square foot for landscaping work */
-  baseRatePerSqFt: { min: number; max: number };
-
-  /** Design fee estimate */
-  designFee: number;
-
-  /** Installation cost estimate */
-  installationCost: number;
-
-  /** Monthly maintenance cost estimate */
-  maintenanceMonthly: number;
-
-  /** Subtotal before minimum service fee application */
-  subtotal: { min: number; max: number };
-
-  /** Minimum service fee for any project */
-  minimumServiceFee: number;
-
-  /** Final price range estimate */
-  finalEstimate: { min: number; max: number };
-}
 
 /**
  * Hook that provides landscaping price estimates based on address data
@@ -72,7 +21,12 @@ export interface EstimateResult {
 export function useLandscapeEstimator() {
   const [status, setStatus] = useState<EstimatorStatus>('idle');
   const [estimate, setEstimate] = useState<EstimateResult | null>(null);
+  const [tieredEstimate, setTieredEstimate] =
+    useState<TieredEstimateResult | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  const [isTieredLoading, setIsTieredLoading] = useState(false);
+  const [tieredError, setTieredError] = useState<string | null>(null);
 
   const calculateEstimate = async (
     addressData: EnrichedAddressSuggestion,
@@ -92,7 +46,9 @@ export function useLandscapeEstimator() {
         });
       }
 
-      const landAreaSqFt = addressData.calc.estimated_landscapable_area;
+      const landAreaSqFt =
+        options?.overrideLotSizeSqFt ||
+        addressData.calc.estimated_landscapable_area;
 
       const latOffset = 0.001;
       const lonOffset = 0.001;
@@ -143,10 +99,46 @@ export function useLandscapeEstimator() {
     }
   };
 
+  const calculateTieredEstimate = useCallback(
+    async (
+      boundingBox: BoundingBox,
+      settings: LandscapeEstimatorOptions,
+      affluenceScore?: number
+    ) => {
+      try {
+        setIsTieredLoading(true);
+        setTieredError(null);
+
+        const tieredResult = await estimateLandscapingPriceTiers(boundingBox, {
+          isCommercial: settings.isCommercial,
+          serviceTypes: settings.serviceTypes,
+          overrideLotSizeSqFt: settings.overrideLotSizeSqFt,
+          affluenceScore: affluenceScore
+        });
+
+        setTieredEstimate(tieredResult);
+        return tieredResult;
+      } catch (error) {
+        const errorMessage =
+          error instanceof Error
+            ? error.message
+            : 'Failed to calculate tiered estimate';
+        setTieredError(errorMessage);
+        throw error;
+      } finally {
+        setIsTieredLoading(false);
+      }
+    },
+    []
+  );
+
   const resetEstimate = () => {
     setEstimate(null);
     setError(null);
     setStatus('idle');
+    setTieredEstimate(null);
+    setTieredError(null);
+    setIsTieredLoading(false);
   };
 
   return {
@@ -154,6 +146,10 @@ export function useLandscapeEstimator() {
     status,
     error,
     calculateEstimate: useCallback(calculateEstimate, []),
-    resetEstimate: useCallback(resetEstimate, [])
+    resetEstimate: useCallback(resetEstimate, []),
+    tieredEstimate,
+    isTieredLoading,
+    tieredError,
+    calculateTieredEstimate
   };
 }

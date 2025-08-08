@@ -1,5 +1,10 @@
 import { ParcelMetadata } from '@app-types/parcel-index';
-import type { PriceBreakdown } from '@app-types/landscapeEstimatorTypes';
+import type {
+  PriceBreakdown,
+  TieredEstimateResult,
+  PriceTier,
+  PriceTierType
+} from '@app-types/landscapeEstimatorTypes';
 import {
   sumByProperty,
   sumMinMaxProperty,
@@ -11,6 +16,12 @@ type BoundingBox = [string, string, string, string];
 const PRICING = {
   residential: {
     baseRate: { min: 4.5, max: 12 },
+    // New tier-based rates
+    tierRates: {
+      curb_appeal: 4.5,
+      full_lawn: 8,
+      dream_lawn: 12
+    },
     complexMultiplier: 1.75,
     designRateHourly: { min: 70, max: 120 },
     designPercentOfInstall: 0.2,
@@ -229,6 +240,129 @@ export function estimateLandscapingPrice(
     computeSingleService(boundingBox, t, options)
   );
   return mergeBreakdowns(breakdowns);
+}
+
+// New tier-based pricing functions
+function calculateTierEstimate(
+  lotSizeSqFt: number,
+  tierType: PriceTierType,
+  serviceTypes: Array<'design' | 'installation' | 'maintenance'>,
+  options?: {
+    isCommercial?: boolean;
+    affluenceScore?: number;
+  }
+): PriceTier {
+  const { isCommercial = false, affluenceScore = 50 } = options || {};
+
+  const config = PRICING.residential;
+  const baseRate = config.tierRates[tierType];
+
+  const commercialMultiplier = isCommercial ? PRICING.commercialMultiplier : 1;
+  const affluenceMultiplier = calculateAffluenceMultiplier(affluenceScore);
+  const adjustedRate = baseRate * commercialMultiplier * affluenceMultiplier;
+
+  let designFee = 0;
+  let installationCost = 0;
+  let maintenanceMonthly = 0;
+
+  if (serviceTypes.includes('installation')) {
+    installationCost = lotSizeSqFt * adjustedRate;
+  }
+
+  if (serviceTypes.includes('design')) {
+    designFee = installationCost * config.designPercentOfInstall;
+  }
+
+  if (serviceTypes.includes('maintenance')) {
+    const maintenanceBase =
+      (config.maintenanceMonthly.min + config.maintenanceMonthly.max) / 2;
+    const tierMultiplier = adjustedRate / 8;
+    maintenanceMonthly = maintenanceBase * tierMultiplier;
+  }
+
+  const subtotal = designFee + installationCost + maintenanceMonthly;
+  const finalEstimate = Math.max(subtotal, config.minimumServiceFee);
+
+  return {
+    tier: tierType,
+    rate: adjustedRate,
+    designFee,
+    installationCost,
+    maintenanceMonthly,
+    finalEstimate
+  };
+}
+
+export function estimateLandscapingPriceTiers(
+  boundingBox: BoundingBox,
+  options?: {
+    isCommercial?: boolean;
+    serviceTypes?: Array<'design' | 'installation' | 'maintenance'>;
+    overrideLotSizeSqFt?: number;
+    affluenceScore?: number;
+  }
+): TieredEstimateResult {
+  const {
+    serviceTypes = ['design', 'installation'],
+    overrideLotSizeSqFt,
+    ...tierOptions
+  } = options || {};
+
+  const lotSizeSqFt =
+    overrideLotSizeSqFt || calculateAreaFromBoundingBox(boundingBox);
+
+  const tiers = {
+    curb_appeal: calculateTierEstimate(
+      lotSizeSqFt,
+      'curb_appeal',
+      serviceTypes,
+      tierOptions
+    ),
+    full_lawn: calculateTierEstimate(
+      lotSizeSqFt,
+      'full_lawn',
+      serviceTypes,
+      tierOptions
+    ),
+    dream_lawn: calculateTierEstimate(
+      lotSizeSqFt,
+      'dream_lawn',
+      serviceTypes,
+      tierOptions
+    )
+  };
+
+  return {
+    address: {
+      display_name: '',
+      lat: 0,
+      lon: 0
+    },
+    lotSizeSqFt,
+    minimumServiceFee: PRICING.residential.minimumServiceFee,
+    tiers
+  };
+}
+
+export function estimateLandscapingPriceTiersFromParcel(
+  parcelData: ParcelMetadata,
+  options?: {
+    isCommercial?: boolean;
+    serviceTypes?: Array<'design' | 'installation' | 'maintenance'>;
+  }
+): TieredEstimateResult {
+  const landscapableAreaSqFt = parcelData.calc.estimated_landscapable_area;
+
+  const isCommercial =
+    options?.isCommercial ?? parcelData.calc.property_type === 'commercial';
+
+  const dummyBoundingBox: BoundingBox = ['0', '0', '0', '0'];
+
+  return estimateLandscapingPriceTiers(dummyBoundingBox, {
+    ...options,
+    isCommercial,
+    overrideLotSizeSqFt: landscapableAreaSqFt
+  });
 }
 
 export function estimateLandscapingPriceFromParcel(

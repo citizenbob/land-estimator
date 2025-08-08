@@ -13,9 +13,21 @@ interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
   style?: React.CSSProperties;
 }
 
-const Button: React.FC<ButtonProps> = ({ children, loading, ...props }) => {
+const Button: React.FC<ButtonProps> = ({
+  children,
+  loading,
+  variant,
+  size,
+  ...props
+}) => {
   return (
-    <ButtonStyles loading={loading} {...props}>
+    <ButtonStyles
+      loading={loading}
+      variant={variant}
+      size={size}
+      tabIndex={0}
+      {...props}
+    >
       {children}
     </ButtonStyles>
   );

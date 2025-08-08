@@ -3,10 +3,16 @@ import tokens from '@tokens/tokens.json';
 import { getToken } from '@tokens/tokenUtils';
 
 export const CalculatorContainer = styled.div.attrs(() => ({
-  className: 'estimate-calculator rounded-md shadow-sm w-full'
+  className: 'rounded-lg shadow-sm'
 }))`
   padding: ${({ theme }) =>
-    getToken(theme, 'spacing.base.value', tokens.spacing.base.value)};
+    getToken(theme, 'spacing.lg.value', tokens.spacing.lg.value)};
+  background-color: ${({ theme }) =>
+    getToken(
+      theme,
+      'colors.light.background.value',
+      tokens.colors.light.background.value
+    )};
   border: 1px solid
     ${({ theme }) =>
       getToken(
@@ -14,108 +20,83 @@ export const CalculatorContainer = styled.div.attrs(() => ({
         'colors.light.gray200.value',
         tokens.colors.light.gray200.value
       )};
-  background: ${({ theme }) =>
+  border-radius: ${({ theme }) =>
     getToken(
       theme,
-      'colors.light.background.value',
-      tokens.colors.light.background.value
+      'borderRadius.default.value',
+      tokens.borderRadius.default.value
     )};
 
   @media (prefers-color-scheme: dark) {
-    border-color: ${({ theme }) =>
-      getToken(
-        theme,
-        'colors.dark.gray300.value',
-        tokens.colors.dark.gray300.value
-      )};
-    background: ${({ theme }) =>
+    background-color: ${({ theme }) =>
       getToken(
         theme,
         'colors.dark.background.value',
         tokens.colors.dark.background.value
       )};
-  }
-`;
-
-export const Title = styled.h2.attrs(() => ({
-  className: 'text-xl font-semibold mb-4'
-}))`
-  color: ${({ theme }) =>
-    getToken(theme, 'colors.light.text.value', tokens.colors.light.text.value)};
-
-  @media (prefers-color-scheme: dark) {
-    color: ${({ theme }) =>
-      getToken(theme, 'colors.dark.text.value', tokens.colors.dark.text.value)};
-  }
-`;
-
-export const ServiceSelection = styled.div.attrs(() => ({
-  className: 'service-selection flex flex-col sm:flex-row gap-2'
-}))`
-  gap: ${({ theme }) =>
-    getToken(theme, 'spacing.sm.value', tokens.spacing.sm.value)};
-`;
-
-export const ServiceLabel = styled.label.attrs(() => ({
-  className: 'flex items-center gap-2 cursor-pointer'
-}))`
-  color: ${({ theme }) =>
-    getToken(theme, 'colors.light.text.value', tokens.colors.light.text.value)};
-
-  @media (prefers-color-scheme: dark) {
-    color: ${({ theme }) =>
-      getToken(theme, 'colors.dark.text.value', tokens.colors.dark.text.value)};
-  }
-`;
-
-export const StatusContainer = styled.div.attrs(() => ({
-  className: 'status-container my-2 flex items-center gap-2'
-}))``;
-
-export const Spinner = styled.span.attrs(() => ({
-  className: 'inline-block w-4 h-4 rounded-full animate-spin'
-}))`
-  border: 2px solid
-    ${({ theme }) =>
+    border-color: ${({ theme }) =>
       getToken(
         theme,
-        'colors.light.info.value',
-        tokens.colors.light.info.value
+        'colors.dark.border.value',
+        tokens.colors.dark.border.value
       )};
-  border-top-color: transparent;
-
-  @media (prefers-color-scheme: dark) {
-    border: 2px solid
-      ${({ theme }) =>
-        getToken(
-          theme,
-          'colors.dark.info.value',
-          tokens.colors.dark.info.value
-        )};
-    border-top-color: transparent;
   }
 `;
 
-export const EstimateBreakdown = styled.div.attrs(() => ({
-  className: 'estimate-breakdown space-y-2'
-}))``;
-
-export const LineItem = styled.div.attrs(() => ({
-  className: 'line-item flex justify-between p-2 rounded'
-}))`
+export const Title = styled.h2`
+  font-size: 1.5rem;
+  font-weight: 600;
+  margin: 0 0
+    ${({ theme }) =>
+      getToken(theme, 'spacing.lg.value', tokens.spacing.lg.value)};
   color: ${({ theme }) =>
     getToken(theme, 'colors.light.text.value', tokens.colors.light.text.value)};
-  background: ${({ theme }) =>
+
+  @media (prefers-color-scheme: dark) {
+    color: ${({ theme }) =>
+      getToken(theme, 'colors.dark.text.value', tokens.colors.dark.text.value)};
+  }
+`;
+
+export const ServiceSelection = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: ${({ theme }) =>
+    getToken(theme, 'spacing.base.value', tokens.spacing.base.value)};
+  margin-bottom: ${({ theme }) =>
+    getToken(theme, 'spacing.lg.value', tokens.spacing.lg.value)};
+
+  @media (min-width: 640px) {
+    flex-direction: row;
+    flex-wrap: wrap;
+  }
+`;
+
+export const StatusContainer = styled.div`
+  display: flex;
+  align-items: center;
+  gap: ${({ theme }) =>
+    getToken(theme, 'spacing.sm.value', tokens.spacing.sm.value)};
+  margin: ${({ theme }) =>
+      getToken(theme, 'spacing.base.value', tokens.spacing.base.value)}
+    0;
+  padding: ${({ theme }) =>
+    getToken(theme, 'spacing.sm.value', tokens.spacing.sm.value)};
+  background-color: ${({ theme }) =>
     getToken(
       theme,
-      'colors.light.background.value',
-      tokens.colors.light.background.value
+      'colors.light.gray100.value',
+      tokens.colors.light.gray100.value
+    )};
+  border-radius: ${({ theme }) =>
+    getToken(
+      theme,
+      'borderRadius.default.value',
+      tokens.borderRadius.default.value
     )};
 
   @media (prefers-color-scheme: dark) {
-    color: ${({ theme }) =>
-      getToken(theme, 'colors.dark.text.value', tokens.colors.dark.text.value)};
-    background: ${({ theme }) =>
+    background-color: ${({ theme }) =>
       getToken(
         theme,
         'colors.dark.gray100.value',
@@ -124,47 +105,143 @@ export const LineItem = styled.div.attrs(() => ({
   }
 `;
 
-export const Total = styled.div.attrs(() => ({
-  className: 'total mt-4 flex justify-between font-bold p-2 rounded'
-}))`
+export const Spinner = styled.div`
+  width: 1rem;
+  height: 1rem;
+  border: 2px solid
+    ${({ theme }) =>
+      getToken(
+        theme,
+        'colors.light.gray300.value',
+        tokens.colors.light.gray300.value
+      )};
+  border-top-color: ${({ theme }) =>
+    getToken(theme, 'colors.primary.value', tokens.colors.primary.value)};
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+
+  @keyframes spin {
+    to {
+      transform: rotate(360deg);
+    }
+  }
+
+  @media (prefers-color-scheme: dark) {
+    border-color: ${({ theme }) =>
+      getToken(
+        theme,
+        'colors.dark.gray300.value',
+        tokens.colors.dark.gray300.value
+      )};
+    border-top-color: ${({ theme }) =>
+      getToken(theme, 'colors.primary.value', tokens.colors.primary.value)};
+  }
+`;
+
+export const EstimateBreakdown = styled.div`
+  margin: ${({ theme }) =>
+      getToken(theme, 'spacing.lg.value', tokens.spacing.lg.value)}
+    0;
+`;
+
+export const LineItem = styled.div`
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: ${({ theme }) =>
+    getToken(theme, 'spacing.base.value', tokens.spacing.base.value)};
+  margin-bottom: ${({ theme }) =>
+    getToken(theme, 'spacing.sm.value', tokens.spacing.sm.value)};
   color: ${({ theme }) =>
-    getToken(theme, 'colors.light.text.value', tokens.colors.light.text.value)};
-  background: ${({ theme }) =>
     getToken(
       theme,
-      'colors.light.gray100.value',
-      tokens.colors.light.gray100.value
+      'colors.light.gray900.value',
+      tokens.colors.light.gray900.value
     )};
-  border-top: 1px solid
+  background-color: ${({ theme }) =>
+    getToken(
+      theme,
+      'colors.light.background.value',
+      tokens.colors.light.background.value
+    )};
+  border: 1px solid
     ${({ theme }) =>
       getToken(
         theme,
         'colors.light.gray200.value',
         tokens.colors.light.gray200.value
       )};
+  border-radius: ${({ theme }) =>
+    getToken(
+      theme,
+      'borderRadius.default.value',
+      tokens.borderRadius.default.value
+    )};
+  font-size: 0.875rem;
+
+  &:last-child {
+    margin-bottom: 0;
+  }
 
   @media (prefers-color-scheme: dark) {
     color: ${({ theme }) =>
       getToken(theme, 'colors.dark.text.value', tokens.colors.dark.text.value)};
-    background: ${({ theme }) =>
+    background-color: ${({ theme }) =>
       getToken(
         theme,
-        'colors.dark.gray200.value',
-        tokens.colors.dark.gray200.value
+        'colors.dark.background.value',
+        tokens.colors.dark.background.value
       )};
-    border-top: 1px solid
-      ${({ theme }) =>
-        getToken(
-          theme,
-          'colors.dark.gray300.value',
-          tokens.colors.dark.gray300.value
-        )};
+    border-color: ${({ theme }) =>
+      getToken(
+        theme,
+        'colors.dark.gray700.value',
+        tokens.colors.dark.gray700.value
+      )};
   }
 `;
 
-export const LotSizeContainer = styled.div.attrs(() => ({
-  className: 'lot-size-container mb-4 flex flex-col'
-}))`
+export const Total = styled.div`
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: ${({ theme }) =>
+    getToken(theme, 'spacing.base.value', tokens.spacing.base.value)};
+  margin-top: ${({ theme }) =>
+    getToken(theme, 'spacing.lg.value', tokens.spacing.lg.value)};
+  font-weight: 600;
+  font-size: 1.125rem;
+  color: ${({ theme }) =>
+    getToken(theme, 'colors.light.text.value', tokens.colors.light.text.value)};
+  background-color: ${({ theme }) =>
+    getToken(theme, 'colors.primary.value', tokens.colors.primary.value)}20;
+  border: 1px solid
+    ${({ theme }) =>
+      getToken(theme, 'colors.primary.value', tokens.colors.primary.value)};
+  border-radius: ${({ theme }) =>
+    getToken(
+      theme,
+      'borderRadius.default.value',
+      tokens.borderRadius.default.value
+    )};
+
+  @media (prefers-color-scheme: dark) {
+    color: ${({ theme }) =>
+      getToken(theme, 'colors.dark.text.value', tokens.colors.dark.text.value)};
+  }
+`;
+
+export const LotSizeContainer = styled.div`
+  display: flex;
+  flex-direction: column;
+  margin-bottom: ${({ theme }) =>
+    getToken(theme, 'spacing.lg.value', tokens.spacing.lg.value)};
+`;
+
+export const LotSizeLabel = styled.label`
+  font-weight: 500;
+  margin-bottom: ${({ theme }) =>
+    getToken(theme, 'spacing.sm.value', tokens.spacing.sm.value)};
   color: ${({ theme }) =>
     getToken(theme, 'colors.light.text.value', tokens.colors.light.text.value)};
 
@@ -174,42 +251,57 @@ export const LotSizeContainer = styled.div.attrs(() => ({
   }
 `;
 
-export const LotSizeLabel = styled.label.attrs(() => ({
-  className: 'mb-2 font-medium'
-}))`
+export const Disclaimer = styled.p`
+  font-size: 0.75rem;
+  font-style: italic;
+  margin-top: ${({ theme }) =>
+    getToken(theme, 'spacing.base.value', tokens.spacing.base.value)};
+  padding: ${({ theme }) =>
+    getToken(theme, 'spacing.sm.value', tokens.spacing.sm.value)};
   color: ${({ theme }) =>
     getToken(
       theme,
-      'colors.light.gray800.value',
-      tokens.colors.light.gray800.value
+      'colors.light.gray700.value',
+      tokens.colors.light.gray700.value
     )};
-
-  @media (prefers-color-scheme: dark) {
-    color: ${({ theme }) =>
+  background-color: ${({ theme }) =>
+    getToken(
+      theme,
+      'colors.light.gray100.value',
+      tokens.colors.light.gray100.value
+    )};
+  border-radius: ${({ theme }) =>
+    getToken(
+      theme,
+      'borderRadius.default.value',
+      tokens.borderRadius.default.value
+    )};
+  border-left: 3px solid
+    ${({ theme }) =>
       getToken(
         theme,
-        'colors.dark.gray800.value',
-        tokens.colors.dark.gray800.value
+        'colors.light.gray300.value',
+        tokens.colors.light.gray300.value
       )};
-  }
-`;
-
-export const Disclaimer = styled.p.attrs(() => ({
-  className: 'text-xs mt-2 italic'
-}))`
-  color: ${({ theme }) =>
-    getToken(
-      theme,
-      'colors.light.gray600.value',
-      tokens.colors.light.gray600.value
-    )};
 
   @media (prefers-color-scheme: dark) {
     color: ${({ theme }) =>
       getToken(
         theme,
-        'colors.dark.gray600.value',
-        tokens.colors.dark.gray600.value
+        'colors.dark.gray300.value',
+        tokens.colors.dark.gray300.value
+      )};
+    background-color: ${({ theme }) =>
+      getToken(
+        theme,
+        'colors.dark.gray100.value',
+        tokens.colors.dark.gray100.value
+      )};
+    border-left-color: ${({ theme }) =>
+      getToken(
+        theme,
+        'colors.dark.gray300.value',
+        tokens.colors.dark.gray300.value
       )};
   }
 `;

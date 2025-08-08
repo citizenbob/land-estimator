@@ -231,7 +231,7 @@ describe('AddressInput', () => {
     fireEvent.change(input, { target: { value: '2323 E Highland' } });
 
     await waitFor(() => {
-      expect(mockSearchAddresses).toHaveBeenCalledWith('2323 e highland', 10);
+      expect(mockSearchAddresses).toHaveBeenCalledWith('2323 E Highland', 10);
     });
 
     await waitFor(() => {
@@ -293,6 +293,7 @@ describe('AddressInput', () => {
 
   it('logs an event when "Get Instant Estimate" is clicked', async () => {
     const logEvent = vi.fn();
+    const onAddressSelect = vi.fn();
 
     const suggestion = {
       place_id: MOCK_LOCAL_ADDRESSES[0].id,
@@ -307,6 +308,7 @@ describe('AddressInput', () => {
           locked: true
         })}
         logEvent={logEvent}
+        onAddressSelect={onAddressSelect}
       />
     );
 
@@ -319,7 +321,7 @@ describe('AddressInput', () => {
 
     await waitFor(() => {
       expect(logEvent).toHaveBeenCalledWith('estimate_button_clicked', {
-        address_id: MOCK_LOCAL_ADDRESSES[0].id
+        address_id: MOCK_LOCAL_ADDRESSES[0].id.toString()
       });
     });
   });

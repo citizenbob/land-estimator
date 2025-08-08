@@ -1,10 +1,13 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useLandscapeEstimator } from '@hooks/useLandscapeEstimator';
 import { EnrichedAddressSuggestion } from '@app-types/localAddressTypes';
 import { logEvent } from '@services/logger';
 import Alert from '@components/Alert/Alert';
-import InputField from '@components/InputField/InputField';
+import { Checkbox } from '@components/Checkbox/Checkbox';
 import { EstimateLineItem } from '@components/EstimateLineItem/EstimateLineItem';
+import { AreaAdjuster } from '@components/AreaAdjuster/AreaAdjuster';
+import { useElementRefs } from '@hooks/useElementRefs';
+import { useKeyboardNavigation } from '@hooks/useKeyboardNavigation';
 import {
   formatCurrency,
   formatSquareFeet,
@@ -14,9 +17,7 @@ import {
 import {
   CalculatorContainer,
   Title,
-  LotSizeContainer,
   ServiceSelection,
-  ServiceLabel,
   StatusContainer,
   Spinner,
   EstimateBreakdown,
@@ -32,20 +33,134 @@ const services = [
 
 interface EstimateCalculatorProps {
   addressData: EnrichedAddressSuggestion;
+  onAreaChange?: (areaSqFt: number) => void;
 }
 
-export function EstimateCalculator({ addressData }: EstimateCalculatorProps) {
+export function EstimateCalculator({
+  addressData,
+  onAreaChange
+}: EstimateCalculatorProps) {
   const [selectedServices, setSelectedServices] = useState<
     Array<'design' | 'installation' | 'maintenance'>
   >(['design', 'installation']);
   const [lotSizeSqFt, setLotSizeSqFt] = useState<string>('');
-  const [showDetails, setShowDetails] = useState<boolean>(false);
   const { estimate, calculateEstimate, status, error } =
     useLandscapeEstimator();
 
+  const { elementRefs: checkboxRefs } = useElementRefs<HTMLInputElement>(
+    services.length
+  );
+
+  const calculatorContainerRef = useRef<HTMLDivElement>(null);
+  const areaAdjusterRef = useRef<HTMLInputElement>(null);
+
+  const totalElements = 1 + services.length;
+  const { elementRefs: allElementRefs } =
+    useElementRefs<HTMLElement>(totalElements);
+
+  const handleElementSelect = useCallback(
+    (index: number) => {
+      if (index === 0) {
+        if (areaAdjusterRef.current) {
+          areaAdjusterRef.current.focus();
+        }
+      } else {
+        const checkboxIndex = index - 1;
+        if (checkboxRefs[checkboxIndex]?.current) {
+          checkboxRefs[checkboxIndex].current?.focus();
+        }
+      }
+    },
+    [checkboxRefs]
+  );
+
+  const { handleTriggerKeyDown, handleElementKeyDown } = useKeyboardNavigation(
+    calculatorContainerRef,
+    handleElementSelect,
+    () => allElementRefs
+  );
+
+  useEffect(() => {
+    if (areaAdjusterRef.current) {
+      allElementRefs[0].current = areaAdjusterRef.current;
+    }
+
+    checkboxRefs.forEach((ref, index) => {
+      if (ref.current && allElementRefs[index + 1]) {
+        allElementRefs[index + 1].current = ref.current;
+      }
+    });
+  }, [allElementRefs, checkboxRefs, areaAdjusterRef]);
+
+  const analyticsTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  const logAnalyticsDebounced = useCallback(() => {
+    if (analyticsTimeoutRef.current) {
+      clearTimeout(analyticsTimeoutRef.current);
+    }
+
+    analyticsTimeoutRef.current = setTimeout(() => {
+      if (status === 'complete' && estimate && addressData.place_id) {
+        const avgEstimate =
+          (estimate.finalEstimate.min + estimate.finalEstimate.max) / 2;
+        let marketSegment: 'budget' | 'mid-market' | 'premium' | 'luxury';
+        if (avgEstimate < 5000) marketSegment = 'budget';
+        else if (avgEstimate < 15000) marketSegment = 'mid-market';
+        else if (avgEstimate < 50000) marketSegment = 'premium';
+        else marketSegment = 'luxury';
+
+        const estimateScore = Math.min(avgEstimate / 1000, 50);
+        const leadScore = Math.round(
+          (addressData.affluence_score || 0) * 10 + estimateScore
+        );
+
+        logEvent(
+          'estimate_generated',
+          {
+            address_id: addressData.place_id,
+            full_address: addressData.display_name || addressData.display_name,
+            region: addressData.region || 'Unknown',
+            latitude: addressData.latitude,
+            longitude: addressData.longitude,
+
+            lot_size_sqft: estimate.lotSizeSqFt,
+            building_size_sqft: addressData.calc?.building_sqft || 0,
+            estimated_landscapable_area:
+              addressData.calc?.estimated_landscapable_area || 0,
+            property_type: addressData.calc?.property_type || 'unknown',
+
+            affluence_score: addressData.affluence_score || 0,
+
+            selected_services: selectedServices,
+            design_fee: estimate.designFee,
+            installation_cost: estimate.installationCost,
+            maintenance_monthly: estimate.maintenanceMonthly,
+            estimate_min: estimate.finalEstimate.min,
+            estimate_max: estimate.finalEstimate.max,
+            estimate_range_size:
+              estimate.finalEstimate.max - estimate.finalEstimate.min,
+
+            price_per_sqft_min:
+              estimate.finalEstimate.min / estimate.lotSizeSqFt,
+            price_per_sqft_max:
+              estimate.finalEstimate.max / estimate.lotSizeSqFt,
+            is_commercial: false,
+            has_custom_lot_size: Boolean(lotSizeSqFt),
+
+            lead_score: leadScore,
+            market_segment: marketSegment
+          },
+          {
+            toFirestore: true,
+            toMixpanel: true
+          }
+        );
+      }
+    }, 1500);
+  }, [status, estimate, addressData, selectedServices, lotSizeSqFt]);
+
   useEffect(() => {
     if (!addressData.calc || !addressData.calc.estimated_landscapable_area) {
-      // Silently handle insufficient data - this is expected for some addresses
       return;
     }
 
@@ -56,61 +171,16 @@ export function EstimateCalculator({ addressData }: EstimateCalculatorProps) {
   }, [addressData, selectedServices, lotSizeSqFt, calculateEstimate]);
 
   useEffect(() => {
-    if (status === 'complete' && estimate && addressData.place_id) {
-      const avgEstimate =
-        (estimate.finalEstimate.min + estimate.finalEstimate.max) / 2;
-      let marketSegment: 'budget' | 'mid-market' | 'premium' | 'luxury';
-      if (avgEstimate < 5000) marketSegment = 'budget';
-      else if (avgEstimate < 15000) marketSegment = 'mid-market';
-      else if (avgEstimate < 50000) marketSegment = 'premium';
-      else marketSegment = 'luxury';
+    logAnalyticsDebounced();
+  }, [logAnalyticsDebounced]);
 
-      const estimateScore = Math.min(avgEstimate / 1000, 50);
-      const leadScore = Math.round(
-        (addressData.affluence_score || 0) * 10 + estimateScore
-      );
-
-      logEvent(
-        'estimate_generated',
-        {
-          address_id: addressData.place_id,
-          full_address: addressData.display_name || addressData.display_name,
-          region: addressData.region || 'Unknown',
-          latitude: addressData.latitude,
-          longitude: addressData.longitude,
-
-          lot_size_sqft: estimate.lotSizeSqFt,
-          building_size_sqft: addressData.calc?.building_sqft || 0,
-          estimated_landscapable_area:
-            addressData.calc?.estimated_landscapable_area || 0,
-          property_type: addressData.calc?.property_type || 'unknown',
-
-          affluence_score: addressData.affluence_score || 0,
-
-          selected_services: selectedServices,
-          design_fee: estimate.designFee,
-          installation_cost: estimate.installationCost,
-          maintenance_monthly: estimate.maintenanceMonthly,
-          estimate_min: estimate.finalEstimate.min,
-          estimate_max: estimate.finalEstimate.max,
-          estimate_range_size:
-            estimate.finalEstimate.max - estimate.finalEstimate.min,
-
-          price_per_sqft_min: estimate.finalEstimate.min / estimate.lotSizeSqFt,
-          price_per_sqft_max: estimate.finalEstimate.max / estimate.lotSizeSqFt,
-          is_commercial: false,
-          has_custom_lot_size: Boolean(lotSizeSqFt),
-
-          lead_score: leadScore,
-          market_segment: marketSegment
-        },
-        {
-          toFirestore: true,
-          toMixpanel: true
-        }
-      );
-    }
-  }, [status, estimate, addressData, selectedServices, lotSizeSqFt]);
+  useEffect(() => {
+    return () => {
+      if (analyticsTimeoutRef.current) {
+        clearTimeout(analyticsTimeoutRef.current);
+      }
+    };
+  }, []);
 
   const handleServiceChange = (
     service: 'design' | 'installation' | 'maintenance'
@@ -122,47 +192,45 @@ export function EstimateCalculator({ addressData }: EstimateCalculatorProps) {
     );
   };
 
-  const handleLotSizeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const value = e.target.value.replace(/[^0-9]/g, '');
-    setLotSizeSqFt(value);
+  const handleAreaChange = (areaSqFt: number) => {
+    setLotSizeSqFt(areaSqFt.toString());
+    onAreaChange?.(areaSqFt);
   };
 
   return (
-    <CalculatorContainer>
+    <CalculatorContainer
+      ref={calculatorContainerRef}
+      tabIndex={-1}
+      onKeyDown={handleTriggerKeyDown}
+    >
       <Title>Customize Your Landscaping Services</Title>
 
-      <LotSizeContainer>
-        <InputField
-          id="lotSize"
-          name="lotSize"
-          type="text"
-          placeholder={
-            estimate?.lotSizeSqFt
-              ? estimate.lotSizeSqFt.toString()
-              : 'Enter square footage'
-          }
-          value={lotSizeSqFt}
-          onChange={handleLotSizeChange}
-          aria-label="Override lot size square footage"
-        />
-      </LotSizeContainer>
+      <AreaAdjuster
+        ref={areaAdjusterRef}
+        addressData={addressData}
+        onAreaChange={handleAreaChange}
+        initialPercentage={80}
+        onKeyDown={(e) => handleElementKeyDown?.(e, 0)}
+        currentEstimate={estimate?.finalEstimate}
+      />
 
       <ServiceSelection>
-        {services.map((service) => (
-          <ServiceLabel key={service.value}>
-            <input
-              type="checkbox"
-              checked={selectedServices.includes(
+        {services.map((service, index) => (
+          <Checkbox
+            key={service.value}
+            ref={checkboxRefs[index]}
+            label={service.label}
+            checked={selectedServices.includes(
+              service.value as 'design' | 'installation' | 'maintenance'
+            )}
+            onChange={() =>
+              handleServiceChange(
                 service.value as 'design' | 'installation' | 'maintenance'
-              )}
-              onChange={() =>
-                handleServiceChange(
-                  service.value as 'design' | 'installation' | 'maintenance'
-                )
-              }
-            />
-            {service.label}
-          </ServiceLabel>
+              )
+            }
+            onKeyDown={(e) => handleElementKeyDown?.(e, index + 1)}
+            id={`service-${service.value}`}
+          />
         ))}
       </ServiceSelection>
 
@@ -225,147 +293,6 @@ export function EstimateCalculator({ addressData }: EstimateCalculatorProps) {
             <strong>Total Estimate:</strong>
             <span>{formatPriceRange(estimate.finalEstimate)}</span>
           </Total>
-
-          <div className="flex justify-start mt-4">
-            <button
-              type="button"
-              onClick={() => setShowDetails(!showDetails)}
-              className="inline-flex items-center px-2.5 py-1 text-xs font-medium text-gray-700 bg-gray-100 border border-gray-300 rounded-full hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-1 transition-colors"
-              aria-label={
-                showDetails
-                  ? 'Hide calculation details'
-                  : 'Show calculation details'
-              }
-            >
-              {showDetails ? 'Hide Details' : 'Show Details'}
-            </button>
-          </div>
-
-          {showDetails && (
-            <div className="mt-4 pt-4 border-t border-gray-200 space-y-2">
-              <h3 className="font-semibold mb-3">Calculation Details</h3>
-
-              <EstimateLineItem
-                label="Property Type"
-                value={addressData.calc?.property_type || 'Unknown'}
-                show={!!addressData.calc?.property_type}
-              />
-
-              <EstimateLineItem
-                label="Building Size"
-                value={formatSquareFeet(addressData.calc?.building_sqft || 0)}
-                show={
-                  !!addressData.calc?.building_sqft &&
-                  addressData.calc.building_sqft > 0
-                }
-              />
-
-              <EstimateLineItem
-                label="Total Land Area"
-                value={formatSquareFeet(addressData.calc?.landarea || 0)}
-                show={
-                  !!addressData.calc?.landarea && addressData.calc.landarea > 0
-                }
-              />
-
-              <EstimateLineItem
-                label="Landscapable Area"
-                value={formatSquareFeet(
-                  addressData.calc?.estimated_landscapable_area || 0
-                )}
-                show={
-                  !!addressData.calc?.estimated_landscapable_area &&
-                  addressData.calc.estimated_landscapable_area > 0
-                }
-              />
-
-              <EstimateLineItem
-                label="Base Rate (per sq ft)"
-                value={`${formatCurrency(estimate.baseRatePerSqFt.min)} - ${formatCurrency(estimate.baseRatePerSqFt.max)}`}
-                show={!!estimate.baseRatePerSqFt}
-              />
-
-              <EstimateLineItem
-                label="Subtotal"
-                value={formatPriceRange(estimate.subtotal)}
-                show={!!estimate.subtotal}
-              />
-
-              <EstimateLineItem
-                label="Minimum Service Fee"
-                value={formatCurrency(estimate.minimumServiceFee)}
-                show={
-                  !!estimate.minimumServiceFee && estimate.minimumServiceFee > 0
-                }
-              />
-
-              <EstimateLineItem
-                label="Affluence Score"
-                value={`${addressData.affluence_score || 0}/100`}
-                show={typeof addressData.affluence_score === 'number'}
-              />
-
-              {typeof addressData.affluence_score === 'number' && (
-                <div className="mt-3 p-3 bg-gray-50 rounded-md text-sm">
-                  <h4 className="font-semibold mb-2">
-                    How Affluence Score Affects Pricing:
-                  </h4>
-                  <div className="space-y-1 text-gray-700">
-                    <div>
-                      • Score 0-50: Base rate × 0.85-1.0 (lower pricing)
-                    </div>
-                    <div>• Score 50: Base rate × 1.0 (standard pricing)</div>
-                    <div>
-                      • Score 51-100: Base rate × 1.0-1.25 (premium pricing)
-                    </div>
-                  </div>
-                  <div className="mt-2 text-xs text-gray-600">
-                    Current multiplier:{' '}
-                    {(() => {
-                      const score = addressData.affluence_score || 50;
-                      const clampedScore = Math.max(0, Math.min(100, score));
-                      let multiplier;
-                      if (clampedScore <= 50) {
-                        const ratio = clampedScore / 50;
-                        multiplier = 0.85 + (1.0 - 0.85) * ratio;
-                      } else {
-                        const ratio = (clampedScore - 50) / (100 - 50);
-                        multiplier = 1.0 + (1.25 - 1.0) * ratio;
-                      }
-                      return `×${multiplier.toFixed(2)}`;
-                    })()}
-                  </div>
-
-                  <div className="mt-3 pt-3 border-t border-gray-300">
-                    <h5 className="font-semibold mb-2 text-xs">
-                      How Affluence Score is Calculated:
-                    </h5>
-                    <div className="space-y-1 text-xs text-gray-600">
-                      <div>
-                        • <strong>Property Assessment:</strong> Total assessed
-                        value compared to regional median
-                      </div>
-                      <div>
-                        • <strong>Land Value Ratio:</strong> Proportion of land
-                        value to total assessment
-                      </div>
-                      <div>
-                        • <strong>Regional Context:</strong> Percentile ranking
-                        within St. Louis City/County
-                      </div>
-                      <div>
-                        • <strong>Score Range:</strong> 0-100 (higher = more
-                        affluent area)
-                      </div>
-                    </div>
-                    <div className="mt-2 text-xs text-gray-500">
-                      Based on county assessor data and regional market analysis
-                    </div>
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
 
           <Disclaimer>
             Estimate range is based on typical landscaping costs in your area.

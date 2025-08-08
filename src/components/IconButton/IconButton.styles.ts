@@ -1,4 +1,6 @@
 import styled from 'styled-components';
+import tokens from '@tokens/tokens.json';
+import { getToken } from '@tokens/tokenUtils';
 import {
   responsiveTextColor,
   responsiveBackgroundColor
@@ -10,4 +12,11 @@ export const IconButtonStyles = styled.button.attrs(() => ({
 }))`
   ${responsiveBackgroundColor}
   ${responsiveTextColor}
+  
+  &:focus {
+    outline: 2px solid
+      ${({ theme }) =>
+        getToken(theme, 'colors.primary.value', tokens.colors.primary.value)};
+    outline-offset: 2px;
+  }
 `;

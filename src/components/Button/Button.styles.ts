@@ -2,7 +2,6 @@ import styled, { keyframes, css } from 'styled-components';
 import tokens from '@tokens/tokens.json';
 import { getToken } from '@tokens/tokenUtils';
 
-// Loading animation - progress bar moving left to right
 const loadingProgress = keyframes`
   0% {
     transform: translateX(-100%);
@@ -12,10 +11,19 @@ const loadingProgress = keyframes`
   }
 `;
 
-// Loading state styles
 const loadingStyles = css`
-  background-color: #9ca3af;
-  color: #6b7280;
+  background-color: ${({ theme }) =>
+    getToken(
+      theme,
+      'colors.light.gray500.value',
+      tokens.colors.light.gray500.value
+    )};
+  color: ${({ theme }) =>
+    getToken(
+      theme,
+      'colors.light.gray600.value',
+      tokens.colors.light.gray600.value
+    )};
   cursor: wait;
 
   &::before {
@@ -28,88 +36,346 @@ const loadingStyles = css`
     background: linear-gradient(
       90deg,
       transparent 0%,
-      rgba(255, 255, 255, 0.3) 50%,
+      ${({ theme }) =>
+          getToken(
+            theme,
+            'colors.light.shimmer.value',
+            tokens.colors.light.shimmer.value
+          )}
+        50%,
       transparent 100%
     );
     animation: ${loadingProgress} 1.5s ease-in-out infinite;
+
+    @media (prefers-color-scheme: dark) {
+      background: linear-gradient(
+        90deg,
+        transparent 0%,
+        ${({ theme }) =>
+            getToken(
+              theme,
+              'colors.dark.shimmer.value',
+              tokens.colors.dark.shimmer.value
+            )}
+          50%,
+        transparent 100%
+      );
+    }
   }
 `;
 
 export const ButtonStyles = styled.button
   .withConfig({
-    shouldForwardProp: (prop) => prop !== 'loading'
+    shouldForwardProp: (prop) => !['loading', 'variant', 'size'].includes(prop)
   })
   .attrs(() => ({
-    className:
-      'rounded-md px-4 py-2 font-semibold focus:outline-none focus:ring focus:border-primary'
-  }))<{ loading?: boolean }>`
-  padding: 0.75rem 1rem;
-  background-color: ${({ theme }) =>
-    getToken(theme, 'colors.primary.value', tokens.colors.primary.value)};
-  color: ${({ theme }) =>
-    getToken(theme, 'colors.light.text.value', tokens.colors.light.text.value)};
-  border: none;
+    className: 'rounded-md px-4 py-2 font-semibold'
+  }))<{
+  loading?: boolean;
+  variant?: 'primary' | 'secondary' | 'tertiary';
+  size?: 'small' | 'medium' | 'large';
+}>`
+  padding: ${({ size }) => {
+    switch (size) {
+      case 'small':
+        return '0.5rem 0.75rem';
+      case 'large':
+        return '1rem 1.5rem';
+      default:
+        return '0.75rem 1rem';
+    }
+  }};
+  
+  font-size: ${({ size }) => {
+    switch (size) {
+      case 'small':
+        return '0.875rem';
+      case 'large':
+        return '1.125rem';
+      default:
+        return '1rem';
+    }
+  }};
+
+  background-color: ${({ theme, variant }) =>
+    variant === 'secondary' || variant === 'tertiary'
+      ? 'transparent'
+      : getToken(theme, 'colors.primary.value', tokens.colors.primary.value)};
+  
+  color: ${({ theme, variant }) => {
+    if (variant === 'secondary') {
+      return getToken(
+        theme,
+        'colors.light.text.value',
+        tokens.colors.light.text.value
+      );
+    }
+    if (variant === 'tertiary') {
+      return getToken(
+        theme,
+        'colors.light.gray600.value',
+        tokens.colors.light.gray600.value
+      );
+    }
+    return getToken(
+      theme,
+      'colors.light.text.value',
+      tokens.colors.light.text.value
+    );
+  }};
+  
+  border: ${({ theme, variant }) => {
+    if (variant === 'secondary') {
+      return `2px solid ${getToken(theme, 'colors.primary.value', tokens.colors.primary.value)}`;
+    }
+    if (variant === 'tertiary') {
+      return `1px solid ${getToken(theme, 'colors.light.gray300.value', tokens.colors.light.gray300.value)}`;
+    }
+    return 'none';
+  }};
+
   position: relative;
   overflow: hidden;
   transition: all 0.2s ease-in-out;
 
-  /* Apply loading styles when loading */
+  &:focus {
+    outline: 2px solid ${({ theme }) =>
+      getToken(theme, 'colors.primary.value', tokens.colors.primary.value)};
+    outline-offset: 2px;
+  }
+
   ${({ loading }) => loading && loadingStyles}
 
   &:hover {
-    background-color: ${({ theme, loading }) =>
-      loading
-        ? '#9ca3af'
-        : getToken(
-            theme,
-            'colors.primaryHover.value',
-            tokens.colors.primaryHover.value
-          )};
+    background-color: ${({ theme, loading, variant }) => {
+      if (loading) {
+        return getToken(
+          theme,
+          'colors.light.gray500.value',
+          tokens.colors.light.gray500.value
+        );
+      }
+
+      if (variant === 'secondary') {
+        return getToken(
+          theme,
+          'colors.primary.value',
+          tokens.colors.primary.value
+        );
+      }
+
+      if (variant === 'tertiary') {
+        return getToken(
+          theme,
+          'colors.light.gray100.value',
+          tokens.colors.light.gray100.value
+        );
+      }
+
+      return getToken(
+        theme,
+        'colors.primaryHover.value',
+        tokens.colors.primaryHover.value
+      );
+    }};
+    
+    color: ${({ theme, loading, variant }) => {
+      if (loading) return 'inherit';
+
+      if (variant === 'secondary') {
+        return getToken(
+          theme,
+          'colors.light.text.value',
+          tokens.colors.light.text.value
+        );
+      }
+
+      return 'inherit';
+    }};
+
+    border-color: ${({ theme, variant }) => {
+      if (variant === 'secondary') {
+        return getToken(
+          theme,
+          'colors.primary.value',
+          tokens.colors.primary.value
+        );
+      }
+      if (variant === 'tertiary') {
+        return getToken(
+          theme,
+          'colors.light.gray400.value',
+          tokens.colors.light.gray400.value
+        );
+      }
+      return 'transparent';
+    }};
   }
 
   @media (prefers-color-scheme: dark) {
-    background-color: ${({ theme }) =>
-      getToken(
+    background-color: ${({ theme, variant }) => {
+      if (variant === 'secondary' || variant === 'tertiary')
+        return 'transparent';
+      return getToken(
         theme,
-        'colors.dark.primary.value',
+        'colors.primary.value',
         tokens.colors.primary.value
-      )};
+      );
+    }};
 
-    ${({ loading }) =>
+    color: ${({ theme, variant }) => {
+      if (variant === 'secondary') {
+        return getToken(
+          theme,
+          'colors.primary.value',
+          tokens.colors.primary.value
+        );
+      }
+      if (variant === 'tertiary') {
+        return getToken(
+          theme,
+          'colors.dark.gray400.value',
+          tokens.colors.dark.gray400.value
+        );
+      }
+      return getToken(
+        theme,
+        'colors.light.text.value',
+        tokens.colors.light.text.value
+      );
+    }};
+
+    border-color: ${({ theme, variant }) => {
+      if (variant === 'secondary') {
+        return getToken(
+          theme,
+          'colors.primary.value',
+          tokens.colors.primary.value
+        );
+      }
+      if (variant === 'tertiary') {
+        return getToken(
+          theme,
+          'colors.dark.gray600.value',
+          tokens.colors.dark.gray600.value
+        );
+      }
+      return 'transparent';
+    }};
+
+    ${({ loading, theme }) =>
       loading &&
       `
-      background-color: #4b5563;
-      color: #9ca3af;
+      background-color: ${getToken(
+        theme,
+        'colors.dark.gray300.value',
+        tokens.colors.dark.gray300.value
+      )};
+      color: ${getToken(
+        theme,
+        'colors.dark.gray500.value',
+        tokens.colors.dark.gray500.value
+      )};
     `}
 
     &:hover {
-      background-color: ${({ theme, loading }) =>
-        loading
-          ? '#4b5563'
-          : getToken(
-              theme,
-              'colors.dark.primaryHover.value',
-              tokens.colors.primaryHover.value
-            )};
+      background-color: ${({ theme, loading, variant }) => {
+        if (loading) {
+          return getToken(
+            theme,
+            'colors.dark.gray300.value',
+            tokens.colors.dark.gray300.value
+          );
+        }
+
+        if (variant === 'secondary') {
+          return getToken(
+            theme,
+            'colors.primary.value',
+            tokens.colors.primary.value
+          );
+        }
+
+        if (variant === 'tertiary') {
+          return getToken(
+            theme,
+            'colors.dark.gray800.value',
+            tokens.colors.dark.gray800.value
+          );
+        }
+
+        return getToken(
+          theme,
+          'colors.primaryHover.value',
+          tokens.colors.primaryHover.value
+        );
+      }};
+
+      color: ${({ theme, loading, variant }) => {
+        if (loading) return 'inherit';
+
+        if (variant === 'secondary') {
+          return getToken(
+            theme,
+            'colors.light.text.value',
+            tokens.colors.light.text.value
+          );
+        }
+
+        return 'inherit';
+      }};
     }
   }
 
   &[disabled] {
-    background-color: ${({ theme }) =>
-      getToken(
+    background-color: ${({ theme, variant }) => {
+      if (variant === 'secondary' || variant === 'tertiary')
+        return 'transparent';
+      return getToken(
         theme,
         'colors.light.gray300.value',
         tokens.colors.light.gray300.value
+      );
+    }};
+    
+    color: ${({ theme }) =>
+      getToken(
+        theme,
+        'colors.light.gray500.value',
+        tokens.colors.light.gray500.value
       )};
-    cursor: not-allowed;
-
-    &:hover {
-      background-color: ${({ theme }) =>
-        getToken(
+    
+    border-color: ${({ theme, variant }) => {
+      if (variant === 'secondary' || variant === 'tertiary') {
+        return getToken(
           theme,
           'colors.light.gray300.value',
           tokens.colors.light.gray300.value
+        );
+      }
+      return 'transparent';
+    }};
+    
+    cursor: not-allowed;
+
+    &:hover {
+      background-color: ${({ theme, variant }) => {
+        if (variant === 'secondary' || variant === 'tertiary')
+          return 'transparent';
+        return getToken(
+          theme,
+          'colors.light.gray300.value',
+          tokens.colors.light.gray300.value
+        );
+      }};
+      
+      color: ${({ theme }) =>
+        getToken(
+          theme,
+          'colors.light.gray500.value',
+          tokens.colors.light.gray500.value
         )};
+      
       cursor: not-allowed;
     }
   }
