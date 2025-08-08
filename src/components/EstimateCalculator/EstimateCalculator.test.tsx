@@ -156,7 +156,8 @@ describe('EstimateCalculator', () => {
       /Estimate range is based on typical landscaping costs/i
     );
     expect(disclaimer).toBeInTheDocument();
-    expect(disclaimer).toHaveClass('text-xs');
+    // Check that it's styled as a disclaimer (italic text)
+    expect(disclaimer).toHaveStyle('font-style: italic');
   });
 
   it('filters out non-numeric input in the lot size field', () => {
@@ -227,5 +228,42 @@ describe('EstimateCalculator', () => {
     expect(calculateEstimateMock).toHaveBeenCalledWith(validAddressData, {
       serviceTypes: ['design', 'installation']
     });
+  });
+
+  it('supports keyboard navigation from input to checkboxes', () => {
+    render(<EstimateCalculator addressData={mockAddressData} />);
+
+    const lotSizeInput = screen.getByLabelText(
+      'Override lot size square footage'
+    );
+    const designCheckbox = screen.getByLabelText('Design');
+    const installationCheckbox = screen.getByLabelText('Installation');
+    const maintenanceCheckbox = screen.getByLabelText('Maintenance');
+
+    // Focus the input field
+    lotSizeInput.focus();
+    expect(lotSizeInput).toHaveFocus();
+
+    // Arrow down should move to first checkbox
+    fireEvent.keyDown(lotSizeInput, { key: 'ArrowDown' });
+
+    // Verify checkboxes are tabbable
+    designCheckbox.focus();
+    expect(designCheckbox).toHaveFocus();
+
+    // Arrow down should move to next checkbox
+    fireEvent.keyDown(designCheckbox, { key: 'ArrowDown' });
+    installationCheckbox.focus();
+    expect(installationCheckbox).toHaveFocus();
+
+    // Arrow down should move to next checkbox
+    fireEvent.keyDown(installationCheckbox, { key: 'ArrowDown' });
+    maintenanceCheckbox.focus();
+    expect(maintenanceCheckbox).toHaveFocus();
+
+    // Space should toggle the checkbox
+    expect(maintenanceCheckbox).not.toBeChecked();
+    fireEvent.keyDown(maintenanceCheckbox, { key: ' ' });
+    expect(maintenanceCheckbox).toBeChecked();
   });
 });

@@ -2,7 +2,6 @@ import styled, { keyframes, css } from 'styled-components';
 import tokens from '@tokens/tokens.json';
 import { getToken } from '@tokens/tokenUtils';
 
-// Loading animation - progress bar moving left to right
 const loadingProgress = keyframes`
   0% {
     transform: translateX(-100%);
@@ -12,10 +11,19 @@ const loadingProgress = keyframes`
   }
 `;
 
-// Loading state styles
 const loadingStyles = css`
-  background-color: #9ca3af;
-  color: #6b7280;
+  background-color: ${({ theme }) =>
+    getToken(
+      theme,
+      'colors.light.gray500.value',
+      tokens.colors.light.gray500.value
+    )};
+  color: ${({ theme }) =>
+    getToken(
+      theme,
+      'colors.light.gray600.value',
+      tokens.colors.light.gray600.value
+    )};
   cursor: wait;
 
   &::before {
@@ -28,10 +36,31 @@ const loadingStyles = css`
     background: linear-gradient(
       90deg,
       transparent 0%,
-      rgba(255, 255, 255, 0.3) 50%,
+      ${({ theme }) =>
+          getToken(
+            theme,
+            'colors.light.shimmer.value',
+            tokens.colors.light.shimmer.value
+          )}
+        50%,
       transparent 100%
     );
     animation: ${loadingProgress} 1.5s ease-in-out infinite;
+
+    @media (prefers-color-scheme: dark) {
+      background: linear-gradient(
+        90deg,
+        transparent 0%,
+        ${({ theme }) =>
+            getToken(
+              theme,
+              'colors.dark.shimmer.value',
+              tokens.colors.dark.shimmer.value
+            )}
+          50%,
+        transparent 100%
+      );
+    }
   }
 `;
 
@@ -58,13 +87,16 @@ export const ButtonStyles = styled.button
     outline-offset: 2px;
   }
 
-  /* Apply loading styles when loading */
   ${({ loading }) => loading && loadingStyles}
 
   &:hover {
     background-color: ${({ theme, loading }) =>
       loading
-        ? '#9ca3af'
+        ? getToken(
+            theme,
+            'colors.light.gray500.value',
+            tokens.colors.light.gray500.value
+          )
         : getToken(
             theme,
             'colors.primaryHover.value',
@@ -80,17 +112,29 @@ export const ButtonStyles = styled.button
         tokens.colors.primary.value
       )};
 
-    ${({ loading }) =>
+    ${({ loading, theme }) =>
       loading &&
       `
-      background-color: #4b5563;
-      color: #9ca3af;
+      background-color: ${getToken(
+        theme,
+        'colors.dark.gray300.value',
+        tokens.colors.dark.gray300.value
+      )};
+      color: ${getToken(
+        theme,
+        'colors.dark.gray500.value',
+        tokens.colors.dark.gray500.value
+      )};
     `}
 
     &:hover {
       background-color: ${({ theme, loading }) =>
         loading
-          ? '#4b5563'
+          ? getToken(
+              theme,
+              'colors.dark.gray300.value',
+              tokens.colors.dark.gray300.value
+            )
           : getToken(
               theme,
               'colors.dark.primaryHover.value',

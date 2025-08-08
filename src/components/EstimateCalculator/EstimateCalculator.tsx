@@ -1,10 +1,13 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useLandscapeEstimator } from '@hooks/useLandscapeEstimator';
 import { EnrichedAddressSuggestion } from '@app-types/localAddressTypes';
 import { logEvent } from '@services/logger';
 import Alert from '@components/Alert/Alert';
 import InputField from '@components/InputField/InputField';
+import { Checkbox } from '@components/Checkbox/Checkbox';
 import { EstimateLineItem } from '@components/EstimateLineItem/EstimateLineItem';
+import { useElementRefs } from '@hooks/useElementRefs';
+import { useKeyboardNavigation } from '@hooks/useKeyboardNavigation';
 import {
   formatCurrency,
   formatSquareFeet,
@@ -16,7 +19,6 @@ import {
   Title,
   LotSizeContainer,
   ServiceSelection,
-  ServiceLabel,
   StatusContainer,
   Spinner,
   EstimateBreakdown,
@@ -43,9 +45,25 @@ export function EstimateCalculator({ addressData }: EstimateCalculatorProps) {
   const { estimate, calculateEstimate, status, error } =
     useLandscapeEstimator();
 
+  // Refs for keyboard navigation
+  const inputRef = useRef<HTMLInputElement>(null);
+  const { elementRefs: checkboxRefs } = useElementRefs<HTMLInputElement>(
+    services.length
+  );
+  const { handleTriggerKeyDown, handleElementKeyDown } = useKeyboardNavigation(
+    inputRef,
+    (index: number) => {
+      // Handle checkbox selection via keyboard
+      const service = services[index];
+      handleServiceChange(
+        service.value as 'design' | 'installation' | 'maintenance'
+      );
+    },
+    () => checkboxRefs
+  );
+
   useEffect(() => {
     if (!addressData.calc || !addressData.calc.estimated_landscapable_area) {
-      // Silently handle insufficient data - this is expected for some addresses
       return;
     }
 
@@ -133,6 +151,7 @@ export function EstimateCalculator({ addressData }: EstimateCalculatorProps) {
 
       <LotSizeContainer>
         <InputField
+          ref={inputRef}
           id="lotSize"
           name="lotSize"
           type="text"
@@ -143,26 +162,30 @@ export function EstimateCalculator({ addressData }: EstimateCalculatorProps) {
           }
           value={lotSizeSqFt}
           onChange={handleLotSizeChange}
+          onKeyDown={handleTriggerKeyDown}
           aria-label="Override lot size square footage"
         />
       </LotSizeContainer>
 
       <ServiceSelection>
-        {services.map((service) => (
-          <ServiceLabel key={service.value}>
-            <input
-              type="checkbox"
-              checked={selectedServices.includes(
+        {services.map((service, index) => (
+          <Checkbox
+            key={service.value}
+            ref={checkboxRefs[index]}
+            label={service.label}
+            checked={selectedServices.includes(
+              service.value as 'design' | 'installation' | 'maintenance'
+            )}
+            onChange={() =>
+              handleServiceChange(
                 service.value as 'design' | 'installation' | 'maintenance'
-              )}
-              onChange={() =>
-                handleServiceChange(
-                  service.value as 'design' | 'installation' | 'maintenance'
-                )
-              }
-            />
-            {service.label}
-          </ServiceLabel>
+              )
+            }
+            onKeyDown={(e: React.KeyboardEvent<HTMLInputElement>) =>
+              handleElementKeyDown(e, index)
+            }
+            id={`service-${service.value}`}
+          />
         ))}
       </ServiceSelection>
 

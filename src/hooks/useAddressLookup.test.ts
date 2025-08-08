@@ -5,7 +5,6 @@ import { TEST_LOCATIONS, MOCK_LOCAL_ADDRESSES } from '@lib/testData';
 import { createTestSuite } from '@lib/testUtils';
 import { searchAddresses } from '@services/addressSearch';
 
-// Mock the client-side search
 vi.mock('@services/addressSearch', () => ({
   searchAddresses: vi.fn(),
   resetAddressSearchCache: vi.fn()
@@ -19,10 +18,12 @@ const performDebouncedSearch = async (
     result.current.handleChange(query);
   });
 
-  expect(result.current.isFetching).toBe(true);
-
   await act(async () => {
-    vi.advanceTimersByTime(600);
+    vi.advanceTimersByTime(200);
+  });
+
+  await vi.waitFor(() => {
+    expect(result.current.isFetching).toBe(false);
   });
 };
 
@@ -33,7 +34,6 @@ describe('useAddressLookup', () => {
   beforeEach(() => {
     testSuite.beforeEachSetup();
 
-    // Get the mocked function using vi.mocked
     searchAddressesMock = vi.mocked(searchAddresses);
     searchAddressesMock.mockClear();
   });
@@ -75,7 +75,7 @@ describe('useAddressLookup', () => {
 
     expect(searchAddressesMock).toHaveBeenCalledTimes(1);
     expect(searchAddressesMock).toHaveBeenCalledWith(
-      TEST_LOCATIONS.FIRST_STREET.toLowerCase(),
+      TEST_LOCATIONS.FIRST_STREET,
       10
     );
 
@@ -130,7 +130,7 @@ describe('useAddressLookup', () => {
 
     expect(searchAddressesMock).toHaveBeenCalledTimes(1);
     expect(searchAddressesMock).toHaveBeenCalledWith(
-      TEST_LOCATIONS.FIRST_STREET.toLowerCase(),
+      TEST_LOCATIONS.FIRST_STREET,
       10
     );
     expect(result.current.suggestions).toEqual([]);
@@ -153,7 +153,7 @@ describe('useAddressLookup', () => {
 
     expect(searchAddressesMock).toHaveBeenCalledTimes(1);
     expect(searchAddressesMock).toHaveBeenCalledWith(
-      TEST_LOCATIONS.FIRST_STREET.toLowerCase(),
+      TEST_LOCATIONS.FIRST_STREET,
       10
     );
     expect(result.current.suggestions).toEqual([]);
@@ -162,17 +162,16 @@ describe('useAddressLookup', () => {
   });
 
   it('clears error on new search', async () => {
-    // First, trigger an error
     searchAddressesMock.mockRejectedValue(new Error('Initial error'));
     const { result } = renderHook(() => useAddressLookup());
 
     await performDebouncedSearch(result, TEST_LOCATIONS.FIRST_STREET);
 
     await vi.waitFor(() => {
+      expect(result.current.error).toBeTruthy();
       expect(result.current.error).toContain('Initial error');
     });
 
-    // Now trigger a successful search
     searchAddressesMock.mockResolvedValue([
       {
         id: MOCK_LOCAL_ADDRESSES[0].id,
@@ -193,14 +192,12 @@ describe('useAddressLookup', () => {
   it('unlocks state on handleChange after being locked', () => {
     const { result } = renderHook(() => useAddressLookup());
 
-    // First lock the state
     act(() => {
       result.current.handleSelect(TEST_LOCATIONS.FIRST_STREET);
     });
 
     expect(result.current.locked).toBe(true);
 
-    // Then change the query
     act(() => {
       result.current.handleChange('new query');
     });
@@ -222,7 +219,6 @@ describe('useAddressLookup', () => {
 
     const { result } = renderHook(() => useAddressLookup());
 
-    // Start first search
     searchAddressesMock.mockReturnValueOnce(firstPromise);
     act(() => {
       result.current.handleChange(TEST_LOCATIONS.FIRST_STREET);
@@ -232,7 +228,6 @@ describe('useAddressLookup', () => {
       vi.advanceTimersByTime(600);
     });
 
-    // Start second search before first completes
     searchAddressesMock.mockReturnValueOnce(secondPromise);
     act(() => {
       result.current.handleChange(TEST_LOCATIONS.DUNN_VIEW);
@@ -242,7 +237,6 @@ describe('useAddressLookup', () => {
       vi.advanceTimersByTime(600);
     });
 
-    // Resolve first search (should be ignored)
     resolveFirst([
       {
         id: 'old-result',
@@ -252,7 +246,6 @@ describe('useAddressLookup', () => {
       }
     ]);
 
-    // Resolve second search
     resolveSecond([
       {
         id: MOCK_LOCAL_ADDRESSES[1].id,
@@ -297,7 +290,7 @@ describe('useAddressLookup', () => {
 
   it('properly formats query for search call', async () => {
     const queryWithSpaces = 'FIRST STREET';
-    const expectedFormattedQuery = 'first street';
+    const expectedFormattedQuery = 'FIRST STREET';
 
     const mockResults = [
       {

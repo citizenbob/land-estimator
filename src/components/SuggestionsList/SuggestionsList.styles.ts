@@ -6,11 +6,9 @@ export const SuggestionsListStyles = styled.ul.attrs(() => ({
   className:
     'absolute z-50 w-full shadow-lg max-h-64 overflow-auto py-2 text-sm focus:outline-none'
 }))`
-  margin-top: calc(
-    3rem +
-      ${({ theme }) =>
-        getToken(theme, 'spacing.sm.value', tokens.spacing.sm.value)}
-  );
+  /* prettier-ignore */
+  margin-top: ${({ theme }) =>
+    `calc(3rem + ${getToken(theme, 'spacing.sm.value', tokens.spacing.sm.value)})`};
   background-color: ${({ theme }) =>
     getToken(
       theme,
@@ -51,13 +49,12 @@ export const SuggestionItemStyles = styled.li.attrs(() => ({
   className:
     'cursor-pointer select-none relative transition-all duration-200 ease-in-out'
 }))`
+  /* prettier-ignore */
   padding: ${({ theme }) =>
-      getToken(theme, 'spacing.sm.value', tokens.spacing.sm.value)}
-    ${({ theme }) =>
-      getToken(theme, 'spacing.base.value', tokens.spacing.base.value)};
-  margin: 0
-    ${({ theme }) =>
-      getToken(theme, 'spacing.sm.value', tokens.spacing.sm.value)};
+    `${getToken(theme, 'spacing.sm.value', tokens.spacing.sm.value)} ${getToken(theme, 'spacing.base.value', tokens.spacing.base.value)}`};
+  /* prettier-ignore */
+  margin: ${({ theme }) =>
+    `0 ${getToken(theme, 'spacing.sm.value', tokens.spacing.sm.value)}`};
   border-radius: ${({ theme }) =>
     getToken(
       theme,

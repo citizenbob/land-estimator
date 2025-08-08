@@ -4,8 +4,8 @@ import React, { useRef, useState, useEffect, useCallback } from 'react';
 import { useAddressLookup } from '@hooks/useAddressLookup';
 import { useEventLogger } from '@hooks/useEventLogger';
 import { useAddressEventLogger } from '@hooks/useAddressEventLogger';
-import { useSuggestionNavigation } from '@hooks/useSuggestionNavigation';
-import { useSuggestionRefs } from '@hooks/useSuggestionRefs';
+import { useKeyboardNavigation } from '@hooks/useKeyboardNavigation';
+import { useElementRefs } from '@hooks/useElementRefs';
 import { useInputState } from '@hooks/useInputState';
 import InputField from '@components/InputField/InputField';
 import IconButton from '@components/IconButton/IconButton';
@@ -106,8 +106,8 @@ const AddressInput = ({
     };
   }, [showSuggestions, closeSuggestions]);
 
-  const { suggestionRefs, getSuggestionRefs } =
-    useSuggestionRefs(uniqueSuggestions);
+  const { elementRefs: suggestionRefs, getElementRefs: getSuggestionRefs } =
+    useElementRefs<HTMLLIElement>(uniqueSuggestions.length);
   const { logAddressEvent } = useAddressEventLogger(
     logEvent,
     query,
@@ -120,8 +120,26 @@ const AddressInput = ({
     logAddressEvent(suggestion, 'address_selected');
   };
 
-  const { handleInputKeyDown: originalInputKeyDown, handleSuggestionKeyDown } =
-    useSuggestionNavigation(inputRef, onSelect, getSuggestionRefs);
+  const { handleTriggerKeyDown: originalInputKeyDown, handleElementKeyDown } =
+    useKeyboardNavigation(
+      inputRef,
+      (index: number) => {
+        const suggestion = uniqueSuggestions[index];
+        if (suggestion) {
+          onSelect(suggestion);
+        }
+      },
+      getSuggestionRefs
+    );
+
+  // Wrapper to match SuggestionsList expected signature
+  const handleSuggestionKeyDown = (
+    e: React.KeyboardEvent<HTMLLIElement>,
+    suggestion: AddressSuggestion,
+    index: number
+  ) => {
+    handleElementKeyDown(e, index);
+  };
 
   // Enhanced keyboard handling for input with Escape support
   const handleInputKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
