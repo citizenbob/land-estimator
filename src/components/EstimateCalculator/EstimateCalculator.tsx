@@ -1,13 +1,12 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useLandscapeEstimator } from '@hooks/useLandscapeEstimator';
 import { EnrichedAddressSuggestion } from '@app-types/localAddressTypes';
 import { logEvent } from '@services/logger';
 import Alert from '@components/Alert/Alert';
-import InputField from '@components/InputField/InputField';
 import { Checkbox } from '@components/Checkbox/Checkbox';
 import { EstimateLineItem } from '@components/EstimateLineItem/EstimateLineItem';
+import { AreaAdjuster } from '@components/AreaAdjuster/AreaAdjuster';
 import { useElementRefs } from '@hooks/useElementRefs';
-import { useKeyboardNavigation } from '@hooks/useKeyboardNavigation';
 import {
   formatCurrency,
   formatSquareFeet,
@@ -17,7 +16,6 @@ import {
 import {
   CalculatorContainer,
   Title,
-  LotSizeContainer,
   ServiceSelection,
   StatusContainer,
   Spinner,
@@ -34,9 +32,13 @@ const services = [
 
 interface EstimateCalculatorProps {
   addressData: EnrichedAddressSuggestion;
+  onAreaChange?: (areaSqFt: number) => void;
 }
 
-export function EstimateCalculator({ addressData }: EstimateCalculatorProps) {
+export function EstimateCalculator({
+  addressData,
+  onAreaChange
+}: EstimateCalculatorProps) {
   const [selectedServices, setSelectedServices] = useState<
     Array<'design' | 'installation' | 'maintenance'>
   >(['design', 'installation']);
@@ -45,22 +47,80 @@ export function EstimateCalculator({ addressData }: EstimateCalculatorProps) {
   const { estimate, calculateEstimate, status, error } =
     useLandscapeEstimator();
 
-  // Refs for keyboard navigation
-  const inputRef = useRef<HTMLInputElement>(null);
   const { elementRefs: checkboxRefs } = useElementRefs<HTMLInputElement>(
     services.length
   );
-  const { handleTriggerKeyDown, handleElementKeyDown } = useKeyboardNavigation(
-    inputRef,
-    (index: number) => {
-      // Handle checkbox selection via keyboard
-      const service = services[index];
-      handleServiceChange(
-        service.value as 'design' | 'installation' | 'maintenance'
-      );
-    },
-    () => checkboxRefs
-  );
+
+  // Ref to store timeout for debounced analytics
+  const analyticsTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Debounced analytics function
+  const logAnalyticsDebounced = useCallback(() => {
+    // Clear existing timeout
+    if (analyticsTimeoutRef.current) {
+      clearTimeout(analyticsTimeoutRef.current);
+    }
+
+    // Set new timeout
+    analyticsTimeoutRef.current = setTimeout(() => {
+      if (status === 'complete' && estimate && addressData.place_id) {
+        const avgEstimate =
+          (estimate.finalEstimate.min + estimate.finalEstimate.max) / 2;
+        let marketSegment: 'budget' | 'mid-market' | 'premium' | 'luxury';
+        if (avgEstimate < 5000) marketSegment = 'budget';
+        else if (avgEstimate < 15000) marketSegment = 'mid-market';
+        else if (avgEstimate < 50000) marketSegment = 'premium';
+        else marketSegment = 'luxury';
+
+        const estimateScore = Math.min(avgEstimate / 1000, 50);
+        const leadScore = Math.round(
+          (addressData.affluence_score || 0) * 10 + estimateScore
+        );
+
+        logEvent(
+          'estimate_generated',
+          {
+            address_id: addressData.place_id,
+            full_address: addressData.display_name || addressData.display_name,
+            region: addressData.region || 'Unknown',
+            latitude: addressData.latitude,
+            longitude: addressData.longitude,
+
+            lot_size_sqft: estimate.lotSizeSqFt,
+            building_size_sqft: addressData.calc?.building_sqft || 0,
+            estimated_landscapable_area:
+              addressData.calc?.estimated_landscapable_area || 0,
+            property_type: addressData.calc?.property_type || 'unknown',
+
+            affluence_score: addressData.affluence_score || 0,
+
+            selected_services: selectedServices,
+            design_fee: estimate.designFee,
+            installation_cost: estimate.installationCost,
+            maintenance_monthly: estimate.maintenanceMonthly,
+            estimate_min: estimate.finalEstimate.min,
+            estimate_max: estimate.finalEstimate.max,
+            estimate_range_size:
+              estimate.finalEstimate.max - estimate.finalEstimate.min,
+
+            price_per_sqft_min:
+              estimate.finalEstimate.min / estimate.lotSizeSqFt,
+            price_per_sqft_max:
+              estimate.finalEstimate.max / estimate.lotSizeSqFt,
+            is_commercial: false,
+            has_custom_lot_size: Boolean(lotSizeSqFt),
+
+            lead_score: leadScore,
+            market_segment: marketSegment
+          },
+          {
+            toFirestore: true,
+            toMixpanel: true
+          }
+        );
+      }
+    }, 1500);
+  }, [status, estimate, addressData, selectedServices, lotSizeSqFt]);
 
   useEffect(() => {
     if (!addressData.calc || !addressData.calc.estimated_landscapable_area) {
@@ -74,61 +134,17 @@ export function EstimateCalculator({ addressData }: EstimateCalculatorProps) {
   }, [addressData, selectedServices, lotSizeSqFt, calculateEstimate]);
 
   useEffect(() => {
-    if (status === 'complete' && estimate && addressData.place_id) {
-      const avgEstimate =
-        (estimate.finalEstimate.min + estimate.finalEstimate.max) / 2;
-      let marketSegment: 'budget' | 'mid-market' | 'premium' | 'luxury';
-      if (avgEstimate < 5000) marketSegment = 'budget';
-      else if (avgEstimate < 15000) marketSegment = 'mid-market';
-      else if (avgEstimate < 50000) marketSegment = 'premium';
-      else marketSegment = 'luxury';
+    logAnalyticsDebounced();
+  }, [logAnalyticsDebounced]);
 
-      const estimateScore = Math.min(avgEstimate / 1000, 50);
-      const leadScore = Math.round(
-        (addressData.affluence_score || 0) * 10 + estimateScore
-      );
-
-      logEvent(
-        'estimate_generated',
-        {
-          address_id: addressData.place_id,
-          full_address: addressData.display_name || addressData.display_name,
-          region: addressData.region || 'Unknown',
-          latitude: addressData.latitude,
-          longitude: addressData.longitude,
-
-          lot_size_sqft: estimate.lotSizeSqFt,
-          building_size_sqft: addressData.calc?.building_sqft || 0,
-          estimated_landscapable_area:
-            addressData.calc?.estimated_landscapable_area || 0,
-          property_type: addressData.calc?.property_type || 'unknown',
-
-          affluence_score: addressData.affluence_score || 0,
-
-          selected_services: selectedServices,
-          design_fee: estimate.designFee,
-          installation_cost: estimate.installationCost,
-          maintenance_monthly: estimate.maintenanceMonthly,
-          estimate_min: estimate.finalEstimate.min,
-          estimate_max: estimate.finalEstimate.max,
-          estimate_range_size:
-            estimate.finalEstimate.max - estimate.finalEstimate.min,
-
-          price_per_sqft_min: estimate.finalEstimate.min / estimate.lotSizeSqFt,
-          price_per_sqft_max: estimate.finalEstimate.max / estimate.lotSizeSqFt,
-          is_commercial: false,
-          has_custom_lot_size: Boolean(lotSizeSqFt),
-
-          lead_score: leadScore,
-          market_segment: marketSegment
-        },
-        {
-          toFirestore: true,
-          toMixpanel: true
-        }
-      );
-    }
-  }, [status, estimate, addressData, selectedServices, lotSizeSqFt]);
+  // Cleanup timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (analyticsTimeoutRef.current) {
+        clearTimeout(analyticsTimeoutRef.current);
+      }
+    };
+  }, []);
 
   const handleServiceChange = (
     service: 'design' | 'installation' | 'maintenance'
@@ -140,32 +156,20 @@ export function EstimateCalculator({ addressData }: EstimateCalculatorProps) {
     );
   };
 
-  const handleLotSizeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const value = e.target.value.replace(/[^0-9]/g, '');
-    setLotSizeSqFt(value);
+  const handleAreaChange = (areaSqFt: number) => {
+    setLotSizeSqFt(areaSqFt.toString());
+    onAreaChange?.(areaSqFt);
   };
 
   return (
     <CalculatorContainer>
       <Title>Customize Your Landscaping Services</Title>
 
-      <LotSizeContainer>
-        <InputField
-          ref={inputRef}
-          id="lotSize"
-          name="lotSize"
-          type="text"
-          placeholder={
-            estimate?.lotSizeSqFt
-              ? estimate.lotSizeSqFt.toString()
-              : 'Enter square footage'
-          }
-          value={lotSizeSqFt}
-          onChange={handleLotSizeChange}
-          onKeyDown={handleTriggerKeyDown}
-          aria-label="Override lot size square footage"
-        />
-      </LotSizeContainer>
+      <AreaAdjuster
+        addressData={addressData}
+        onAreaChange={handleAreaChange}
+        initialPercentage={80}
+      />
 
       <ServiceSelection>
         {services.map((service, index) => (
@@ -180,9 +184,6 @@ export function EstimateCalculator({ addressData }: EstimateCalculatorProps) {
               handleServiceChange(
                 service.value as 'design' | 'installation' | 'maintenance'
               )
-            }
-            onKeyDown={(e: React.KeyboardEvent<HTMLInputElement>) =>
-              handleElementKeyDown(e, index)
             }
             id={`service-${service.value}`}
           />

@@ -13,6 +13,12 @@ export default function Home() {
   const [selectedTier, setSelectedTier] = useState<
     'curb_appeal' | 'full_lawn' | 'dream_lawn'
   >('full_lawn');
+  const [adjustedAreaSqFt, setAdjustedAreaSqFt] = useState<number | null>(null);
+
+  const handleAddressSelect = (address: EnrichedAddressSuggestion | null) => {
+    setAddressData(address);
+    setAdjustedAreaSqFt(null);
+  };
 
   const currentYear = new Date().getFullYear();
 
@@ -25,12 +31,18 @@ export default function Home() {
               addressData={addressData}
               selectedTier={selectedTier}
               onTierSelect={setSelectedTier}
+              lotSizeSqFt={adjustedAreaSqFt ?? undefined}
             />
           </div>
         )}
         <div className="w-full max-w-2xl flex flex-col gap-8 items-center sm:items-start">
-          <AddressInput onAddressSelect={setAddressData} />
-          {addressData && <EstimateCalculator addressData={addressData} />}
+          <AddressInput onAddressSelect={handleAddressSelect} />
+          {addressData && (
+            <EstimateCalculator
+              addressData={addressData}
+              onAreaChange={setAdjustedAreaSqFt}
+            />
+          )}
         </div>
       </div>
 

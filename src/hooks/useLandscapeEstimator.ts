@@ -46,7 +46,9 @@ export function useLandscapeEstimator() {
         });
       }
 
-      const landAreaSqFt = addressData.calc.estimated_landscapable_area;
+      const landAreaSqFt =
+        options?.overrideLotSizeSqFt ||
+        addressData.calc.estimated_landscapable_area;
 
       const latOffset = 0.001;
       const lonOffset = 0.001;

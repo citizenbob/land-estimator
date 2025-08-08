@@ -60,12 +60,13 @@ export const PriceTiers: React.FC<PriceTiersProps> = ({
       ];
 
       const options = {
-        overrideLotSizeSqFt: addressData.calc.estimated_landscapable_area
+        overrideLotSizeSqFt:
+          propLotSizeSqFt ?? addressData.calc.estimated_landscapable_area
       };
 
       calculateTieredEstimate(boundingBox, options);
     }
-  }, [addressData, calculateTieredEstimate]);
+  }, [addressData, propLotSizeSqFt, calculateTieredEstimate]);
 
   const handleTouchStart = (e: React.TouchEvent) => {
     setStartX(e.touches[0].clientX);

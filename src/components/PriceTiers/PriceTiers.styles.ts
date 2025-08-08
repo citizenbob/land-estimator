@@ -35,8 +35,7 @@ export const SwipeWrapper = styled.div<{ $translateX?: number }>`
   gap: ${({ theme }) =>
     getToken(theme, 'spacing.base.value', tokens.spacing.base.value)};
   padding: ${({ theme }) =>
-      getToken(theme, 'spacing.base.value', tokens.spacing.base.value)}
-    0 0 0;
+    getToken(theme, 'spacing.xl.value', tokens.spacing.xl.value)};
   scrollbar-width: none;
 
   &::-webkit-scrollbar {
