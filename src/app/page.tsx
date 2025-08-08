@@ -4,22 +4,37 @@ import React, { useState } from 'react';
 import AddressInput from '@components/AddressInput/AddressInput';
 import { EnrichedAddressSuggestion } from '@app-types/localAddressTypes';
 import { EstimateCalculator } from '@components/EstimateCalculator/EstimateCalculator';
+import { PriceTiers } from '@components/PriceTiers/PriceTiers';
 import Icon from '@components/Icon/Icon';
 
 export default function Home() {
   const [addressData, setAddressData] =
     useState<EnrichedAddressSuggestion | null>(null);
+  const [selectedTier, setSelectedTier] = useState<
+    'curb_appeal' | 'full_lawn' | 'dream_lawn'
+  >('full_lawn');
 
   const currentYear = new Date().getFullYear();
 
   return (
-    <div className="grid grid-rows-[20px_1fr_auto] items-center justify-items-center min-h-screen p-8 pb-4 gap-16 sm:p-20 font-[family-name:var(--font-geist-sans)]">
-      <main className="flex flex-col gap-8 row-start-2 items-center sm:items-start w-full max-w-2xl">
-        <AddressInput onAddressSelect={setAddressData} />
-        {addressData && <EstimateCalculator addressData={addressData} />}
-      </main>
+    <div className="min-h-screen flex flex-col p-8 pb-4 gap-8 sm:p-20 font-[family-name:var(--font-geist-sans)]">
+      <div className="flex-1 flex flex-col items-center justify-center gap-8">
+        {addressData && (
+          <div className="w-full">
+            <PriceTiers
+              addressData={addressData}
+              selectedTier={selectedTier}
+              onTierSelect={setSelectedTier}
+            />
+          </div>
+        )}
+        <div className="w-full max-w-2xl flex flex-col gap-8 items-center sm:items-start">
+          <AddressInput onAddressSelect={setAddressData} />
+          {addressData && <EstimateCalculator addressData={addressData} />}
+        </div>
+      </div>
 
-      <footer className="row-start-3 w-full border-t border-gray-200 mt-12 pt-6 pb-4">
+      <footer className="w-full border-t border-gray-200 mt-12 pt-6 pb-4">
         <div className="max-w-6xl mx-auto px-4">
           <div className="flex flex-col md:flex-row justify-between items-center gap-4">
             <div className="flex flex-col items-center md:items-start">
